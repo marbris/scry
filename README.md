@@ -57,6 +57,45 @@ ln -s "$(pwd)/scryfall-tui" ~/.local/bin/scryfall-tui
 
 Make sure `~/.local/bin` is in your `$PATH`.
 
+### macOS
+
+Download the latest binary from [Releases](https://github.com/YOURUSER/scryfall-tui/releases):
+
+- Apple Silicon (M1/M2/M3): `scryfall-tui-darwin-arm64`
+- Intel Mac: `scryfall-tui-darwin-amd64`
+
+```bash
+chmod +x scryfall-tui-darwin-arm64
+xattr -d com.apple.quarantine scryfall-tui-darwin-arm64
+mv scryfall-tui-darwin-arm64 /usr/local/bin/scryfall-tui
+```
+
+Or build from source:
+
+```bash
+brew install go
+git clone https://github.com/YOURUSER/scryfall-tui.git
+cd scryfall-tui
+go build -o scryfall-tui .
+mv scryfall-tui /usr/local/bin/
+```
+
+### Windows
+
+Download `scryfall-tui-windows-amd64.exe` from [Releases](https://github.com/YOURUSER/scryfall-tui/releases) and add it to your PATH.
+
+### Linux (other distros)
+
+Download the latest binary from [Releases](https://github.com/YOURUSER/scryfall-tui/releases):
+
+- x86_64: `scryfall-tui-linux-amd64`
+- ARM64: `scryfall-tui-linux-arm64`
+
+```bash
+chmod +x scryfall-tui-linux-amd64
+mv scryfall-tui-linux-amd64 ~/.local/bin/scryfall-tui
+```
+
 ## Usage
 
 ### Interactive mode
