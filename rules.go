@@ -630,22 +630,6 @@ func rulesFilePath() string {
 	return filepath.Join(dataDir(), "comprules.txt")
 }
 
-// adoptLegacyRules copies the rules text over from the standalone
-// mtg-rules cache the first time, rather than re-downloading a megabyte.
-// The old file is left in place so that tool keeps working.
-func adoptLegacyRules() {
-	path := rulesFilePath()
-	if _, err := os.Stat(path); err == nil {
-		return
-	}
-	legacy := filepath.Join(os.Getenv("HOME"), ".local", "share", "mtg-rules", "comprules.txt")
-	body, err := os.ReadFile(legacy)
-	if err != nil {
-		return
-	}
-	os.WriteFile(path, body, 0644)
-}
-
 func downloadRules() error {
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -682,8 +666,6 @@ func downloadRules() error {
 }
 
 func loadRules() (RulesData, error) {
-	adoptLegacyRules()
-
 	path := rulesFilePath()
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := downloadRules(); err != nil {
