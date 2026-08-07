@@ -485,7 +485,9 @@ func TestPanelModes(t *testing.T) {
 // Each panel keeps its own scroll position.
 func TestPanelScrolling(t *testing.T) {
 	data := loadTestRules(t)
-	m := resultsModel(t, 160, 40, data)
+
+	// A short terminal, so the card panel has more to show than it can fit.
+	m := resultsModel(t, 160, 14, data)
 
 	scrollDown := func(m model) model {
 		return drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
@@ -508,6 +510,28 @@ func TestPanelScrolling(t *testing.T) {
 	m = drive(m, tea.KeyMsg{Type: tea.KeyDown})
 	if m.previewScroll != 0 || m.rulesScroll != 0 {
 		t.Errorf("moving cards left scroll at %d/%d", m.previewScroll, m.rulesScroll)
+	}
+
+	// Scrolling stops at the end of the content rather than running on
+	// into blank space.
+	m = press(m, 'r')
+	for i := 0; i < 200; i++ {
+		m = scrollDown(m)
+	}
+	lines := strings.Count(m.panelContent(m.resultsLayout().panelW-4), "\n") + 1
+	if m.rulesScroll >= lines {
+		t.Errorf("scrolled to line %d of %d lines of content", m.rulesScroll, lines)
+	}
+	atEnd := m.rulesScroll
+	m = scrollDown(m)
+	if m.rulesScroll != atEnd {
+		t.Errorf("scroll moved past the end: %d then %d", atEnd, m.rulesScroll)
+	}
+
+	// A panel that fits doesn't scroll at all.
+	tall := resultsModel(t, 160, 60, data)
+	if got := scrollDown(scrollDown(tall)).previewScroll; got != 0 {
+		t.Errorf("a panel with room to spare scrolled to %d", got)
 	}
 }
 
@@ -1461,5 +1485,53 @@ func TestBarsScaleToTheUnfilteredSet(t *testing.T) {
 	cmc5 := selectedBar(t, walkTo(t, base, "CMC", "5"))
 	if cmc5 <= cmc3 {
 		t.Errorf("CMC 5 (2 cards) drew %d blocks and CMC 3 (1 card) drew %d", cmc5, cmc3)
+	}
+}
+
+func TestStatsScrollLeavesTheSelectionAlone(t *testing.T) {
+	// A short terminal, so the category list runs past the panel.
+	cards := deckFixture()
+	cards[0].tags = []string{"Ramp", "Own"}
+	cards[1].tags = []string{"Ramp"}
+	cards[3].tags = []string{"Land"}
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 16})
+	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Tagged", total: 34}, cards: cards})
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m = walkTo(t, m, "Type", "Creature")
+
+	was, wasFilter := m.statIndex, m.statFilterLabel()
+	narrowed := len(m.resultList.Items())
+
+	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlD})
+	if m.previewScroll == 0 {
+		t.Fatal("ctrl+d did not scroll the statistics panel")
+	}
+	if m.statIndex != was || m.statFilterLabel() != wasFilter {
+		t.Errorf("scrolling moved the selection from %d/%s to %d/%s",
+			was, wasFilter, m.statIndex, m.statFilterLabel())
+	}
+	if len(m.resultList.Items()) != narrowed {
+		t.Error("scrolling changed which cards are listed")
+	}
+
+	scrolled := m.previewScroll
+	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+	if m.previewScroll >= scrolled {
+		t.Errorf("ctrl+u did not scroll back: %d then %d", scrolled, m.previewScroll)
+	}
+	if m.statIndex != was {
+		t.Error("scrolling back moved the selection")
+	}
+
+	// Moving the selection again brings it back into view.
+	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlD})
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	line := statLine(m.statPanel(), m.statIndex)
+	height := m.resultsLayout().panelH - 1
+	if line < m.previewScroll || line >= m.previewScroll+height {
+		t.Errorf("selected row on line %d is outside the visible %d..%d",
+			line, m.previewScroll, m.previewScroll+height-1)
 	}
 }

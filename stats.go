@@ -200,12 +200,14 @@ func tagRows(entries []cardItem) []statRow {
 // and so hold still, while the numbers beside them describe just the cards
 // on screen — a category with nothing left in it stays put and reads zero.
 func statGroups(rowSource, counted []cardItem) []statGroup {
+	// Most telling first: what the deck's author called their cards, then
+	// what those cards are, and the printing details last.
 	groups := []statGroup{
-		{title: "Color", rows: colorRows()},
-		{title: "Rarity", rows: rarityRows(rowSource)},
-		{title: "CMC (Mana Value)", rows: cmcRows()},
-		{title: "Type", rows: typeRows()},
 		{title: "Tags", rows: tagRows(rowSource)},
+		{title: "Type", rows: typeRows()},
+		{title: "Color", rows: colorRows()},
+		{title: "CMC (Mana Value)", rows: cmcRows()},
+		{title: "Rarity", rows: rarityRows(rowSource)},
 	}
 
 	out := make([]statGroup, 0, len(groups))

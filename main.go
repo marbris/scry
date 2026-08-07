@@ -530,6 +530,9 @@ KEYS — RESULTS
   J/K, shift+↑/↓          Scroll the panel — in the statistics panel,
                           walk the categories and filter the cards to
                           whichever one the cursor is on
+  ctrl+d / ctrl+u         Scroll the panel half a screen; in the
+                          statistics panel this moves the view without
+                          moving the selected category
   r                       Rules for this card (again for the card view)
   s                       Statistics for these results (again for the card).
                           J/K there filters to a colour, rarity, mana
@@ -1202,37 +1205,28 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "w":
 			return m.saveCurrentDeck(), nil
 		case "J", "shift+down":
-			switch m.panel {
-			case panelStats:
-				// The statistics panel is a list rather than a wall of
-				// text, so J/K walks its categories and filters to them.
+			// The statistics panel is a list rather than a wall of text,
+			// so J/K walks its categories and filters to them.
+			if m.panel == panelStats {
 				return m.statMove(1)
-			case panelRules:
-				m.rulesScroll++
-			case panelHistory:
-				m.historyScroll++
-			default:
-				m.previewScroll++
 			}
-			return m, nil
+			return m.scrollPanel(1), nil
 		case "K", "shift+up":
-			switch m.panel {
-			case panelStats:
+			if m.panel == panelStats {
 				return m.statMove(-1)
-			case panelRules:
-				if m.rulesScroll > 0 {
-					m.rulesScroll--
-				}
-			case panelHistory:
-				if m.historyScroll > 0 {
-					m.historyScroll--
-				}
-			default:
-				if m.previewScroll > 0 {
-					m.previewScroll--
-				}
 			}
-			return m, nil
+			return m.scrollPanel(-1), nil
+		case "ctrl+d", "ctrl+u":
+			// Scrolling the panel proper, which in the statistics panel
+			// means moving the view without moving the selected category.
+			step := (m.resultsLayout().panelH - 1) / 2
+			if step < 1 {
+				step = 1
+			}
+			if msg.String() == "ctrl+u" {
+				step = -step
+			}
+			return m.scrollPanel(step), nil
 		case "enter":
 			// Open the rules browser scoped to this card's keywords.
 			if item, ok := m.resultList.SelectedItem().(cardItem); ok {
@@ -1596,22 +1590,8 @@ func (m model) viewResults() string {
 	// given, which would reflow everything beside it.
 	listView := lipgloss.NewStyle().MaxWidth(l.listW).Render(m.resultList.View())
 
-	card, _ := m.resultList.SelectedItem().(cardItem)
-	inner := l.panelW - 4
-
-	var content string
-	var scroll int
-	switch m.panel {
-	case panelStats:
-		content, scroll = m.renderStats(inner), m.previewScroll
-	case panelRules:
-		content, scroll = m.renderCardRules(card.card, inner), m.rulesScroll
-	case panelHistory:
-		content, scroll = m.renderTextHistory(card.card, inner), m.historyScroll
-	default:
-		content, scroll = m.renderPreview(card.card, inner), m.previewScroll
-	}
-	panel := scrollView(content, scroll, l.panelH-1) + "\n" + m.panelHint()
+	panel := scrollView(m.panelContent(l.panelW-4), m.panelScroll(), l.panelH-1) +
+		"\n" + m.panelHint()
 
 	var body string
 	if l.vertical {
@@ -1629,6 +1609,64 @@ func (m model) viewResults() string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, m.resultsHeader(), body)
+}
+
+// panelContent renders whichever panel is on screen.
+func (m model) panelContent(inner int) string {
+	card, _ := m.resultList.SelectedItem().(cardItem)
+
+	switch m.panel {
+	case panelStats:
+		return m.renderStats(inner)
+	case panelRules:
+		return m.renderCardRules(card.card, inner)
+	case panelHistory:
+		return m.renderTextHistory(card.card, inner)
+	default:
+		return m.renderPreview(card.card, inner)
+	}
+}
+
+// panelScroll is how far the panel on screen is scrolled. The card and
+// statistics panels share an offset — only one of them is ever showing.
+func (m model) panelScroll() int {
+	switch m.panel {
+	case panelRules:
+		return m.rulesScroll
+	case panelHistory:
+		return m.historyScroll
+	default:
+		return m.previewScroll
+	}
+}
+
+// scrollPanel moves the panel on screen by delta lines, without disturbing
+// anything it has selected — the statistics panel keeps its category.
+func (m model) scrollPanel(delta int) model {
+	l := m.resultsLayout()
+
+	// Stop at the bottom of the content rather than scrolling into blank.
+	maxScroll := strings.Count(m.panelContent(l.panelW-4), "\n") - (l.panelH - 1) + 1
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+
+	target := &m.previewScroll
+	switch m.panel {
+	case panelRules:
+		target = &m.rulesScroll
+	case panelHistory:
+		target = &m.historyScroll
+	}
+
+	*target += delta
+	if *target > maxScroll {
+		*target = maxScroll
+	}
+	if *target < 0 {
+		*target = 0
+	}
+	return m
 }
 
 // panelBox frames the panel beside (or below) the result list.
@@ -1659,7 +1697,7 @@ func (m model) panelHint() string {
 	parts := []string{"J/K: scroll"}
 	switch m.panel {
 	case panelStats:
-		parts = []string{"J/K: category", "s: card", "r: rules"}
+		parts = []string{"J/K: category", "^d/^u: scroll", "s: card"}
 		if m.statFilter != nil {
 			parts = append(parts, "esc: clear")
 		}

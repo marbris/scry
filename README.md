@@ -40,9 +40,17 @@ Search results with the card panel alongside — oracle text highlighted, ruling
 
 ![Rules for the selected card](screenshots/rules.png)
 
-`s` shows statistics across the whole result set: colour, rarity, mana value and type.
+A public Moxfield deck opened by URL — the deck reads in decklist order, and its cards behave like any other result.
 
-![Statistics for the result set](screenshots/statistics.png)
+![A Moxfield deck](screenshots/moxfield_deck.png)
+
+`s` breaks the list down by the author's tags, type, colour, mana value and rarity.
+
+![Statistics for a deck](screenshots/statistics.png)
+
+`J/K` walks those categories and narrows the cards to whichever one it's on — here the deck's removal, with the breakdown re-cut for just those sixteen cards. Categories the filter has emptied hold their places at zero, and the bars stay scaled to the whole deck.
+
+![Filtering by a statistics category](screenshots/filter_stats.png)
 
 `t` shows how the card's printed wording changed across its printings, one entry per distinct wording.
 
@@ -258,7 +266,7 @@ Cards    100 cards · 86 unique  ▸ Tags: Aura
 
 The histograms redraw for whichever cards the selected category leaves on screen: land on **White** and every bar describes the white cards — their curve, their rarities, their types. Walking further re-cuts the same view again.
 
-Categories the filter has emptied keep their places and read zero rather than disappearing, so nothing shifts under the cursor and you can always walk back out. `esc` clears the filter; the header shows which one is active until you do.
+Categories the filter has emptied keep their places and read zero rather than disappearing, so nothing shifts under the cursor and you can always walk back out. Bars stay scaled to the unfiltered set, so a small category reads as small rather than refilling the panel. `ctrl+d` / `ctrl+u` scroll a long breakdown without moving the selected category; `esc` clears the filter, and the header shows which one is active until you do.
 
 ```
 Statistics (30 cards) · Color: White      Statistics (12 cards) · Tags: Aura
@@ -322,6 +330,7 @@ scry "t:dragon c:R"
 | `i` | Edit the search query |
 | `esc` | Clear the filter — or quit, if there isn't one |
 | `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
+| `ctrl+d` / `ctrl+u` | Scroll the panel half a screen, leaving the selection put |
 | `r` | Rules for this card (press again for the card view) |
 | `s` | Statistics for these results (press again for the card view) |
 | `t` | Printed text history (press again for the card view) |
