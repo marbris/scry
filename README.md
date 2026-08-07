@@ -26,6 +26,32 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 - **Built-in syntax reference** — press `?` for a comprehensive Scryfall syntax guide focused on Commander
 - **Gruvbox dark theme**
 
+## Screenshots
+
+Search results with the card panel alongside — oracle text highlighted, rulings loaded for whichever card is under the cursor.
+
+![Results and card panel](screenshots/results.png)
+
+`r` swaps the panel for the comprehensive rules the card's text invokes — keyword abilities, keyword actions, ability words and the glossary entries behind them.
+
+![Rules for the selected card](screenshots/rules.png)
+
+`s` shows statistics across the whole result set: colour, rarity, mana value and type.
+
+![Statistics for the result set](screenshots/statistics.png)
+
+`t` shows how the card's printed wording changed across its printings, one entry per distinct wording.
+
+![Printed text history](screenshots/card_text_history.png)
+
+`enter` opens the full rules browser on the rules that card matched, with the rule text and its cross-references on the right.
+
+![Rules browser](screenshots/browse_rules.png)
+
+A query that returns exactly one card prints straight to stdout — same highlighting, no TUI.
+
+![Quick lookup](screenshots/quick_lookup.png)
+
 ## Install
 
 ### From source
@@ -126,28 +152,35 @@ Runs the query straight away — the search bar shows it at the top while the re
 If your query returns exactly one card, the details are printed to stdout without opening the TUI — with the same syntax highlighting the TUI uses, including the card's rulings:
 
 ```
-$ scry maarika
-Maarika, Brutal Gladiator  2BRG
-Legendary Creature — Human Warrior
-P/T: 7/4
-Universes Within · rare · CMC 5
-EDHREC Rank: #10333
+$ scry ghen
+Ghen, Arcanum Weaver  RWB
+Legendary Creature — Human Wizard
+P/T: 2/3
+Commander Legends · rare · CMC 3
+EDHREC Rank: #9208
 
 Oracle Text
-Maarika, Brutal Gladiator must be blocked if able.
-As long as it's your turn, Maarika has indestructible.
-Whenever Maarika deals damage to a creature, if that creature was dealt excess
-damage this turn, that creature's controller sacrifices a noncreature, nonland
-permanent.
+{R}{W}{B}, {T}, Sacrifice an enchantment: Return target enchantment card from
+your graveyard to the battlefield.
 
-Rulings
-  none
+Rulings (2)
+  • Because targets are chosen before costs are paid (such as the cost of
+    sacrificing an enchantment), Ghen's ability can't target the enchantment
+    you intend to sacrifice to activate its ability.
+  • An Aura put onto the battlefield this way doesn't target anything (so it
+    could be attached to an opponent's permanent with hexproof, for example),
+    but the Aura's enchant ability restricts what it can be attached to. If
+    the Aura can't legally be attached to anything, it remains in your
+    graveyard.
 
 Legalities
   ✘ standard
+  ✘ pioneer
+  ✘ modern
   ✔ legacy
   ✔ vintage
   ✔ commander
+  ✘ pauper
 ```
 
 The text wraps to your terminal width, and the colour is dropped automatically when the output is piped or redirected.
