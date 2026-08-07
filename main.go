@@ -37,7 +37,7 @@ var (
 
 const (
 	// Sent to Scryfall, Moxfield, MTGJSON and Wizards alike.
-	userAgent = "scry/2.0"
+	userAgent = "scry/2.1"
 
 	// Below this width the panel sits under the list instead of beside it
 	compactWidth = 120
