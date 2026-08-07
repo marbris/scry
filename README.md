@@ -32,6 +32,10 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 
 ## Screenshots
 
+A query that returns exactly one card prints straight to stdout — same highlighting, no TUI.
+
+![Quick lookup](screenshots/quick_lookup.png)
+
 Search results with the card panel alongside — oracle text highlighted, rulings loaded for whichever card is under the cursor.
 
 ![Results and card panel](screenshots/results.png)
@@ -39,6 +43,14 @@ Search results with the card panel alongside — oracle text highlighted, ruling
 `r` swaps the panel for the comprehensive rules the card's text invokes — keyword abilities, keyword actions, ability words and the glossary entries behind them.
 
 ![Rules for the selected card](screenshots/rules.png)
+
+`enter` opens the full rules browser on the rules that card matched, with the rule text and its cross-references on the right.
+
+![Rules browser](screenshots/browse_rules.png)
+
+`t` shows how the card's printed wording changed across its printings, one entry per distinct wording.
+
+![Printed text history](screenshots/card_text_history.png)
 
 A public Moxfield deck opened by URL — the deck reads in decklist order, and its cards behave like any other result.
 
@@ -51,18 +63,6 @@ A public Moxfield deck opened by URL — the deck reads in decklist order, and i
 `J/K` walks those categories and narrows the cards to whichever one it's on — here the deck's removal, with the breakdown re-cut for just those sixteen cards. Categories the filter has emptied hold their places at zero, and the bars stay scaled to the whole deck.
 
 ![Filtering by a statistics category](screenshots/filter_stats.png)
-
-`t` shows how the card's printed wording changed across its printings, one entry per distinct wording.
-
-![Printed text history](screenshots/card_text_history.png)
-
-`enter` opens the full rules browser on the rules that card matched, with the rule text and its cross-references on the right.
-
-![Rules browser](screenshots/browse_rules.png)
-
-A query that returns exactly one card prints straight to stdout — same highlighting, no TUI.
-
-![Quick lookup](screenshots/quick_lookup.png)
 
 ## Install
 
@@ -202,8 +202,8 @@ The text wraps to your terminal width, and the colour is dropped automatically w
 Any public [Moxfield](https://moxfield.com/) deck can be opened as a result list:
 
 ```bash
-scry deck j-0aJlxuOUm9FnKRvJcfZw            # the id out of the deck's URL
-scry https://moxfield.com/decks/j-0aJlxuOUm9FnKRvJcfZw
+scry deck zJ0qPOnI2UqykOwmeIUixg            # the id out of the deck's URL
+scry https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
 ```
 
 or paste the URL into the search bar instead of a query.
@@ -211,13 +211,16 @@ or paste the URL into the search bar instead of a query.
 The deck reads in decklist order — commanders, then creatures, spells and lands, alphabetically within each — with repeat copies shown as `30x Mountain`. Everything the results view does works on a deck's cards: `r` for the rules a card invokes, `s` for the deck's curve and colour spread, `t` for printed text history, `/` to filter, `enter` to browse matched rules.
 
 ```
-⌕ https://moxfield.com/decks/j-0aJlxuOUm9FnKRvJcfZw
-Deck     Winota: Snowball Stax  by ComedIan  · commander
-Cards    100 cards · 98 unique
-──────────────────────────────────────────────────────────────
-▸ Winota, Joiner of Forces        2RW     Legendary Creature — …
-  Ainok Strike Leader             1W      Creature — Dog Warrior
-  Alexios, Deimos of Kosmos       3R      Legendary Creature — …
+⌕ https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
+Deck     👑-Marchesa d'Amati, First of her Name: …  by Breezykiwi  · commander
+  Cards    100 cards · 93 unique
+──────────────────────────────────────────────────────────────────────────────────
+Queen Marchesa         1RWB    Legendary Creature — Human Assassin
+Brash Taunter          4R      Creature — Goblin                  
+Breena, the Demagogue  1WB     Legendary Creature — Bird Warlock  
+Flumph                 1W      Creature — Jellyfish               
+Generous Plunderer     1R      Creature — Human Rogue             
+...
 ```
 
 Only the command zone and mainboard are loaded; sideboards and maybeboards are skipped. Moxfield stores a Scryfall id per card, so the deck request only supplies ids and quantities — the card data itself comes from Scryfall, which is why rulings, highlighting and rules matching all work unchanged. A 100-card deck is one Moxfield request plus two Scryfall lookups.
@@ -229,10 +232,10 @@ Private and unlisted decks aren't accessible; the deck has to be public.
 Press `w` on a deck to save it under a name made from its title, or name it yourself from the shell:
 
 ```bash
-scry deck save ghen https://moxfield.com/decks/pdxwlkCOVkSQB2-6FYBvog
-scry deck ghen          # open it again
-scry deck list          # what's saved
-scry deck rm ghen       # forget it
+scry deck save marchesa-political https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
+scry deck marchesa-political      # open it again
+scry deck list                    # what's saved
+scry deck rm marchesa-political   # forget it
 ```
 
 Saved decks live in `~/.local/share/scry/decks.json` and hold only the name and address — the deck itself is re-fetched each time, so an edited deck comes back current rather than stale.
@@ -243,11 +246,10 @@ If the deck's author tagged their cards on Moxfield — `Ramp`, `Removal`, `Prot
 
 ```
 Tags
-  Land          ██████████████████████████████████████████ 37
-  Aura          ████████████████ 12
-  ETB/LTB       ██████████ 8
-  Ramp          ██████████ 8
-  Own           █████████ 7
+  D.) Lands                     █████████████████████████████████████████ 38   
+  H.) Sunforger-Toolbox         ████████████████████████████ 26                
+  A.) Card Advantage/Selection  █████████████████ 16                           
+  C.) Removal/Interaction       █████████████████ 16
 ```
 
 Tags are per deck and set by whoever built it, so an untagged deck simply doesn't show the section.
@@ -257,11 +259,14 @@ Tags are per deck and set by whoever built it, so an untagged deck simply doesn'
 `s` swaps the card panel for a breakdown of everything in the list — colour, rarity, mana value, type, and the author's tags if it's a tagged deck. The breakdown is a list in its own right: `J/K` walks it, and the cards narrow to whichever category the cursor is on.
 
 ```
-Cards    100 cards · 86 unique  ▸ Tags: Aura
-──────────────────────────────────────────────────────────────
-▸ Chime of Night        1B    Enchantment — Aura  │  Tags
-  Darksteel Mutation    1W    Enchantment — Aura  │    Land   ████████████████ 37
-  Despondency           1B    Enchantment — Aura  │  ▸ Aura   ██████ 12
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                        │   Statistics (16 cards) · Tags: C.) Removal/Interaction
+16 items                                                                │
+                                                                        │  Tags
+Loran of the Third Path  2W          Legendary Creature — Human Artific…│    D.) Lands                                0
+Anguished Unmaking       1WB         Instant                            │    H.) Sunforger-Toolbox                   ███████████████ 14
+Excise the Imperfect     1WW         Instant                            │    A.) Card Advantage/Selection            █ 1
+Fire Covenant            1BR         Instant                            │  ▸ C.) Removal/Interaction                 █████████████████ 16
 ```
 
 The histograms redraw for whichever cards the selected category leaves on screen: land on **White** and every bar describes the white cards — their curve, their rarities, their types. Walking further re-cuts the same view again.
