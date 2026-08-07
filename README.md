@@ -4,7 +4,7 @@ A terminal UI for looking up [Magic: The Gathering](https://magic.wizards.com/) 
 
 Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the rules and glossary from the official [comprehensive rules](https://magic.wizards.com/en/rules), and the printed text of older printings from [MTGJSON](https://mtgjson.com/). *Scry* is a keyword action in its own right — rule 701.22, "look at the top card of your library" — which is roughly what this does.
 
-![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
 
@@ -30,7 +30,7 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 
 ### From source
 
-Requires [Go 1.21+](https://go.dev/dl/).
+Requires [Go 1.26+](https://go.dev/dl/) — that's what `go.mod` asks for.
 
 ```bash
 git clone https://github.com/marbris/scry.git
