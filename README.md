@@ -160,7 +160,7 @@ scry rules flying       # open pre-filtered
 scry rules update       # re-download the latest rules text
 ```
 
-The rules text is cached in `~/.local/share/scry/comprules.txt` and downloaded on first use. (Upgrading from the old `scryfall-tui` name? The printed-text cache is moved over from `~/.local/share/scryfall-tui/`, so nothing is re-downloaded.)
+The rules text is cached in `~/.local/share/scry/comprules.txt` and downloaded on first use.
 
 ### Example queries
 

@@ -221,19 +221,6 @@ func downloadSetOriginals(set string) (map[string]string, error) {
 
 func originalsDir() string {
 	dir := filepath.Join(dataDir(), "originals")
-
-	// Move the cache over from the pre-rename location, once.
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		legacy := filepath.Join(os.Getenv("HOME"), ".local", "share", "scryfall-tui", "originals")
-		if _, err := os.Stat(legacy); err == nil {
-			os.MkdirAll(filepath.Dir(dir), 0755)
-			if os.Rename(legacy, dir) == nil {
-				os.Remove(filepath.Dir(legacy))
-				return dir
-			}
-		}
-	}
-
 	os.MkdirAll(dir, 0755)
 	return dir
 }
