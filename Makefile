@@ -1,4 +1,4 @@
-APP=scryfall-tui
+APP=scry
 VERSION=1.0.0
 
 build:
