@@ -21,7 +21,11 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 - **Oracle text highlighting** — mana and tap symbols, keyword abilities, keyword actions, ability words, reminder text, loyalty costs and P/T modifiers, all coloured
 - **Printed text history** — press `t` to see how a card's wording changed across its printings, from Alpha to today (via MTGJSON, since Scryfall only serves current oracle text)
 - **Comprehensive rules built in** — press `r` to swap the card panel for the rules its text invokes, and browse the full rulebook and glossary (merged in from `mtg-rules`)
+- **Statistics you can filter by** — `s` breaks the results down by colour, rarity, mana value and type; `J/K` walks those categories, narrows the list to whichever one you're on, and re-cuts every histogram for what's left
 - **Configurable sort** — cycle sort orders; every search returns up to 175 cards
+- **Moxfield decks** — paste a public deck URL (or `scry deck <id>`) to browse someone's list, with every card behaving like a search result; save decks by name and reopen them with `scry deck <name>`
+- **Deck tags in statistics** — the author's own card tags come down with the deck and get their own breakdown
+- **Both faces of double-faced cards** — transforming and modal cards show each side's cost, type, P/T and rules text
 - **Quick lookup mode** — pass a query that returns one card and get plain text output, no TUI
 - **Built-in syntax reference** — press `?` for a comprehensive Scryfall syntax guide focused on Commander
 - **Gruvbox dark theme**
@@ -185,6 +189,89 @@ Legalities
 
 The text wraps to your terminal width, and the colour is dropped automatically when the output is piped or redirected.
 
+### Moxfield decks
+
+Any public [Moxfield](https://moxfield.com/) deck can be opened as a result list:
+
+```bash
+scry deck j-0aJlxuOUm9FnKRvJcfZw            # the id out of the deck's URL
+scry https://moxfield.com/decks/j-0aJlxuOUm9FnKRvJcfZw
+```
+
+or paste the URL into the search bar instead of a query.
+
+The deck reads in decklist order — commanders, then creatures, spells and lands, alphabetically within each — with repeat copies shown as `30x Mountain`. Everything the results view does works on a deck's cards: `r` for the rules a card invokes, `s` for the deck's curve and colour spread, `t` for printed text history, `/` to filter, `enter` to browse matched rules.
+
+```
+⌕ https://moxfield.com/decks/j-0aJlxuOUm9FnKRvJcfZw
+Deck     Winota: Snowball Stax  by ComedIan  · commander
+Cards    100 cards · 98 unique
+──────────────────────────────────────────────────────────────
+▸ Winota, Joiner of Forces        2RW     Legendary Creature — …
+  Ainok Strike Leader             1W      Creature — Dog Warrior
+  Alexios, Deimos of Kosmos       3R      Legendary Creature — …
+```
+
+Only the command zone and mainboard are loaded; sideboards and maybeboards are skipped. Moxfield stores a Scryfall id per card, so the deck request only supplies ids and quantities — the card data itself comes from Scryfall, which is why rulings, highlighting and rules matching all work unchanged. A 100-card deck is one Moxfield request plus two Scryfall lookups.
+
+Private and unlisted decks aren't accessible; the deck has to be public.
+
+#### Saving decks
+
+Press `w` on a deck to save it under a name made from its title, or name it yourself from the shell:
+
+```bash
+scry deck save ghen https://moxfield.com/decks/pdxwlkCOVkSQB2-6FYBvog
+scry deck ghen          # open it again
+scry deck list          # what's saved
+scry deck rm ghen       # forget it
+```
+
+Saved decks live in `~/.local/share/scry/decks.json` and hold only the name and address — the deck itself is re-fetched each time, so an edited deck comes back current rather than stale.
+
+#### Card tags
+
+If the deck's author tagged their cards on Moxfield — `Ramp`, `Removal`, `Protection` — those tags come down with the deck and get their own breakdown in the statistics panel, counted by copies and commonest first:
+
+```
+Tags
+  Land          ██████████████████████████████████████████ 37
+  Aura          ████████████████ 12
+  ETB/LTB       ██████████ 8
+  Ramp          ██████████ 8
+  Own           █████████ 7
+```
+
+Tags are per deck and set by whoever built it, so an untagged deck simply doesn't show the section.
+
+### Statistics as a filter
+
+`s` swaps the card panel for a breakdown of everything in the list — colour, rarity, mana value, type, and the author's tags if it's a tagged deck. The breakdown is a list in its own right: `J/K` walks it, and the cards narrow to whichever category the cursor is on.
+
+```
+Cards    100 cards · 86 unique  ▸ Tags: Aura
+──────────────────────────────────────────────────────────────
+▸ Chime of Night        1B    Enchantment — Aura  │  Tags
+  Darksteel Mutation    1W    Enchantment — Aura  │    Land   ████████████████ 37
+  Despondency           1B    Enchantment — Aura  │  ▸ Aura   ██████ 12
+```
+
+The histograms redraw for whichever cards the selected category leaves on screen: land on **White** and every bar describes the white cards — their curve, their rarities, their types. Walking further re-cuts the same view again.
+
+Categories the filter has emptied keep their places and read zero rather than disappearing, so nothing shifts under the cursor and you can always walk back out. `esc` clears the filter; the header shows which one is active until you do.
+
+```
+Statistics (30 cards) · Color: White      Statistics (12 cards) · Tags: Aura
+
+Color                                     Type
+▸ White       ██████████████████ 30         Creature      0
+  Black       ██ 2                          Instant       0
+  Red         █ 1                           Sorcery       0
+  Colorless    0                            Artifact      0
+  Multi       ██ 2                          Enchantment ██████████ 12
+                                            Land          0
+```
+
 ### Rules browser
 
 ```bash
@@ -220,7 +307,7 @@ scry "t:dragon c:R"
 
 | Key | Action |
 |---|---|
-| `enter` | Run search, then move to the results |
+| `enter` | Run search — or load the deck, if the text is a Moxfield URL |
 | `tab` / `shift+tab` | Cycle sort order |
 | `↑/↓` | Move through the results while typing |
 | `ctrl+r` | Browse the comprehensive rules |
@@ -232,11 +319,13 @@ scry "t:dragon c:R"
 |---|---|
 | `↑/↓` or `j/k` | Navigate list |
 | `/` | Fuzzy filter (searches name + oracle text) |
-| `i` or `esc` | Edit the search query |
-| `J/K` or `shift+↑/↓` | Scroll the panel |
+| `i` | Edit the search query |
+| `esc` | Clear the filter — or quit, if there isn't one |
+| `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
 | `r` | Rules for this card (press again for the card view) |
 | `s` | Statistics for these results (press again for the card view) |
 | `t` | Printed text history (press again for the card view) |
+| `w` | Save the current deck (decks only) |
 | `enter` | Browse the rules this card's text matched |
 | `ctrl+r` | Browse all comprehensive rules |
 | `?` | Scryfall syntax reference |
@@ -329,6 +418,7 @@ Keyword highlighting and the rules panel are driven by the official comprehensiv
 - [Scryfall API](https://scryfall.com/docs/api) — card data
 - [Magic Comprehensive Rules](https://magic.wizards.com/en/rules) — rules text and glossary
 - [MTGJSON](https://mtgjson.com/) — per-printing printed text
+- [Moxfield](https://moxfield.com/) — public deck lists
 
 ## Acknowledgments
 

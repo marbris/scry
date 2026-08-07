@@ -281,10 +281,11 @@ func buildRevisions(c ScryfallCard, printings []printing, originals map[string]m
 
 	// The current oracle wording is the last revision, whether or not any
 	// printing carries it verbatim.
-	if n := len(revs); n > 0 && sameText(revs[n-1].Text, c.OracleText) {
+	current := c.combinedOracle()
+	if n := len(revs); n > 0 && sameText(revs[n-1].Text, current) {
 		revs[n-1].Current = true
-	} else if c.OracleText != "" {
-		revs = append(revs, TextRevision{Text: c.OracleText, Current: true})
+	} else if current != "" {
+		revs = append(revs, TextRevision{Text: current, Current: true})
 	}
 
 	return revs

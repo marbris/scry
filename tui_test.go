@@ -677,3 +677,789 @@ func TestHistoryAssemblesFromCachedSets(t *testing.T) {
 		}
 	}
 }
+
+// ── Moxfield decks ──────────────────────────────────────────────
+
+func TestDeckReferenceParsing(t *testing.T) {
+	urls := map[string]string{
+		"https://moxfield.com/decks/j-0aJlxuOUm9FnKRvJcfZw": "j-0aJlxuOUm9FnKRvJcfZw",
+		"https://www.moxfield.com/decks/Y8dZ7":              "Y8dZ7",
+		"http://moxfield.com/decks/Y8dZ7/primer":            "Y8dZ7",
+		"moxfield.com/decks/Y8dZ7?utm_source=x":             "Y8dZ7",
+		"  https://moxfield.com/decks/Y8dZ7  ":              "Y8dZ7",
+	}
+	for in, want := range urls {
+		got, ok := moxfieldURLID(in)
+		if !ok || got != want {
+			t.Errorf("moxfieldURLID(%q) = %q, %t; want %q, true", in, got, ok, want)
+		}
+	}
+
+	// A bare word is a Scryfall query, not a deck — otherwise typing a card
+	// name in the search bar would try to load a deck.
+	for _, in := range []string{"ghen", "t:dragon c:R", "", "archidekt.com/decks/123"} {
+		if id, ok := moxfieldURLID(in); ok {
+			t.Errorf("moxfieldURLID(%q) = %q, true; want no match", in, id)
+		}
+	}
+
+	// `scry deck` is explicit, so it takes the bare id too.
+	if id, ok := deckRef("Y8dZ7"); !ok || id != "Y8dZ7" {
+		t.Errorf("deckRef(bare id) = %q, %t; want Y8dZ7, true", id, ok)
+	}
+	if id, ok := deckRef("https://moxfield.com/decks/Y8dZ7"); !ok || id != "Y8dZ7" {
+		t.Errorf("deckRef(url) = %q, %t; want Y8dZ7, true", id, ok)
+	}
+	if _, ok := deckRef("t:dragon c:R"); ok {
+		t.Error("deckRef accepted a query with spaces")
+	}
+}
+
+func TestPrimaryTypePicksOneSection(t *testing.T) {
+	cases := map[string]string{
+		"Legendary Creature — Human Warrior": "Creature",
+		"Artifact Creature — Golem":          "Creature",
+		"Enchantment Creature — Nightmare":   "Creature",
+		"Artifact Land":                      "Land",
+		"Land Creature — Forest Dryad":       "Creature",
+		"Legendary Enchantment Land":         "Land",
+		"Instant":                            "Instant",
+		"Legendary Planeswalker — Teferi":    "Planeswalker",
+		"Sorcery // Land":                    "Sorcery",
+		"Basic Land — Mountain":              "Land",
+		"Dungeon":                            "Other",
+	}
+	for line, want := range cases {
+		if got := primaryType(line); got != want {
+			t.Errorf("primaryType(%q) = %q, want %q", line, got, want)
+		}
+	}
+}
+
+// deckFixture is a small deck covering the things grouping has to get right:
+// a commander, repeat copies, and more than one section.
+func deckFixture() []deckCard {
+	cards := testCards()
+	return []deckCard{
+		{card: cards[1], qty: 1, commander: true}, // Goldspan Dragon
+		{card: cards[0], qty: 1},                  // Dragonlord Ojutai — creature
+		{card: cards[2], qty: 1},                  // Test Walker — planeswalker
+		{card: ScryfallCard{ID: "m", Name: "Mountain", TypeLine: "Basic Land — Mountain"}, qty: 30},
+		{card: ScryfallCard{ID: "z", Name: "Ancient Tomb", TypeLine: "Land"}, qty: 1},
+	}
+}
+
+func TestDeckItemsOrderByType(t *testing.T) {
+	items := deckItems(deckFixture())
+
+	var layout []string
+	for _, it := range items {
+		if ci, ok := it.(cardItem); ok {
+			layout = append(layout, ci.card.Name)
+		}
+	}
+
+	// Commander first, then creatures, spells and lands — alphabetically
+	// inside each group, and with no heading rows between them.
+	want := []string{
+		"Goldspan Dragon",
+		"Dragonlord Ojutai",
+		"Test Walker",
+		"Ancient Tomb", "Mountain",
+	}
+	if strings.Join(layout, "|") != strings.Join(want, "|") {
+		t.Errorf("deck order =\n  %v\nwant\n  %v", layout, want)
+	}
+	if len(items) != len(want) {
+		t.Errorf("deck produced %d rows for %d cards — headings are back", len(items), len(want))
+	}
+}
+
+func TestDeckStatsCountCopies(t *testing.T) {
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = drive(m, deckLoadedMsg{
+		info:  deckInfo{name: "Test Deck", total: 34, unique: 5},
+		cards: deckFixture(),
+	})
+
+	stats := stripANSI(m.renderStats(60))
+	if !strings.Contains(stats, "Statistics (34 cards)") {
+		t.Errorf("statistics did not count copies:\n%s", stats)
+	}
+
+	// 30 Mountains have to show up as 30 lands, not one.
+	for _, line := range strings.Split(stats, "\n") {
+		if strings.Contains(line, "Land") && strings.HasSuffix(strings.TrimSpace(line), "31") {
+			return
+		}
+	}
+	t.Errorf("Land count is not 31:\n%s", stats)
+}
+
+func TestDeckHeaderShowsDeckNotSort(t *testing.T) {
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = drive(m, deckLoadedMsg{
+		info:  deckInfo{name: "Winota: Snowball Stax", author: "ComedIan", format: "commander", total: 100, unique: 98},
+		cards: deckFixture(),
+	})
+
+	header := stripANSI(m.resultsHeader())
+	for _, want := range []string{"Deck", "Winota: Snowball Stax", "by ComedIan", "commander", "100 cards", "98 unique"} {
+		if !strings.Contains(header, want) {
+			t.Errorf("deck header missing %q:\n%s", want, header)
+		}
+	}
+	// The layout budget is fixed, so the deck header has to be the same
+	// height as the search one.
+	if got := strings.Count(m.resultsHeader(), "\n") + 1; got != headerLines {
+		t.Errorf("deck header is %d lines, layout assumes %d", got, headerLines)
+	}
+}
+
+func TestSearchAfterDeckClearsIt(t *testing.T) {
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Test Deck", total: 34}, cards: deckFixture()})
+	if m.deck == nil {
+		t.Fatal("deck did not load")
+	}
+
+	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+	if m.deck != nil {
+		t.Error("a new search left the deck header in place")
+	}
+	if !strings.Contains(stripANSI(m.resultsHeader()), "Sort") {
+		t.Error("header did not go back to showing the sort order")
+	}
+}
+
+// ── Layout ──────────────────────────────────────────────────────
+
+func TestListColumnsFitTheirWidth(t *testing.T) {
+	// 2 for the cursor and 2 between each pair of columns.
+	const chrome = 6
+	for _, w := range []int{40, 60, 75, 80, 100, 120, 160, 240} {
+		nameW, manaW, typeW := listColumns(w)
+		if got := nameW + manaW + typeW + chrome; got > w {
+			t.Errorf("at width %d the row needs %d columns (%d/%d/%d)", w, got, nameW, manaW, typeW)
+		}
+		if nameW < 10 || typeW < 8 || manaW < 1 {
+			t.Errorf("at width %d the columns collapsed: %d/%d/%d", w, nameW, manaW, typeW)
+		}
+	}
+
+	// Wider terminals give the columns more room, not the same fixed 30.
+	narrow, _, _ := listColumns(80)
+	wide, _, _ := listColumns(200)
+	if wide <= narrow {
+		t.Errorf("name column did not grow with the terminal: %d at 80, %d at 200", narrow, wide)
+	}
+}
+
+func TestManaNeverOverflowsItsColumn(t *testing.T) {
+	// A four-symbol hybrid cost is 12 characters wide unabbreviated.
+	rendered, width := renderManaWidth("{R/W}{R/W}{R/W}{R/W}", 10)
+	if width > 10 {
+		t.Errorf("hybrid cost rendered %d wide, column is 10", width)
+	}
+	if !strings.Contains(stripANSI(rendered), "…") {
+		t.Errorf("a truncated cost should say so: %q", stripANSI(rendered))
+	}
+	// Cutting mid-symbol would turn R/W into a different cost.
+	if strings.HasSuffix(strings.TrimSuffix(stripANSI(rendered), "…"), "/") {
+		t.Errorf("cost was cut through a symbol: %q", stripANSI(rendered))
+	}
+
+	if _, width := renderManaWidth("{3}{W}{U}", 10); width != 3 {
+		t.Errorf("a cost that fits should render whole, got width %d", width)
+	}
+}
+
+// ── Double-faced cards ──────────────────────────────────────────
+
+func dfcFixture() ScryfallCard {
+	return ScryfallCard{
+		ID: "dfc", Name: "Slicer, Hired Muscle // Slicer, High-Speed Antagonist",
+		TypeLine: "Legendary Artifact Creature — Robot // Legendary Artifact — Vehicle",
+		SetName:  "Transformers", Rarity: "mythic", CMC: 5,
+		CardFaces: []CardFace{
+			{
+				Name: "Slicer, Hired Muscle", ManaCost: "{4}{R}",
+				TypeLine: "Legendary Artifact Creature — Robot", Colors: []string{"R"},
+				Power: "3", Toughness: "4",
+				OracleText: "Double strike, haste",
+			},
+			{
+				Name: "Slicer, High-Speed Antagonist", ManaCost: "",
+				TypeLine: "Legendary Artifact — Vehicle", Colors: []string{"R"},
+				Power: "3", Toughness: "2",
+				OracleText: "Living metal\nFirst strike, haste",
+			},
+		},
+	}
+}
+
+func TestFacesStandInForTheCard(t *testing.T) {
+	c := dfcFixture()
+
+	faces := c.faces()
+	if len(faces) != 2 {
+		t.Fatalf("got %d faces, want 2", len(faces))
+	}
+	if faces[0].Name != "Slicer, Hired Muscle" || faces[0].Power != "3" || faces[0].ManaCost != "{4}{R}" {
+		t.Errorf("front face did not take the face's own details: %+v", faces[0])
+	}
+	// Details that belong to the card, not the face, stay put.
+	if faces[1].SetName != "Transformers" || faces[1].CMC != 5 {
+		t.Errorf("back face lost the card's printing details: %+v", faces[1])
+	}
+
+	// A single-faced card is its own only face.
+	if got := len(testCards()[0].faces()); got != 1 {
+		t.Errorf("single-faced card produced %d faces", got)
+	}
+
+	if !strings.Contains(c.combinedOracle(), "Double strike") ||
+		!strings.Contains(c.combinedOracle(), "Living metal") {
+		t.Errorf("combined oracle text missed a face: %q", c.combinedOracle())
+	}
+
+	// The top level carries no cost or colors for a transforming card, so
+	// the list has to fall back to the front face.
+	if c.displayManaCost() != "{4}{R}" {
+		t.Errorf("display mana cost = %q, want the front face's", c.displayManaCost())
+	}
+	if len(c.displayColors()) != 1 || c.displayColors()[0] != "R" {
+		t.Errorf("display colors = %v, want the front face's", c.displayColors())
+	}
+}
+
+func TestPanelShowsBothFaces(t *testing.T) {
+	data := loadTestRules(t)
+	m := resultsModel(t, 160, 40, data)
+
+	panel := stripANSI(m.renderPreview(dfcFixture(), 70))
+	for _, want := range []string{
+		"Slicer, Hired Muscle",
+		"Legendary Artifact Creature — Robot",
+		"P/T: 3/4",
+		"Double strike, haste",
+		// The back face needs its own heading, not just its text.
+		"Slicer, High-Speed Antagonist",
+		"Legendary Artifact — Vehicle",
+		"P/T: 3/2",
+		"Living metal",
+		"First strike, haste",
+	} {
+		if !strings.Contains(panel, want) {
+			t.Errorf("panel missing %q:\n%s", want, panel)
+		}
+	}
+}
+
+func TestBackFaceKeywordsMatchRules(t *testing.T) {
+	data := loadTestRules(t)
+
+	var terms []string
+	for _, match := range data.MatchCard(dfcFixture()) {
+		terms = append(terms, strings.ToLower(match.Term))
+	}
+	joined := strings.Join(terms, " ")
+	// "first strike" is only on the back face.
+	if !strings.Contains(joined, "first strike") {
+		t.Errorf("back face keywords did not reach the rules panel: %v", terms)
+	}
+	if !strings.Contains(joined, "double strike") {
+		t.Errorf("front face keywords went missing: %v", terms)
+	}
+}
+
+// ── Author tags ─────────────────────────────────────────────────
+
+func TestAuthorTagsInStatistics(t *testing.T) {
+	cards := deckFixture()
+	cards[0].tags = []string{"Ramp", "Own"}
+	cards[1].tags = []string{"Ramp"}
+	cards[3].tags = []string{"Land"} // the 30 Mountains
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Tagged", total: 34}, cards: cards})
+
+	stats := stripANSI(m.renderStats(70))
+	if !strings.Contains(stats, "Tags") {
+		t.Fatalf("statistics has no tag breakdown:\n%s", stats)
+	}
+
+	tagPart := stats[strings.Index(stats, "Tags"):]
+	// Tags count copies like everything else, so 30 Mountains is 30 lands,
+	// and the commonest tag leads.
+	if !strings.Contains(tagPart, "Land") || !strings.Contains(tagPart, "30") {
+		t.Errorf("tag counts do not follow quantities:\n%s", tagPart)
+	}
+	if idxLand, idxRamp := strings.Index(tagPart, "Land"), strings.Index(tagPart, "Ramp"); idxLand > idxRamp {
+		t.Errorf("tags are not ordered by count:\n%s", tagPart)
+	}
+
+	// Search results have no tags, so the section shouldn't appear at all.
+	plain := drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+	if strings.Contains(stripANSI(plain.renderStats(70)), "Tags") {
+		t.Error("search results grew a tag section")
+	}
+}
+
+// ── Saved decks ─────────────────────────────────────────────────
+
+func TestSavedDeckRoundTrip(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	if decks, err := loadSavedDecks(); err != nil || len(decks) != 0 {
+		t.Fatalf("a fresh install should have no saved decks: %v, %v", decks, err)
+	}
+
+	err := saveDeck("ghen", savedDeck{
+		Name: "Ghen reanimator", ID: "pdxwlk", URL: "https://moxfield.com/decks/pdxwlk",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := lookupSavedDeck("ghen")
+	if !ok || got.ID != "pdxwlk" || got.Name != "Ghen reanimator" {
+		t.Fatalf("lookup returned %+v, %t", got, ok)
+	}
+	if got.Saved == "" {
+		t.Error("saved deck has no timestamp")
+	}
+
+	// Saving again under the same name replaces it rather than duplicating.
+	if err := saveDeck("ghen", savedDeck{Name: "Ghen v2", ID: "other"}); err != nil {
+		t.Fatal(err)
+	}
+	decks, _ := loadSavedDecks()
+	if len(decks) != 1 || decks["ghen"].ID != "other" {
+		t.Errorf("re-saving did not replace the entry: %+v", decks)
+	}
+
+	found, err := forgetDeck("ghen")
+	if err != nil || !found {
+		t.Fatalf("forget returned %t, %v", found, err)
+	}
+	if _, ok := lookupSavedDeck("ghen"); ok {
+		t.Error("deck survived being forgotten")
+	}
+	if found, _ := forgetDeck("ghen"); found {
+		t.Error("forgetting an unknown deck reported success")
+	}
+}
+
+func TestSlugify(t *testing.T) {
+	cases := map[string]string{
+		"Winota: Snowball Stax": "winota-snowball-stax",
+		"Ghen reanimator":       "ghen-reanimator",
+		"  Trailing  ":          "trailing",
+		"Ω":                     "ω",
+		"!!!":                   "",
+	}
+	for in, want := range cases {
+		if got := slugify(in); got != want {
+			t.Errorf("slugify(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestSaveDeckFromTheApp(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+
+	// On search results w has nothing to save, and must say so rather than
+	// filing an empty deck. (With no results at all the search bar has
+	// focus, so w is just typing.)
+	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	if !strings.Contains(m.notice, "nothing to save") {
+		t.Errorf("notice on search results = %q", m.notice)
+	}
+	if !strings.Contains(stripANSI(m.resultsHeader()), "nothing to save") {
+		t.Error("the notice never reached the header on search results")
+	}
+
+	m = drive(m, deckLoadedMsg{
+		info:  deckInfo{name: "Winota: Snowball Stax", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7", total: 34},
+		cards: deckFixture(),
+	})
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+
+	saved, ok := lookupSavedDeck("winota-snowball-stax")
+	if !ok {
+		t.Fatalf("w did not save the deck; notice was %q", m.notice)
+	}
+	if saved.ID != "Y8dZ7" {
+		t.Errorf("saved the wrong deck: %+v", saved)
+	}
+	if !strings.Contains(m.notice, "winota-snowball-stax") {
+		t.Errorf("notice does not say how to reopen it: %q", m.notice)
+	}
+	if !strings.Contains(stripANSI(m.resultsHeader()), "winota-snowball-stax") {
+		t.Error("the confirmation never reached the header")
+	}
+
+	// The next keypress clears it.
+	m = drive(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.notice != "" {
+		t.Errorf("notice outlived the next keypress: %q", m.notice)
+	}
+}
+
+// ── Statistics as a filter ──────────────────────────────────────
+
+// taggedDeckModel is a loaded deck with author tags, sitting on the
+// statistics panel.
+func taggedDeckModel(t *testing.T) model {
+	t.Helper()
+
+	cards := deckFixture()
+	cards[0].tags = []string{"Ramp", "Own"} // Goldspan Dragon, commander
+	cards[1].tags = []string{"Ramp"}        // Dragonlord Ojutai
+	cards[3].tags = []string{"Land"}        // 30x Mountain
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Tagged", total: 34, unique: 5}, cards: cards})
+	return drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+}
+
+func TestStatCountsMatchWhatFilteringGives(t *testing.T) {
+	m := taggedDeckModel(t)
+	entries := toEntries(m.baseItems)
+
+	// Every row's number has to be exactly what you get when you filter to
+	// it — that's the whole point of the rows carrying their own test.
+	for _, row := range flatRows(statGroups(entries, entries)) {
+		got := 0
+		for _, e := range entries {
+			if row.match(e) {
+				got += e.qty
+			}
+		}
+		if got != row.count {
+			t.Errorf("%s/%s counts %d but filtering gives %d", row.group, row.label, row.count, got)
+		}
+	}
+}
+
+func TestStatNavigationFiltersTheList(t *testing.T) {
+	m := taggedDeckModel(t)
+
+	if m.statFilter != nil {
+		t.Fatal("opening the statistics panel filtered the list on its own")
+	}
+	full := len(m.resultList.Items())
+
+	// The first press enters the category list rather than stepping past it.
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	if m.statIndex != 0 || m.statFilter == nil {
+		t.Fatalf("first J did not select the first category (index %d)", m.statIndex)
+	}
+
+	rows := flatRows(m.statPanel())
+	for i, want := range rows {
+		// Walk to row i.
+		for m.statIndex < i {
+			m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+		}
+		if !want.same(m.statFilter) {
+			t.Fatalf("at index %d the filter is %+v, want %s/%s", i, m.statFilter, want.group, want.label)
+		}
+
+		onScreen := toEntries(m.resultList.Items())
+		total := 0
+		for _, e := range onScreen {
+			total += e.qty
+		}
+
+		// The panel now describes the cards the category left on screen,
+		// while keeping every row in the place it started in.
+		panel := flatRows(m.statPanel())
+		if len(panel) != len(rows) {
+			t.Fatalf("at %s/%s the panel has %d rows, want the original %d",
+				want.group, want.label, len(panel), len(rows))
+		}
+		for j, got := range panel {
+			if !got.same(&rows[j]) {
+				t.Fatalf("at %s/%s row %d became %s/%s, want %s/%s",
+					want.group, want.label, j, got.group, got.label, rows[j].group, rows[j].label)
+			}
+			expect := 0
+			for _, e := range onScreen {
+				if got.match(e) {
+					expect += e.qty
+				}
+			}
+			if got.count != expect {
+				t.Errorf("filtered to %s/%s, row %s/%s reads %d but %d cards on screen match",
+					want.group, want.label, got.group, got.label, got.count, expect)
+			}
+		}
+
+		// The category you are on accounts for everything on screen.
+		if panel[i].count != total {
+			t.Errorf("%s/%s reads %d but the list holds %d cards",
+				want.group, want.label, panel[i].count, total)
+		}
+	}
+
+	// The categories hold their places while filtering, so there is always
+	// something to move on to.
+	if got := len(flatRows(m.statPanel())); got != len(rows) {
+		t.Errorf("categories collapsed to %d while filtering, want %d", got, len(rows))
+	}
+
+	// Walking off either end stays put rather than wrapping.
+	for i := 0; i < len(rows)+5; i++ {
+		m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	}
+	if m.statIndex != 0 {
+		t.Errorf("K past the top left index at %d", m.statIndex)
+	}
+
+	m = drive(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.statFilter != nil || m.statIndex != -1 {
+		t.Error("esc did not clear the category")
+	}
+	if len(m.resultList.Items()) != full {
+		t.Errorf("clearing left %d cards, want all %d", len(m.resultList.Items()), full)
+	}
+}
+
+func TestStatLineMatchesRender(t *testing.T) {
+	m := taggedDeckModel(t)
+	groups := m.statPanel()
+	m.statFilter = &flatRows(groups)[0] // so the panel counts the whole deck
+
+	for i := range flatRows(groups) {
+		m.statIndex = i
+		lines := strings.Split(stripANSI(m.renderStats(60)), "\n")
+
+		got := -1
+		for n, line := range lines {
+			if strings.HasPrefix(strings.TrimLeft(line, " "), "▸") {
+				got = n
+				break
+			}
+		}
+		if want := statLine(groups, i); got != want {
+			t.Fatalf("row %d renders on line %d, statLine says %d — scrolling will be off", i, got, want)
+		}
+	}
+}
+
+func TestStatFilterSurvivesLeavingThePanel(t *testing.T) {
+	m := taggedDeckModel(t)
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	narrowed := len(m.resultList.Items())
+
+	// Back to the card view: the filter stays, and the header says so.
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	if m.panel != panelCard {
+		t.Fatal("s did not return to the card view")
+	}
+	if len(m.resultList.Items()) != narrowed {
+		t.Error("leaving the statistics panel dropped the filter")
+	}
+	if !strings.Contains(stripANSI(m.resultsHeader()), m.statFilterLabel()) {
+		t.Errorf("header does not name the active category: %s", stripANSI(m.resultsHeader()))
+	}
+}
+
+func TestNewResultsForgetTheCategory(t *testing.T) {
+	m := taggedDeckModel(t)
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	if m.statFilter == nil {
+		t.Fatal("no category selected")
+	}
+
+	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+	if m.statFilter != nil || m.statIndex != -1 {
+		t.Error("a new search kept the old category filter")
+	}
+	if len(m.resultList.Items()) != len(testCards()) {
+		t.Errorf("search results were narrowed to %d", len(m.resultList.Items()))
+	}
+}
+
+// ── esc and i ───────────────────────────────────────────────────
+
+// quits reports whether a command asks the program to quit.
+func quits(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	_, ok := cmd().(tea.QuitMsg)
+	return ok
+}
+
+func TestEscPeelsOffOneLayerAtATime(t *testing.T) {
+	m := taggedDeckModel(t)
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")}) // back to the card view
+
+	// A typed filter goes first.
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("Mountain")})
+	m = drive(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.resultList.FilterState() == list.Unfiltered {
+		t.Fatal("the typed filter never applied")
+	}
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = next.(model)
+	if m.resultList.FilterState() != list.Unfiltered {
+		t.Error("esc did not clear the typed filter")
+	}
+	if quits(cmd) {
+		t.Fatal("esc quit while a filter was still on")
+	}
+
+	// Then the category filter.
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	next, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = next.(model)
+	if m.statFilter != nil {
+		t.Error("esc did not clear the category filter")
+	}
+	if quits(cmd) {
+		t.Fatal("esc quit while a category was still selected")
+	}
+
+	// Only then does it quit.
+	if _, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc}); !quits(cmd) {
+		t.Error("esc with nothing to clear did not quit")
+	}
+
+	// And it no longer walks back to the search bar — i does that.
+	if m.searchFocused {
+		t.Fatal("focus should still be on the list")
+	}
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if !next.(model).searchFocused {
+		t.Error("i did not move focus to the search bar")
+	}
+}
+
+func TestEmptiedCategoriesKeepTheirPlace(t *testing.T) {
+	m := taggedDeckModel(t)
+	before := flatRows(m.statPanel())
+
+	// Land: the 30 Mountains and nothing else, so most other categories
+	// are emptied by it.
+	target := -1
+	for i, r := range before {
+		if r.group == "Type" && r.label == "Land" {
+			target = i
+			break
+		}
+	}
+	if target < 0 {
+		t.Fatal("fixture has no Land row")
+	}
+	for i := 0; i <= target; i++ {
+		m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	}
+	if m.statFilterLabel() != "Type: Land" {
+		t.Fatalf("landed on %q", m.statFilterLabel())
+	}
+
+	after := flatRows(m.statPanel())
+	zeros := 0
+	for i, r := range after {
+		if !r.same(&before[i]) {
+			t.Fatalf("row %d moved from %s/%s to %s/%s", i,
+				before[i].group, before[i].label, r.group, r.label)
+		}
+		if r.count == 0 {
+			zeros++
+		}
+	}
+	if zeros == 0 {
+		t.Fatal("filtering to Land emptied nothing — the fixture is not exercising this")
+	}
+
+	// The emptied rows are still drawn, reading zero.
+	panel := stripANSI(m.renderStats(60))
+	if !strings.Contains(panel, "Creature") {
+		t.Errorf("an emptied category vanished from the panel:\n%s", panel)
+	}
+	for _, line := range strings.Split(panel, "\n") {
+		if strings.Contains(line, "Creature") && !strings.HasSuffix(strings.TrimRight(line, " "), "0") {
+			t.Errorf("Creature should read zero under a Land filter: %q", line)
+		}
+	}
+
+	// And the histograms describe the filtered cards, not the whole deck.
+	for _, r := range after {
+		if r.group == "Type" && r.label == "Land" && r.count != 31 {
+			t.Errorf("Land reads %d, want 31 (30 Mountains + Ancient Tomb)", r.count)
+		}
+	}
+}
+
+// selectedBar is the length of the bar on the highlighted row.
+func selectedBar(t *testing.T, m model) int {
+	t.Helper()
+	for _, line := range strings.Split(stripANSI(m.renderStats(60)), "\n") {
+		if strings.HasPrefix(strings.TrimLeft(line, " "), "▸") {
+			return strings.Count(line, "█")
+		}
+	}
+	t.Fatal("no row is selected")
+	return 0
+}
+
+// walkTo moves the statistics cursor onto a named category.
+func walkTo(t *testing.T, m model, group, label string) model {
+	t.Helper()
+	rows := flatRows(m.statPanel())
+	for i, r := range rows {
+		if r.group == group && r.label == label {
+			for j := 0; j <= i; j++ {
+				m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+			}
+			if m.statFilterLabel() != group+": "+label {
+				t.Fatalf("walked to %q, want %s: %s", m.statFilterLabel(), group, label)
+			}
+			return m
+		}
+	}
+	t.Fatalf("no %s/%s row", group, label)
+	return m
+}
+
+func TestBarsScaleToTheUnfilteredSet(t *testing.T) {
+	// The fixture's types are Creature 2, Planeswalker 1, Land 31.
+	base := taggedDeckModel(t)
+
+	land := selectedBar(t, walkTo(t, base, "Type", "Land"))
+	creature := selectedBar(t, walkTo(t, base, "Type", "Creature"))
+
+	// Land is the group's largest, so it fills the bar; a category a
+	// fifteenth its size must not look the same.
+	if creature >= land {
+		t.Errorf("Creature (2 cards) drew %d blocks against Land's (31 cards) %d — "+
+			"the scale is following the filtered set", creature, land)
+	}
+	if land < 10 {
+		t.Errorf("the group's largest category drew only %d blocks", land)
+	}
+
+	// And two small categories stay in proportion to each other rather
+	// than both filling the bar: CMC 5 has two cards, CMC 3 has one.
+	cmc3 := selectedBar(t, walkTo(t, base, "CMC", "3"))
+	cmc5 := selectedBar(t, walkTo(t, base, "CMC", "5"))
+	if cmc5 <= cmc3 {
+		t.Errorf("CMC 5 (2 cards) drew %d blocks and CMC 3 (1 card) drew %d", cmc5, cmc3)
+	}
+}

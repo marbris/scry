@@ -36,6 +36,9 @@ var (
 )
 
 const (
+	// Sent to Scryfall, Moxfield, MTGJSON and Wizards alike.
+	userAgent = "scry/2.0"
+
 	// Below this width the panel sits under the list instead of beside it
 	compactWidth = 120
 
@@ -80,6 +83,78 @@ type ScryfallCard struct {
 	Legalities    map[string]string `json:"legalities"`
 	CMC           float64           `json:"cmc"`
 	EDHRECRank    int               `json:"edhrec_rank"`
+
+	// Transforming and modal double-faced cards carry no top-level oracle
+	// text, mana cost or colors at all — it's per face.
+	CardFaces []CardFace `json:"card_faces"`
+}
+
+type CardFace struct {
+	Name       string   `json:"name"`
+	ManaCost   string   `json:"mana_cost"`
+	TypeLine   string   `json:"type_line"`
+	OracleText string   `json:"oracle_text"`
+	Colors     []string `json:"colors"`
+	Power      string   `json:"power"`
+	Toughness  string   `json:"toughness"`
+	Loyalty    string   `json:"loyalty"`
+}
+
+// faces returns a card's printed faces as cards in their own right, so
+// anything that renders a card can work a face at a time. A single-faced
+// card comes back as itself.
+func (c ScryfallCard) faces() []ScryfallCard {
+	if len(c.CardFaces) < 2 {
+		return []ScryfallCard{c}
+	}
+	out := make([]ScryfallCard, 0, len(c.CardFaces))
+	for _, f := range c.CardFaces {
+		fc := c
+		fc.CardFaces = nil
+		fc.Name = f.Name
+		fc.ManaCost = f.ManaCost
+		fc.TypeLine = f.TypeLine
+		fc.OracleText = f.OracleText
+		fc.Power = f.Power
+		fc.Toughness = f.Toughness
+		fc.Loyalty = f.Loyalty
+		if len(f.Colors) > 0 {
+			fc.Colors = f.Colors
+		}
+		out = append(out, fc)
+	}
+	return out
+}
+
+// combinedOracle is every face's text at once, for the places that match
+// against a card's wording rather than display it.
+func (c ScryfallCard) combinedOracle() string {
+	if len(c.CardFaces) < 2 {
+		return c.OracleText
+	}
+	var parts []string
+	for _, f := range c.CardFaces {
+		if f.OracleText != "" {
+			parts = append(parts, f.OracleText)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// displayColors and displayManaCost fall back to the front face, which is
+// where a transforming card keeps them.
+func (c ScryfallCard) displayColors() []string {
+	if len(c.Colors) > 0 || len(c.CardFaces) == 0 {
+		return c.Colors
+	}
+	return c.CardFaces[0].Colors
+}
+
+func (c ScryfallCard) displayManaCost() string {
+	if c.ManaCost != "" || len(c.CardFaces) == 0 {
+		return c.ManaCost
+	}
+	return c.CardFaces[0].ManaCost
 }
 
 type Ruling struct {
@@ -116,6 +191,27 @@ func (d compactDelegate) Height() int                             { return 1 }
 func (d compactDelegate) Spacing() int                            { return 0 }
 func (d compactDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 
+// listColumns divides the list's width between the three columns. Mana gets
+// a fixed share, wide enough for most costs, and the name and type line
+// share what's left — name first, since that's what you're scanning for.
+func listColumns(total int) (nameW, manaW, typeW int) {
+	manaW = 10
+	// 2 columns for the cursor, and 2 between each pair of columns.
+	rest := total - 2 - manaW - 4
+	if rest < 18 {
+		rest = 18
+	}
+	nameW = rest * 55 / 100
+	typeW = rest - nameW
+	if nameW < 10 {
+		nameW = 10
+	}
+	if typeW < 8 {
+		typeW = 8
+	}
+	return nameW, manaW, typeW
+}
+
 func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.Item) {
 	ci, ok := item.(cardItem)
 	if !ok {
@@ -125,37 +221,30 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	selected := index == m.Index()
 	c := ci.card
 
-	col := colorForCard(c.Colors)
-	mana := c.ManaCost
-	if mana == "" {
-		mana = "·"
+	nameW, manaW, typeW := listColumns(m.Width())
+
+	// A deck's repeat cards carry their count in the name column, so the
+	// columns stay where search results put them.
+	name := c.Name
+	if ci.qty > 1 {
+		name = fmt.Sprintf("%dx %s", ci.qty, name)
 	}
-
-	nameW := 30
-	typeW := 30
-	manaW := 15
-
-	name := truncate(c.Name, nameW)
+	name = truncate(name, nameW)
 	typeLine := truncate(c.TypeLine, typeW)
-	mana = truncate(mana, manaW)
 
 	nameStyle := lipgloss.NewStyle().
 		Width(nameW).
-		Foreground(col)
+		Foreground(colorForCard(c.displayColors()))
 	typeStyle := lipgloss.NewStyle().
 		Width(typeW).
 		Foreground(gruvFgDim)
 
-	renderedMana := renderMana(c.ManaCost)
-	if renderedMana == "" {
+	renderedMana, manaLen := renderManaWidth(c.displayManaCost(), manaW)
+	if manaLen == 0 {
 		renderedMana = lipgloss.NewStyle().Foreground(gruvFgDim).Render("·")
+		manaLen = 1
 	}
-	// Pad to keep columns aligned
-	rawMana := strings.ReplaceAll(strings.ReplaceAll(c.ManaCost, "{", ""), "}", "")
-	if rawMana == "" {
-		rawMana = "·"
-	}
-	pad := 10 - len(rawMana)
+	pad := manaW - manaLen
 	if pad < 0 {
 		pad = 0
 	}
@@ -176,23 +265,34 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	fmt.Fprint(w, line)
 }
 
+// truncate cuts to a rune count, not a byte count — an em dash in a type
+// line is three bytes, and slicing through one renders as a replacement
+// character.
 func truncate(s string, maxLen int) string {
-	if len(s) > maxLen {
-		return s[:maxLen-1] + "…"
+	if runeLen(s) <= maxLen {
+		return s
 	}
-	return s
+	if maxLen <= 1 {
+		return "…"
+	}
+	runes := []rune(s)
+	return string(runes[:maxLen-1]) + "…"
 }
 
 // ── List item adapter ───────────────────────────────────────────
 
 type cardItem struct {
 	card ScryfallCard
+	// qty is how many copies a deck runs; zero for search results.
+	qty int
+	// tags are the deck author's own, and only ever set for deck cards.
+	tags []string
 }
 
 func (c cardItem) Title() string       { return c.card.Name }
 func (c cardItem) Description() string { return c.card.TypeLine }
 func (c cardItem) FilterValue() string {
-	return c.card.Name + " " + c.card.OracleText
+	return c.card.Name + " " + c.card.combinedOracle()
 }
 
 // ── Color helpers ───────────────────────────────────────────────
@@ -219,8 +319,17 @@ func colorForCard(colors []string) lipgloss.Color {
 }
 
 func renderMana(manaCost string) string {
+	s, _ := renderManaWidth(manaCost, 0)
+	return s
+}
+
+// renderManaWidth colours a mana cost symbol by symbol. A limit above zero
+// stops it there, so a long hybrid cost like {R/W}{R/W}{R/W}{R/W} can't push
+// the columns beside it out of line; it reports the width it actually used,
+// since the styling makes that impossible to measure afterwards.
+func renderManaWidth(manaCost string, limit int) (string, int) {
 	if manaCost == "" {
-		return ""
+		return "", 0
 	}
 
 	colorMap := map[string]lipgloss.Color{
@@ -239,9 +348,17 @@ func renderMana(manaCost string) string {
 	symbols := strings.Split(stripped, "}")
 
 	var result strings.Builder
+	used := 0
 	for _, s := range symbols {
 		if s == "" {
 			continue
+		}
+		// Cut between symbols, never through one — half a hybrid symbol
+		// reads as a different cost entirely.
+		if limit > 0 && used+runeLen(s) > limit {
+			result.WriteString(lipgloss.NewStyle().Foreground(gruvFgDim).Render("…"))
+			used++
+			break
 		}
 		if col, ok := colorMap[s]; ok {
 			result.WriteString(lipgloss.NewStyle().Foreground(col).Render(s))
@@ -249,8 +366,9 @@ func renderMana(manaCost string) string {
 			// Generic/numeric mana
 			result.WriteString(lipgloss.NewStyle().Foreground(gruvFgDim).Render(s))
 		}
+		used += runeLen(s)
 	}
-	return result.String()
+	return result.String(), used
 }
 
 // ── App state ───────────────────────────────────────────────────
@@ -297,6 +415,22 @@ type model struct {
 	height        int
 	initialQuery  string
 	helpScroll    int
+
+	// A loaded Moxfield deck replaces the search results with the deck's
+	// cards; nil whenever the list is holding search results instead.
+	deck        *deckInfo
+	deckLoading bool
+	initialDeck string
+	// notice is a one-off confirmation ("saved as …") shown beside the
+	// counts until the next keypress.
+	notice string
+
+	// The result list before the statistics panel narrows it, and which
+	// category it's narrowed to. statIndex is -1 when the panel's category
+	// list hasn't been entered.
+	baseItems  []list.Item
+	statIndex  int
+	statFilter *statRow
 
 	// The panel beside the list shows one of card / stats / rules,
 	// each keeping its own scroll position.
@@ -371,15 +505,40 @@ KEYS — SEARCH BAR
   ↑/↓                     Move through the results while typing
   esc                     Back to the results (quits if there are none)
 
+DECKS
+  Paste a Moxfield deck URL into the search bar to load that deck
+  instead of running a search — moxfield.com/decks/<id>. The deck is
+  listed in decklist order, and r / s / t / enter work on its cards
+  as they do on search results. The author's own card tags, if the
+  deck has any, are broken down under s.
+
+  w                       Save the deck you're looking at
+
+  From the shell:
+    scry deck <name>      A deck you've saved
+    scry deck <id>        The id out of the deck's URL
+    scry <moxfield url>   Same thing, pasted whole
+    scry deck list        The decks you've saved
+    scry deck save <name> <id|url>
+    scry deck rm <name>
+
 KEYS — RESULTS
   j/k, ↑/↓                Move through cards
   /                       Filter the results (name + oracle text)
-  i, esc                  Edit the search query
-  J/K, shift+↑/↓          Scroll the panel
+  i                       Edit the search query
+  esc                     Clear the filter, or quit if there isn't one
+  J/K, shift+↑/↓          Scroll the panel — in the statistics panel,
+                          walk the categories and filter the cards to
+                          whichever one the cursor is on
   r                       Rules for this card (again for the card view)
-  s                       Statistics for these results (again for the card)
+  s                       Statistics for these results (again for the card).
+                          J/K there filters to a colour, rarity, mana
+                          value, type or — for a deck — an author's tag,
+                          and the histograms redraw for the cards that
+                          category leaves on screen
   t                       Printed text history — how the card's wording
                           changed across printings (again for the card view)
+  w                       Save the current deck (decks only)
   enter                   Browse the rules matched by this card
   ctrl+r                  Browse all comprehensive rules
   ?                       This help
@@ -605,7 +764,7 @@ func doGet(u string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "scry/1.0")
+	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json;q=0.9,*/*;q=0.8")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -623,9 +782,19 @@ func doGet(u string) ([]byte, error) {
 		return nil, notFoundError{}
 	}
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("scryfall (%d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("%s (%d): %s", hostOf(u), resp.StatusCode, string(body))
 	}
 	return body, nil
+}
+
+// hostOf labels an error with the service that produced it — cards and
+// rulings come from Scryfall, decks from Moxfield.
+func hostOf(u string) string {
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Host == "" {
+		return "request"
+	}
+	return strings.TrimPrefix(parsed.Host, "api.")
 }
 
 // ── Commands ────────────────────────────────────────────────────
@@ -754,6 +923,7 @@ func initialModel() model {
 		resultList:    l,
 		rulesList:     rl,
 		sortIndex:     9,
+		statIndex:     -1,
 		rulings:       make(map[string][]Ruling),
 		rulingErr:     make(map[string]error),
 		inflight:      make(map[string]bool),
@@ -766,6 +936,9 @@ func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{textinput.Blink}
 	if !m.rules.loaded() {
 		cmds = append(cmds, loadRulesCmd())
+	}
+	if m.initialDeck != "" {
+		cmds = append(cmds, loadDeckCmd(m.initialDeck))
 	}
 	if m.initialQuery != "" {
 		cmds = append(cmds, searchScryfall(m.initialQuery, sortOptions[m.sortIndex], maxResults))
@@ -868,16 +1041,42 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.err = nil
+		m.deck = nil
 		m.cards = msg.cards
 		m.totalCards = msg.totalCards
 		items := make([]list.Item, len(msg.cards))
 		for i, c := range msg.cards {
 			items[i] = cardItem{card: c}
 		}
-		m.resultList.SetItems(items)
-		m.resultList.ResetSelected()
+		m = m.setResults(items)
 
 		// Hand focus to the list so the results are immediately navigable.
+		m.searchFocused = false
+		m.searchInput.Blur()
+		m.applyLayout()
+		next, cmd := m.syncHover()
+		return next, cmd
+
+	case deckLoadedMsg:
+		m.searching = false
+		m.deckLoading = false
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+
+		m.err = nil
+		info := msg.info
+		m.deck = &info
+		m.cards = make([]ScryfallCard, 0, len(msg.cards))
+		for _, dc := range msg.cards {
+			m.cards = append(m.cards, dc.card)
+		}
+		m.totalCards = info.total
+
+		m = m.setResults(deckItems(msg.cards))
+
+		m.searchInput.SetValue(info.url)
 		m.searchFocused = false
 		m.searchInput.Blur()
 		m.applyLayout()
@@ -908,6 +1107,13 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.searching = true
+
+		// A pasted Moxfield link loads that deck instead of being run as a
+		// (hopeless) Scryfall query.
+		if id, ok := moxfieldURLID(query); ok {
+			m.deckLoading = true
+			return m, loadDeckCmd(id)
+		}
 		return m, searchScryfall(query, sortOptions[m.sortIndex], maxResults)
 
 	case "esc":
@@ -937,12 +1143,49 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// saveCurrentDeck files the deck on screen under a name made from its title,
+// so it can be reopened with `scry deck <name>`.
+func (m model) saveCurrentDeck() model {
+	if m.deck == nil {
+		m.notice = "nothing to save — open a deck first"
+		return m
+	}
+
+	alias := slugify(m.deck.name)
+	if alias == "" {
+		alias = m.deck.id
+	}
+	err := saveDeck(alias, savedDeck{Name: m.deck.name, ID: m.deck.id, URL: m.deck.url})
+	if err != nil {
+		m.notice = fmt.Sprintf("could not save: %v", err)
+		return m
+	}
+	m.notice = fmt.Sprintf("saved · scry deck %s", alias)
+	return m
+}
+
 // updateList handles keys while the result list has focus.
 func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Any key moves on from the last confirmation.
+	if msg.String() != "w" {
+		m.notice = ""
+	}
+
 	if m.resultList.FilterState() != list.Filtering {
 		switch msg.String() {
-		case "esc", "i", "ctrl+f":
+		case "i", "ctrl+f":
 			return m.focusSearch(), textinput.Blink
+		case "esc":
+			// esc peels one layer off at a time: the typed filter, then
+			// the statistics category, then the app itself.
+			if m.resultList.FilterState() != list.Unfiltered {
+				m.resultList.ResetFilter()
+				return m, nil
+			}
+			if m.statFilter != nil {
+				return m.clearStatFilter()
+			}
+			return m, tea.Quit
 		case "?":
 			m.helpScroll = 0
 			m.state = stateHelp
@@ -956,8 +1199,14 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "t":
 			return m.toggleHistory()
+		case "w":
+			return m.saveCurrentDeck(), nil
 		case "J", "shift+down":
 			switch m.panel {
+			case panelStats:
+				// The statistics panel is a list rather than a wall of
+				// text, so J/K walks its categories and filters to them.
+				return m.statMove(1)
 			case panelRules:
 				m.rulesScroll++
 			case panelHistory:
@@ -968,6 +1217,8 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "K", "shift+up":
 			switch m.panel {
+			case panelStats:
+				return m.statMove(-1)
 			case panelRules:
 				if m.rulesScroll > 0 {
 					m.rulesScroll--
@@ -995,6 +1246,18 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.resultList, cmd = m.resultList.Update(msg)
 	next, hoverCmd := m.syncHover()
 	return next, tea.Batch(cmd, hoverCmd)
+}
+
+// setResults installs a fresh set of cards, forgetting whichever statistics
+// category the last lot was narrowed to.
+func (m model) setResults(items []list.Item) model {
+	m.baseItems = items
+	m.statFilter = nil
+	m.statIndex = -1
+	m.previewScroll = 0
+	m.resultList.SetItems(items)
+	m.resultList.ResetSelected()
+	return m
 }
 
 func (m model) focusSearch() model {
@@ -1207,14 +1470,32 @@ func (m model) resultsHeader() string {
 
 	var b strings.Builder
 	b.WriteString(m.searchInput.View() + "\n")
-	b.WriteString(labelStyle.Render("Sort") + valueStyle.Render(sortOptions[m.sortIndex]))
-	if m.searchFocused {
-		b.WriteString(dimStyle.Render("  tab: cycle  enter: search"))
+
+	// A deck's own name and author are more use on this line than a sort
+	// order that only applies to the next search.
+	if m.deck != nil {
+		b.WriteString(labelStyle.Render("Deck") + valueStyle.Render(truncate(m.deck.name, 40)))
+		if by := m.deck.author; by != "" {
+			b.WriteString(dimStyle.Render("  by " + by))
+		}
+		if f := m.deck.format; f != "" {
+			b.WriteString(dimStyle.Render("  · " + f))
+		}
 	} else {
-		b.WriteString(dimStyle.Render("  i: edit search  ?: help"))
+		b.WriteString(labelStyle.Render("Sort") + valueStyle.Render(sortOptions[m.sortIndex]))
+		if m.searchFocused {
+			b.WriteString(dimStyle.Render("  tab: cycle  enter: search"))
+		} else {
+			b.WriteString(dimStyle.Render("  i: edit search  ?: help"))
+		}
 	}
 	b.WriteString("\n")
-	b.WriteString(labelStyle.Render("Results") + m.resultsSummary())
+
+	label := "Results"
+	if m.deck != nil {
+		label = "Cards"
+	}
+	b.WriteString(labelStyle.Render(label) + m.resultsSummary())
 
 	return lipgloss.NewStyle().
 		Width(m.width).
@@ -1230,6 +1511,9 @@ func (m model) resultsSummary() string {
 	valueStyle := lipgloss.NewStyle().Foreground(gruvYellow)
 	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
 
+	if m.deckLoading {
+		return dimStyle.Render("loading deck…")
+	}
 	if m.searching {
 		return dimStyle.Render("searching…")
 	}
@@ -1241,6 +1525,18 @@ func (m model) resultsSummary() string {
 		return dimStyle.Render("type a query and press enter")
 	}
 
+	// A deck counts copies, so 99 cards can be 63 distinct ones.
+	if m.deck != nil {
+		out := valueStyle.Render(fmt.Sprintf("%d cards", m.deck.total))
+		if m.deck.unique != m.deck.total {
+			out += dimStyle.Render(fmt.Sprintf(" · %d unique", m.deck.unique))
+		}
+		if m.resultList.FilterState() != list.Unfiltered {
+			out += dimStyle.Render(fmt.Sprintf("  (%d filtered)", len(m.resultList.VisibleItems())))
+		}
+		return out + m.noticeText()
+	}
+
 	shown := len(m.cards)
 	out := formatInt(shown)
 	if m.totalCards > shown {
@@ -1250,6 +1546,19 @@ func (m model) resultsSummary() string {
 
 	if m.resultList.FilterState() != list.Unfiltered {
 		out += dimStyle.Render(fmt.Sprintf("  (%d filtered)", len(m.resultList.VisibleItems())))
+	}
+	return out + m.noticeText()
+}
+
+// noticeText is the last confirmation, if one is still standing, preceded by
+// whichever statistics category the list is narrowed to.
+func (m model) noticeText() string {
+	out := ""
+	if label := m.statFilterLabel(); label != "" {
+		out += lipgloss.NewStyle().Foreground(gruvOrange).Render("  ▸ " + label)
+	}
+	if m.notice != "" {
+		out += lipgloss.NewStyle().Foreground(gruvGreen).Render("  " + m.notice)
 	}
 	return out
 }
@@ -1350,7 +1659,10 @@ func (m model) panelHint() string {
 	parts := []string{"J/K: scroll"}
 	switch m.panel {
 	case panelStats:
-		parts = append(parts, "s: card", "r: rules", "t: text history")
+		parts = []string{"J/K: category", "s: card", "r: rules"}
+		if m.statFilter != nil {
+			parts = append(parts, "esc: clear")
+		}
 	case panelRules:
 		parts = append(parts, "r: card", "s: stats", "enter: browse")
 	case panelHistory:
@@ -1358,7 +1670,54 @@ func (m model) panelHint() string {
 	default:
 		parts = append(parts, "r: rules", "s: stats", "t: text history")
 	}
+	if m.deck != nil {
+		parts = append(parts, "w: save")
+	}
 	return lipgloss.NewStyle().Foreground(gruvGray).Render(strings.Join(parts, "  "))
+}
+
+// faceHeading is a face's name, cost, type line and P/T — the block that
+// identifies which side of a card you're looking at.
+func faceHeading(f ScryfallCard, nameStyle lipgloss.Style) string {
+	var b strings.Builder
+
+	line := nameStyle.Render(f.Name)
+	if f.ManaCost != "" {
+		line += "  " + renderMana(f.ManaCost)
+	}
+	b.WriteString(line + "\n")
+	b.WriteString(lipgloss.NewStyle().Foreground(gruvFgDim).Render(f.TypeLine) + "\n")
+
+	if f.Power != "" && f.Toughness != "" {
+		b.WriteString(lipgloss.NewStyle().Foreground(gruvPurple).
+			Render(fmt.Sprintf("P/T: %s/%s", f.Power, f.Toughness)) + "\n")
+	}
+	if f.Loyalty != "" {
+		b.WriteString(lipgloss.NewStyle().Foreground(gruvPurple).
+			Render(fmt.Sprintf("Loyalty: %s", f.Loyalty)) + "\n")
+	}
+	return b.String()
+}
+
+// oracleBlock is a card's rules text: one block for an ordinary card, and
+// one per face for a double-faced one, each labelled with the face it
+// belongs to, since Scryfall keeps no text on the card itself.
+func oracleBlock(c ScryfallCard, width int, rules RulesData) string {
+	faces := c.faces()
+
+	var b strings.Builder
+	for i, f := range faces {
+		if i > 0 {
+			// The back face needs its own heading — its name, cost and
+			// P/T are all different from the front's.
+			b.WriteString("\n")
+			b.WriteString(faceHeading(f, lipgloss.NewStyle().Bold(true).Foreground(colorForCard(f.Colors))))
+		}
+		if f.OracleText != "" {
+			b.WriteString(highlightOracle(f, width, rules) + "\n")
+		}
+	}
+	return b.String()
 }
 
 func (m model) renderPreview(c ScryfallCard, maxW int) string {
@@ -1369,38 +1728,26 @@ func (m model) renderPreview(c ScryfallCard, maxW int) string {
 		maxW = 24
 	}
 
-	col := colorForCard(c.Colors)
-	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(col)
+	// A double-faced card's name, cost and P/T live on its faces; the front
+	// one stands in for the card at the top of the panel.
+	front := c.faces()[0]
+
+	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(colorForCard(front.Colors))
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvAqua).MarginTop(1)
 	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
 
 	var b strings.Builder
 
-	nameLine := nameStyle.Render(c.Name)
-	if c.ManaCost != "" {
-		nameLine += "  " + renderMana(c.ManaCost)
-	}
-	b.WriteString(nameLine + "\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(gruvFgDim).Render(c.TypeLine) + "\n")
-
-	if c.Power != "" && c.Toughness != "" {
-		b.WriteString(lipgloss.NewStyle().Foreground(gruvPurple).
-			Render(fmt.Sprintf("P/T: %s/%s", c.Power, c.Toughness)) + "\n")
-	}
-	if c.Loyalty != "" {
-		b.WriteString(lipgloss.NewStyle().Foreground(gruvPurple).
-			Render(fmt.Sprintf("Loyalty: %s", c.Loyalty)) + "\n")
-	}
-
+	b.WriteString(faceHeading(front, nameStyle))
 	b.WriteString(dimStyle.Render(fmt.Sprintf("%s · %s · CMC %.0f", c.SetName, c.Rarity, c.CMC)) + "\n")
 
 	if c.EDHRECRank > 0 {
 		b.WriteString(dimStyle.Render(fmt.Sprintf("EDHREC Rank: #%d", c.EDHRECRank)) + "\n")
 	}
 
-	if c.OracleText != "" {
+	if body := oracleBlock(c, maxW, m.rules); body != "" {
 		b.WriteString(headerStyle.Render("Oracle Text") + "\n")
-		b.WriteString(highlightOracle(c, maxW, m.rules) + "\n")
+		b.WriteString(body)
 	}
 
 	// Rulings — fetched in the background once the cursor settles here.
@@ -1454,240 +1801,6 @@ func (m model) renderRulings(c ScryfallCard, maxW int) string {
 	return b.String()
 }
 
-// ── Statistics helpers ──────────────────────────────────────────
-
-func (m model) getVisibleCards() []ScryfallCard {
-	items := m.resultList.VisibleItems()
-	cards := make([]ScryfallCard, 0, len(items))
-	for _, item := range items {
-		if ci, ok := item.(cardItem); ok {
-			cards = append(cards, ci.card)
-		}
-	}
-	return cards
-}
-
-func renderHistogram(title string, counts map[string]int, order []string, maxW int, labelW int, colorFn func(string) lipgloss.Color) string {
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvAqua)
-	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
-
-	var b strings.Builder
-	b.WriteString(headerStyle.Render(title) + "\n")
-
-	if len(counts) == 0 {
-		b.WriteString(dimStyle.Render("  (none)") + "\n")
-		return b.String()
-	}
-
-	// Find max count for scaling
-	maxCount := 0
-	for _, k := range order {
-		if c, ok := counts[k]; ok && c > maxCount {
-			maxCount = c
-		}
-	}
-	// Also check for keys not in order
-	for k, c := range counts {
-		found := false
-		for _, o := range order {
-			if o == k {
-				found = true
-				break
-			}
-		}
-		if !found {
-			order = append(order, k)
-		}
-		if c > maxCount {
-			maxCount = c
-		}
-	}
-
-	if maxCount == 0 {
-		b.WriteString(dimStyle.Render("  (none)") + "\n")
-		return b.String()
-	}
-
-	// Bar area width
-	countW := len(fmt.Sprintf("%d", maxCount))
-	barMaxW := maxW - labelW - countW - 5
-	if barMaxW < 5 {
-		barMaxW = 5
-	}
-
-	for _, k := range order {
-		c, ok := counts[k]
-		if !ok || c == 0 {
-			continue
-		}
-
-		barLen := (c * barMaxW) / maxCount
-		if barLen < 1 {
-			barLen = 1
-		}
-
-		col := gruvFg
-		if colorFn != nil {
-			col = colorFn(k)
-		}
-
-		label := lipgloss.NewStyle().
-			Width(labelW).
-			Foreground(col).
-			Render(k)
-
-		bar := lipgloss.NewStyle().
-			Foreground(col).
-			Render(strings.Repeat("█", barLen))
-
-		count := lipgloss.NewStyle().
-			Foreground(gruvFgDim).
-			Render(fmt.Sprintf(" %d", c))
-
-		b.WriteString(fmt.Sprintf("  %s %s%s\n", label, bar, count))
-	}
-
-	return b.String()
-}
-
-func (m model) renderStats(maxW int) string {
-	cards := m.getVisibleCards()
-
-	if maxW < 30 {
-		maxW = 30
-	}
-
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvOrange)
-
-	var b strings.Builder
-
-	b.WriteString(titleStyle.Render(fmt.Sprintf(" Statistics (%d cards)", len(cards))) + "\n\n")
-
-	// Gather all label names to compute a global label width
-	allLabels := []string{
-		"White", "Blue", "Black", "Red", "Green", "Colorless", "Multi",
-		"common", "uncommon", "rare", "mythic", "special", "bonus",
-		"0", "1", "2", "3", "4", "5", "6", "7+",
-		"Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land",
-	}
-	globalLabelW := 0
-	for _, l := range allLabels {
-		if len(l) > globalLabelW {
-			globalLabelW = len(l)
-		}
-	}
-
-	// ── Color Distribution ──
-	colorCounts := map[string]int{}
-	for _, c := range cards {
-		if len(c.Colors) == 0 {
-			colorCounts["Colorless"]++
-		} else {
-			for _, col := range c.Colors {
-				switch col {
-				case "W":
-					colorCounts["White"]++
-				case "U":
-					colorCounts["Blue"]++
-				case "B":
-					colorCounts["Black"]++
-				case "R":
-					colorCounts["Red"]++
-				case "G":
-					colorCounts["Green"]++
-				}
-			}
-		}
-		if len(c.Colors) > 1 {
-			colorCounts["Multi"]++
-		}
-	}
-	colorOrder := []string{"White", "Blue", "Black", "Red", "Green", "Colorless", "Multi"}
-	colorFn := func(k string) lipgloss.Color {
-		switch k {
-		case "White":
-			return lipgloss.Color("#fbf1c7")
-		case "Blue":
-			return gruvBlue
-		case "Black":
-			return gruvGray
-		case "Red":
-			return gruvRed
-		case "Green":
-			return gruvGreen
-		case "Multi":
-			return gruvYellow
-		default:
-			return gruvFgDim
-		}
-	}
-	b.WriteString(renderHistogram("Color", colorCounts, colorOrder, maxW, globalLabelW, colorFn))
-	b.WriteString("\n")
-
-	// ── Rarity Distribution ──
-	rarityCounts := map[string]int{}
-	for _, c := range cards {
-		r := c.Rarity
-		if r == "" {
-			r = "unknown"
-		}
-		rarityCounts[r]++
-	}
-	rarityOrder := []string{"common", "uncommon", "rare", "mythic", "special", "bonus"}
-	rarityFn := func(k string) lipgloss.Color {
-		switch k {
-		case "common":
-			return gruvFg
-		case "uncommon":
-			return gruvFgDim
-		case "rare":
-			return gruvYellow
-		case "mythic":
-			return gruvOrange
-		case "special":
-			return gruvPurple
-		default:
-			return gruvGray
-		}
-	}
-	b.WriteString(renderHistogram("Rarity", rarityCounts, rarityOrder, maxW, globalLabelW, rarityFn))
-	b.WriteString("\n")
-
-	// ── CMC Distribution ──
-	cmcCounts := map[string]int{}
-	for _, c := range cards {
-		cmc := int(c.CMC)
-		key := strconv.Itoa(cmc)
-		if cmc >= 7 {
-			key = "7+"
-		}
-		cmcCounts[key]++
-	}
-	cmcOrder := []string{"0", "1", "2", "3", "4", "5", "6", "7+"}
-	cmcFn := func(k string) lipgloss.Color {
-		return gruvAqua
-	}
-	b.WriteString(renderHistogram("CMC (Mana Value)", cmcCounts, cmcOrder, maxW, globalLabelW, cmcFn))
-	b.WriteString("\n")
-
-	// ── Type Distribution ──
-	typeCounts := map[string]int{}
-	typeOrder := []string{"Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land"}
-	for _, c := range cards {
-		for _, t := range typeOrder {
-			if strings.Contains(c.TypeLine, t) {
-				typeCounts[t]++
-			}
-		}
-	}
-	typeFn := func(k string) lipgloss.Color {
-		return gruvPurple
-	}
-	b.WriteString(renderHistogram("Type", typeCounts, typeOrder, maxW, globalLabelW, typeFn))
-
-	return b.String()
-}
-
 // ── Main ────────────────────────────────────────────────────────
 
 // printCardStdout renders a single card for the terminal, with the same
@@ -1700,31 +1813,18 @@ func printCardStdout(c ScryfallCard) {
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvAqua)
 	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
 
-	name := lipgloss.NewStyle().Bold(true).Foreground(colorForCard(c.Colors)).Render(c.Name)
-	if c.ManaCost != "" {
-		name += "  " + renderMana(c.ManaCost)
-	}
-	fmt.Println(name)
-	fmt.Println(lipgloss.NewStyle().Foreground(gruvFgDim).Render(c.TypeLine))
-
-	if c.Power != "" && c.Toughness != "" {
-		fmt.Println(lipgloss.NewStyle().Foreground(gruvPurple).
-			Render(fmt.Sprintf("P/T: %s/%s", c.Power, c.Toughness)))
-	}
-	if c.Loyalty != "" {
-		fmt.Println(lipgloss.NewStyle().Foreground(gruvPurple).
-			Render(fmt.Sprintf("Loyalty: %s", c.Loyalty)))
-	}
+	front := c.faces()[0]
+	fmt.Print(faceHeading(front, lipgloss.NewStyle().Bold(true).Foreground(colorForCard(front.Colors))))
 
 	fmt.Println(dimStyle.Render(fmt.Sprintf("%s · %s · CMC %.0f", c.SetName, c.Rarity, c.CMC)))
 	if c.EDHRECRank > 0 {
 		fmt.Println(dimStyle.Render(fmt.Sprintf("EDHREC Rank: #%d", c.EDHRECRank)))
 	}
 
-	if c.OracleText != "" {
+	if body := oracleBlock(c, width, rules); body != "" {
 		fmt.Println()
 		fmt.Println(headerStyle.Render("Oracle Text"))
-		fmt.Println(highlightOracle(c, width, rules))
+		fmt.Print(body)
 	}
 
 	fmt.Println()
@@ -1813,8 +1913,20 @@ func main() {
 		return
 	}
 
+	// `scry deck <id | url>` — the id out of a deck's public URL is enough.
+	if len(os.Args) > 1 && os.Args[1] == "deck" {
+		runDeck(m, os.Args[2:])
+		return
+	}
+
 	if len(os.Args) > 1 {
 		query := strings.Join(os.Args[1:], " ")
+
+		// A Moxfield link passed straight in opens that deck.
+		if id, ok := moxfieldURLID(query); ok {
+			runDeck(m, []string{id})
+			return
+		}
 
 		// Check if single result — print to stdout and exit
 		u := fmt.Sprintf("https://api.scryfall.com/cards/search?q=%s&order=%s",
@@ -1842,6 +1954,140 @@ func main() {
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}
+}
+
+const deckUsage = `Usage:
+  scry deck <name | id | url>     Open a saved deck, or one off Moxfield
+  scry deck list                  List the decks you've saved
+  scry deck save <name> <id|url>  Save a deck under a short name
+  scry deck rm <name>             Forget a saved deck
+
+Inside the app, w saves the deck you're looking at.`
+
+// runDeck opens a Moxfield deck directly, or handles one of the subcommands
+// for the saved-deck list. The reference is checked here so a typo fails on
+// the terminal; the deck itself loads once the TUI is up, which keeps the
+// "loading deck…" line on screen while it does.
+func runDeck(m model, args []string) {
+	if len(args) == 0 {
+		fmt.Println(deckUsage)
+		os.Exit(1)
+	}
+
+	switch args[0] {
+	case "list":
+		runDeckList()
+		return
+	case "save":
+		runDeckSave(args[1:])
+		return
+	case "rm", "remove", "forget":
+		runDeckForget(args[1:])
+		return
+	}
+
+	arg := strings.Join(args, " ")
+
+	// A saved name wins over reading the same text as a deck id, so saving
+	// a deck as "ghen" doesn't collide with anything on Moxfield.
+	id := ""
+	if saved, ok := lookupSavedDeck(arg); ok {
+		id = saved.ID
+	} else {
+		var ok bool
+		if id, ok = deckRef(arg); !ok {
+			fmt.Println("Not a saved deck, a Moxfield id, or a Moxfield URL:", arg)
+			os.Exit(1)
+		}
+	}
+
+	m.searching = true
+	m.deckLoading = true
+	m.initialDeck = id
+	m.searchInput.SetValue("https://moxfield.com/decks/" + id)
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+}
+
+func runDeckList() {
+	decks, err := loadSavedDecks()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	if len(decks) == 0 {
+		fmt.Println("No saved decks yet. Save one with:")
+		fmt.Println("  scry deck save <name> <moxfield url>")
+		return
+	}
+
+	aliasStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvYellow)
+	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
+
+	aliases := aliasesSorted(decks)
+	width := 0
+	for _, a := range aliases {
+		if len(a) > width {
+			width = len(a)
+		}
+	}
+	for _, a := range aliases {
+		d := decks[a]
+		fmt.Printf("%s  %s\n",
+			aliasStyle.Render(a+strings.Repeat(" ", width-len(a))),
+			d.Name)
+		fmt.Printf("%s  %s\n", strings.Repeat(" ", width), dimStyle.Render(d.URL))
+	}
+}
+
+func runDeckSave(args []string) {
+	if len(args) < 2 {
+		fmt.Println("Usage: scry deck save <name> <deck-id | moxfield url>")
+		os.Exit(1)
+	}
+
+	alias := args[0]
+	id, ok := deckRef(strings.Join(args[1:], " "))
+	if !ok {
+		fmt.Println("Not a Moxfield deck id or URL:", strings.Join(args[1:], " "))
+		os.Exit(1)
+	}
+
+	// Fetch it once before saving, so a bad id fails now rather than the
+	// next time the deck is opened — and so the deck's real title is stored.
+	fmt.Println("Checking deck…")
+	info, _, err := loadDeck(id)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := saveDeck(alias, savedDeck{Name: info.name, ID: id, URL: info.url}); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Saved %q as %s — open it with: scry deck %s\n", info.name, alias, alias)
+}
+
+func runDeckForget(args []string) {
+	if len(args) != 1 {
+		fmt.Println("Usage: scry deck rm <name>")
+		os.Exit(1)
+	}
+
+	found, err := forgetDeck(args[0])
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	if !found {
+		fmt.Printf("No saved deck called %q.\n", args[0])
+		os.Exit(1)
+	}
+	fmt.Printf("Forgot %s.\n", args[0])
 }
 
 // runRules opens the comprehensive-rules browser directly.

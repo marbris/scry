@@ -543,7 +543,11 @@ func (d RulesData) MatchCard(c ScryfallCard) []RuleMatch {
 	var out []RuleMatch
 	seen := make(map[string]bool)
 
-	for _, sp := range scan(d.keywordRe, c.OracleText) {
+	// Both halves of a double-faced card, so the back face's keywords
+	// still turn up in the rules panel.
+	oracle := c.combinedOracle()
+
+	for _, sp := range scan(d.keywordRe, oracle) {
 		kw, ok := d.keywords[strings.ToLower(sp.text)]
 		if !ok {
 			continue
@@ -560,7 +564,7 @@ func (d RulesData) MatchCard(c ScryfallCard) []RuleMatch {
 	}
 
 	glossaryHits := 0
-	for _, sp := range scan(d.glossaryRe, c.OracleText) {
+	for _, sp := range scan(d.glossaryRe, oracle) {
 		if glossaryHits >= maxGlossaryMatches {
 			break
 		}
