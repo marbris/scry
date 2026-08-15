@@ -25,7 +25,7 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+r" {
 			return m.openRulesBrowser(nil, "")
 		}
-		if m.searchFocused {
+		if m.searchFocused() {
 			return m.updateSearchBar(msg)
 		}
 		return m.updateList(msg)
@@ -42,19 +42,19 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.err = nil
-		m.deck = nil
-		m.deckCards = nil
 		m.cards = msg.cards
 		m.totalCards = msg.totalCards
 		items := make([]list.Item, len(msg.cards))
 		for i, c := range msg.cards {
 			items[i] = cardItem{card: c}
 		}
-		m = m.setResults(items)
+		m.results.setItems(items)
+		m.previewScroll = 0
 
-		// Hand focus to the list so the results are immediately navigable.
-		m.searchFocused = false
-		m.searchInput.Blur()
+		// Hand focus to the results so they're immediately navigable. A
+		// search no longer closes the deck: having both on screen at once is
+		// the point of the deck column.
+		m = m.setFocus(focusResults)
 		m.applyLayout()
 		next, cmd := m.syncHover()
 		return next, cmd
@@ -78,31 +78,36 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		info := msg.info
 		m.deck = &info
 		m.deckCards = msg.cards
-		m.cards = make([]ScryfallCard, 0, len(msg.cards))
-		for _, dc := range msg.cards {
-			m.cards = append(m.cards, dc.card)
+		m.deckPane.setItems(deckItems(msg.cards))
+		m.previewScroll = 0
+
+		// The deck gets its own column, so the search results stay where
+		// they are. With nothing searched yet the deck is all there is to
+		// look at, which is what an empty results list means.
+		if m.results.empty() {
+			m.cards = make([]ScryfallCard, 0, len(msg.cards))
+			for _, dc := range msg.cards {
+				m.cards = append(m.cards, dc.card)
+			}
+			m.totalCards = info.total
+			m.searchInput.SetValue(info.ref())
 		}
-		m.totalCards = info.total
 
-		m = m.setResults(deckItems(msg.cards))
-
-		m.searchInput.SetValue(info.ref())
-		m.searchFocused = false
-		m.searchInput.Blur()
+		m = m.setFocus(focusDeck)
 		m.applyLayout()
 		next, cmd := m.syncHover()
 		return next, cmd
 	}
 
 	// Anything else (cursor blink, spinner ticks) goes to whatever has focus.
-	if m.searchFocused {
+	if m.searchFocused() {
 		var cmd tea.Cmd
 		m.searchInput, cmd = m.searchInput.Update(msg)
 		return m, cmd
 	}
 
 	var cmd tea.Cmd
-	m.resultList, cmd = m.resultList.Update(msg)
+	m.active().list, cmd = m.active().list.Update(msg)
 	next, hoverCmd := m.syncHover()
 	return next, tea.Batch(cmd, hoverCmd)
 }
@@ -113,7 +118,7 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		query := strings.TrimSpace(m.searchInput.Value())
 		if query == "" {
-			return m.focusList(), nil
+			return m.setFocus(m.lastListFocus()), nil
 		}
 		m.err = nil
 		m.searching = true
@@ -127,10 +132,10 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, searchScryfall(query, sortOptions[m.sortIndex], maxResults)
 
 	case "esc":
-		if len(m.cards) == 0 {
+		if len(m.cards) == 0 && !m.deckOpen() {
 			return m, tea.Quit
 		}
-		return m.focusList(), nil
+		return m.setFocus(m.lastListFocus()), nil
 
 	case "tab":
 		m.sortIndex = (m.sortIndex + 1) % len(sortOptions)
@@ -143,7 +148,7 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Browse the results without leaving the search bar.
 	case "up", "down", "pgup", "pgdown":
 		var cmd tea.Cmd
-		m.resultList, cmd = m.resultList.Update(msg)
+		m.results.list, cmd = m.results.list.Update(msg)
 		next, hoverCmd := m.syncHover()
 		return next, tea.Batch(cmd, hoverCmd)
 	}
@@ -199,19 +204,25 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 	}
 
-	if m.resultList.FilterState() != list.Filtering {
+	if !m.active().filtering() {
 		switch msg.String() {
 		case "i", "ctrl+f":
-			return m.focusSearch(), textinput.Blink
+			return m.setFocus(focusSearch), textinput.Blink
+		case "tab", "shift+tab":
+			// Between the results and the deck beside them.
+			return m.cycleFocus(), nil
 		case "esc":
 			// esc peels one layer off at a time: the typed filter, then
-			// the statistics category, then the app itself.
-			if m.resultList.FilterState() != list.Unfiltered {
-				m.resultList.ResetFilter()
+			// the statistics category, then the deck column, then the app.
+			if m.active().list.FilterState() != list.Unfiltered {
+				m.active().list.ResetFilter()
 				return m, nil
 			}
-			if m.statFilter != nil {
+			if m.active().statFilter != nil {
 				return m.clearStatFilter()
+			}
+			if m.focus == focusDeck {
+				return m.setFocus(focusResults), nil
 			}
 			return m, tea.Quit
 		case "?":
@@ -258,7 +269,7 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.scrollPanel(step), nil
 		case "enter":
 			// Open the rules browser scoped to this card's keywords.
-			if item, ok := m.resultList.SelectedItem().(cardItem); ok {
+			if item, ok := m.active().selected(); ok {
 				return m.openRulesBrowser(m.cardRuleItems(item.card), item.card.Name)
 			}
 			return m, nil
@@ -266,41 +277,16 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmd tea.Cmd
-	m.resultList, cmd = m.resultList.Update(msg)
+	m.active().list, cmd = m.active().list.Update(msg)
 	next, hoverCmd := m.syncHover()
 	return next, tea.Batch(cmd, hoverCmd)
-}
-
-// setResults installs a fresh set of cards, forgetting whichever statistics
-// category the last lot was narrowed to.
-func (m model) setResults(items []list.Item) model {
-	m.baseItems = items
-	m.statFilter = nil
-	m.statIndex = -1
-	m.previewScroll = 0
-	m.resultList.SetItems(items)
-	m.resultList.ResetSelected()
-	return m
-}
-
-func (m model) focusSearch() model {
-	m.searchFocused = true
-	m.searchInput.Focus()
-	m.searchInput.CursorEnd()
-	return m
-}
-
-func (m model) focusList() model {
-	m.searchFocused = false
-	m.searchInput.Blur()
-	return m
 }
 
 // syncHover notices when the cursor lands on a different card and queues
 // that card's rulings behind a short delay, so scrolling through a list
 // doesn't fire a request per row.
 func (m model) syncHover() (model, tea.Cmd) {
-	item, ok := m.resultList.SelectedItem().(cardItem)
+	item, ok := m.active().selected()
 	if !ok {
 		m.hoverKey = ""
 		return m, nil
@@ -380,16 +366,32 @@ func (m model) cardRuleItems(c ScryfallCard) []list.Item {
 // resultsLayout is the single source of truth for panel geometry, used
 // both when sizing the list in Update and when drawing in View.
 type resultsLayout struct {
-	headerH  int
-	bodyH    int
-	listW    int
-	listH    int
-	panelW   int
-	panelH   int
+	headerH int
+	bodyH   int
+	listW   int
+	listH   int
+	deckW   int // 0 when the deck has no column of its own
+	panelW  int
+	panelH  int
+
 	vertical bool // panel sits under the list (narrow terminals)
 }
 
-const headerLines = 4 // search bar, sort, results, and the rule below them
+const (
+	headerLines = 4 // search bar, sort, results, and the rule below them
+
+	// Above this width the deck gets a column of its own beside the search
+	// results, with the card panel still to the right of both. Below it
+	// there's only room for one of the two, and `tab` swaps between them.
+	// Three columns need roughly 50 each to be worth having.
+	threeColumnWidth = 160
+)
+
+// deckColumn reports whether the deck is drawn beside the results rather
+// than in place of the panel.
+func (m model) deckColumn() bool {
+	return m.deckOpen() && m.width >= threeColumnWidth
+}
 
 func (m model) resultsLayout() resultsLayout {
 	l := resultsLayout{headerH: headerLines}
@@ -401,14 +403,25 @@ func (m model) resultsLayout() resultsLayout {
 
 	// The panel box is one column (or row) wider than its Width()/Height()
 	// because of its border, which the -1s below account for.
-	if m.width < compactWidth {
-		// Narrow: list on top, panel underneath.
+	switch {
+	case m.width < compactWidth:
+		// Narrow: list on top, panel underneath, one at a time.
 		l.vertical = true
 		l.listW = m.width
 		l.listH = l.bodyH / 2
 		l.panelW = m.width
 		l.panelH = l.bodyH - l.listH - 1
-	} else {
+
+	case m.deckColumn():
+		// Wide: results, deck and panel side by side. The deck column is
+		// the narrowest of the three — it's a list of names, where the
+		// other two carry mana costs and type lines or whole rules texts.
+		l.listH, l.panelH = l.bodyH, l.bodyH
+		l.deckW = m.width * 28 / 100
+		l.listW = (m.width - l.deckW - 2) / 2
+		l.panelW = m.width - l.listW - l.deckW - 2
+
+	default:
 		l.listW = m.width / 2
 		l.listH = l.bodyH
 		l.panelW = m.width - l.listW - 1
@@ -420,6 +433,9 @@ func (m model) resultsLayout() resultsLayout {
 	}
 	if l.panelW < 24 {
 		l.panelW = 24
+	}
+	if l.deckW != 0 && l.deckW < 18 {
+		l.deckW = 18
 	}
 	if l.listH < 3 {
 		l.listH = 3
@@ -437,7 +453,14 @@ func (m *model) applyLayout() {
 		return
 	}
 	l := m.resultsLayout()
-	m.resultList.SetSize(l.listW, l.listH)
+	m.results.list.SetSize(l.listW, l.listH)
+	if l.deckW > 0 {
+		m.deckPane.list.SetSize(l.deckW-deckChrome, l.listH-1)
+	} else {
+		// Without a column of its own the deck takes the list's slot when
+		// it has focus, so it's sized for that.
+		m.deckPane.list.SetSize(l.listW, l.listH)
+	}
 
 	inputW := m.width - 12
 	if inputW < 20 {
@@ -459,7 +482,7 @@ func (m model) resultsHeader() string {
 
 	// The search bar dims when the list has focus, so it's always clear
 	// where typing will go.
-	if m.searchFocused {
+	if m.searchFocused() {
 		m.searchInput.PromptStyle = lipgloss.NewStyle().Foreground(gruvOrange)
 		m.searchInput.TextStyle = lipgloss.NewStyle().Foreground(gruvFg)
 	} else {
@@ -471,18 +494,39 @@ func (m model) resultsHeader() string {
 	b.WriteString(m.searchInput.View() + "\n")
 
 	// A deck's own name and author are more use on this line than a sort
-	// order that only applies to the next search.
-	if m.deck != nil {
-		b.WriteString(labelStyle.Render("Deck") + valueStyle.Render(truncate(m.deck.name, 40)))
+	// order that only applies to the next search — but only while the deck
+	// is what the main list is showing. Once it has a column of its own the
+	// column is captioned with its name, and this line goes back to the
+	// sort order, which is about the search beside it.
+	// Padded to the label column when it starts the line, plain when it's
+	// tacked onto the end of the sort order.
+	deckLine := func(padded bool) {
+		label := labelStyle.Render("Deck")
+		if !padded {
+			label = lipgloss.NewStyle().Foreground(gruvAqua).Bold(true).Render("  Deck ")
+		}
+		b.WriteString(label + valueStyle.Render(truncate(m.deck.name, 40)))
 		if by := m.deck.author; by != "" {
 			b.WriteString(dimStyle.Render("  by " + by))
 		}
 		if f := m.deck.format; f != "" {
 			b.WriteString(dimStyle.Render("  · " + f))
 		}
-	} else {
+	}
+
+	switch {
+	case m.deckInMainList():
+		deckLine(true)
+
+	case m.deckColumn():
+		// Both are on screen, so this line carries both: the sort order the
+		// search beside it will use, and whose deck the column is.
 		b.WriteString(labelStyle.Render("Sort") + valueStyle.Render(sortOptions[m.sortIndex]))
-		if m.searchFocused {
+		deckLine(false)
+
+	default:
+		b.WriteString(labelStyle.Render("Sort") + valueStyle.Render(sortOptions[m.sortIndex]))
+		if m.searchFocused() {
 			b.WriteString(dimStyle.Render("  tab: cycle  enter: search"))
 		} else {
 			b.WriteString(dimStyle.Render("  i: edit search  ?: help"))
@@ -491,7 +535,7 @@ func (m model) resultsHeader() string {
 	b.WriteString("\n")
 
 	label := "Results"
-	if m.deck != nil {
+	if m.deckInMainList() {
 		label = "Cards"
 	}
 	b.WriteString(labelStyle.Render(label) + m.resultsSummary())
@@ -525,13 +569,13 @@ func (m model) resultsSummary() string {
 	}
 
 	// A deck counts copies, so 99 cards can be 63 distinct ones.
-	if m.deck != nil {
+	if m.deckInMainList() {
 		out := valueStyle.Render(fmt.Sprintf("%d cards", m.deck.total))
 		if m.deck.unique != m.deck.total {
 			out += dimStyle.Render(fmt.Sprintf(" · %d unique", m.deck.unique))
 		}
-		if m.resultList.FilterState() != list.Unfiltered {
-			out += dimStyle.Render(fmt.Sprintf("  (%d filtered)", len(m.resultList.VisibleItems())))
+		if m.active().list.FilterState() != list.Unfiltered {
+			out += dimStyle.Render(fmt.Sprintf("  (%d filtered)", len(m.active().list.VisibleItems())))
 		}
 		return out + m.noticeText()
 	}
@@ -543,8 +587,8 @@ func (m model) resultsSummary() string {
 	}
 	out = valueStyle.Render(out)
 
-	if m.resultList.FilterState() != list.Unfiltered {
-		out += dimStyle.Render(fmt.Sprintf("  (%d filtered)", len(m.resultList.VisibleItems())))
+	if m.active().list.FilterState() != list.Unfiltered {
+		out += dimStyle.Render(fmt.Sprintf("  (%d filtered)", len(m.active().list.VisibleItems())))
 	}
 	return out + m.noticeText()
 }
@@ -564,23 +608,44 @@ func (m model) noticeText() string {
 
 func (m model) viewResults() string {
 	l := m.resultsLayout()
-	m.resultList.SetSize(l.listW, l.listH)
+
+	// Which list occupies the main slot. With a deck column both are on
+	// screen at once; without one, the slot shows whichever has focus, and
+	// tab swaps them.
+	main := &m.results
+	if m.focus == focusDeck && l.deckW == 0 {
+		main = &m.deckPane
+	}
+	main.list.SetSize(l.listW, l.listH)
 
 	// The list's own help line can render wider than the width it was
 	// given, which would reflow everything beside it.
-	listView := lipgloss.NewStyle().MaxWidth(l.listW).Render(m.resultList.View())
+	listView := lipgloss.NewStyle().MaxWidth(l.listW).Render(main.list.View())
 
 	panel := scrollView(m.panelContent(l.panelW-4), m.panelScroll(), l.panelH-1) +
 		"\n" + m.panelHint()
 
 	var body string
-	if l.vertical {
+	switch {
+	case l.vertical:
 		body = lipgloss.JoinVertical(
 			lipgloss.Left,
 			listView,
 			m.panelBox(panel, l.panelW, l.panelH, false, true),
 		)
-	} else {
+
+	case l.deckW > 0:
+		// One line of the column goes to its heading.
+		m.deckPane.list.SetSize(l.deckW-deckChrome, l.listH-1)
+		deckView := m.deckPane.list.View()
+		body = lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			listView,
+			m.deckBox(deckView, l.deckW, l.listH),
+			m.panelBox(panel, l.panelW, l.panelH, true, false),
+		)
+
+	default:
 		body = lipgloss.JoinHorizontal(
 			lipgloss.Top,
 			listView,
@@ -591,9 +656,50 @@ func (m model) viewResults() string {
 	return lipgloss.JoinVertical(lipgloss.Left, m.resultsHeader(), body)
 }
 
+// deckChrome is what the deck column's frame costs its contents: one column
+// for the rule down its left edge and one for the padding inside it. The
+// list has to be sized to what's left, or every row wraps.
+const deckChrome = 2
+
+// deckBox frames the deck column, with a heading naming the deck and a rule
+// down its left edge. The border picks up the focus colour so it's obvious
+// which of the two lists the keys are going to.
+func (m model) deckBox(content string, w, h int) string {
+	border := gruvGray
+	if m.focus == focusDeck {
+		border = gruvOrange
+	}
+
+	inner := w - deckChrome
+	if inner < 1 {
+		inner = 1
+	}
+
+	title, counts := "Deck", ""
+	if m.deck != nil {
+		counts = fmt.Sprintf(" %d · %d", m.deck.total, m.deck.unique)
+		title = truncate(m.deck.name, inner-runeLen(counts))
+	}
+	heading := lipgloss.NewStyle().Foreground(gruvAqua).Bold(true).Render(title) +
+		lipgloss.NewStyle().Foreground(gruvGray).Render(counts)
+
+	// Hard-clip, as the panel does: one over-long row would otherwise wrap
+	// and push everything below it down a line.
+	content = lipgloss.NewStyle().MaxWidth(inner).MaxHeight(h).Render(heading + "\n" + content)
+
+	return lipgloss.NewStyle().
+		Width(w).
+		Height(h).
+		PaddingLeft(1).
+		BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(border).
+		Render(content)
+}
+
 // panelContent renders whichever panel is on screen.
 func (m model) panelContent(inner int) string {
-	card, _ := m.resultList.SelectedItem().(cardItem)
+	card, _ := m.active().selected()
 
 	switch m.panel {
 	case panelStats:
@@ -678,7 +784,7 @@ func (m model) panelHint() string {
 	switch m.panel {
 	case panelStats:
 		parts = []string{"J/K: category", "^d/^u: scroll", "s: card"}
-		if m.statFilter != nil {
+		if m.active().statFilter != nil {
 			parts = append(parts, "esc: clear")
 		}
 	case panelRules:

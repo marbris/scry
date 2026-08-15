@@ -275,7 +275,7 @@ func TestStartsOnResultsScreen(t *testing.T) {
 	if m.state != stateResults {
 		t.Errorf("initial state is %v, want the results screen", m.state)
 	}
-	if !m.searchFocused {
+	if !m.searchFocused() {
 		t.Error("the search bar does not have focus at startup")
 	}
 
@@ -320,7 +320,7 @@ func TestInitialQuerySkipsTheSearchScreen(t *testing.T) {
 	if m.searching {
 		t.Error("still marked as searching after the results arrived")
 	}
-	if m.searchFocused {
+	if m.searchFocused() {
 		t.Error("focus stayed in the search bar after the results arrived")
 	}
 }
@@ -330,7 +330,7 @@ func TestSearchBarFocus(t *testing.T) {
 	data := loadTestRules(t)
 	m := resultsModel(t, 140, 40, data)
 
-	if m.searchFocused {
+	if m.searchFocused() {
 		t.Fatal("focus should be on the list once results are in")
 	}
 
@@ -342,7 +342,7 @@ func TestSearchBarFocus(t *testing.T) {
 
 	// i (or esc) puts focus back in the search bar, where the same letter types.
 	editing := drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
-	if !editing.searchFocused {
+	if !editing.searchFocused() {
 		t.Fatal("i did not focus the search bar")
 	}
 	typed := drive(editing, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
@@ -352,12 +352,12 @@ func TestSearchBarFocus(t *testing.T) {
 
 	// Arrows still move the list while typing.
 	moved := drive(typed, tea.KeyMsg{Type: tea.KeyDown})
-	if moved.resultList.Index() != 1 {
+	if moved.active().list.Index() != 1 {
 		t.Error("arrow keys do not move the list while the search bar has focus")
 	}
 
 	// esc hands focus back to the list.
-	if back := drive(typed, tea.KeyMsg{Type: tea.KeyEsc}); back.searchFocused {
+	if back := drive(typed, tea.KeyMsg{Type: tea.KeyEsc}); back.searchFocused() {
 		t.Error("esc did not return focus to the list")
 	}
 }
@@ -389,10 +389,10 @@ func TestRulingsAreDebounced(t *testing.T) {
 	cards := testCards()
 	m.cards = cards
 	m.state = stateResults
-	m.resultList.SetItems([]list.Item{
+	m.active().list.SetItems([]list.Item{
 		cardItem{card: cards[0]}, cardItem{card: cards[1]},
 	})
-	m.resultList.ResetSelected()
+	m.active().list.ResetSelected()
 
 	m, _ = m.syncHover() // hovering the first card; a tick is pending
 	staleSeq := m.hoverSeq
@@ -669,7 +669,7 @@ func TestHistoryAssemblesFromCachedSets(t *testing.T) {
 		OracleText: "Flying", TypeLine: "Creature — Bird",
 	}
 	m.cards = []ScryfallCard{card}
-	m.resultList.SetItems([]list.Item{cardItem{card: card}})
+	m.active().list.SetItems([]list.Item{cardItem{card: card}})
 	m.histories["oid"] = &cardHistory{state: histPrintings}
 
 	// Both sets are already in memory, so this resolves without any fetch.
@@ -836,11 +836,19 @@ func TestDeckHeaderShowsDeckNotSort(t *testing.T) {
 		cards: deckFixture(),
 	})
 
+	// Whose deck it is stays on the header line, beside the sort order the
+	// search will use.
 	header := stripANSI(m.resultsHeader())
-	for _, want := range []string{"Deck", "Winota: Snowball Stax", "by ComedIan", "commander", "100 cards", "98 unique"} {
+	for _, want := range []string{"Deck", "Winota: Snowball Stax", "by ComedIan", "commander"} {
 		if !strings.Contains(header, want) {
 			t.Errorf("deck header missing %q:\n%s", want, header)
 		}
+	}
+
+	// Its size belongs to the column, which is what's being counted.
+	view := stripANSI(m.View())
+	if !strings.Contains(view, "100 · 98") {
+		t.Errorf("the deck column is not captioned with its size:\n%s", view)
 	}
 	// The layout budget is fixed, so the deck header has to be the same
 	// height as the search one.
@@ -849,20 +857,76 @@ func TestDeckHeaderShowsDeckNotSort(t *testing.T) {
 	}
 }
 
-func TestSearchAfterDeckClearsIt(t *testing.T) {
+func TestSearchKeepsTheDeckOpen(t *testing.T) {
+	// Searching while a deck is open used to close it. Having both on
+	// screen at once is the whole point of the deck column, so now it
+	// doesn't — the results fill their own list beside the deck.
 	m := initialModel()
-	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = drive(m, tea.WindowSizeMsg{Width: 200, Height: 40})
 	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Test Deck", total: 34}, cards: deckFixture()})
 	if m.deck == nil {
 		t.Fatal("deck did not load")
 	}
+	if !m.deckColumn() {
+		t.Fatal("a deck at 200 columns should have a column of its own")
+	}
 
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
-	if m.deck != nil {
-		t.Error("a new search left the deck header in place")
+	if m.deck == nil {
+		t.Error("a search closed the deck")
 	}
-	if !strings.Contains(stripANSI(m.resultsHeader()), "Sort") {
-		t.Error("header did not go back to showing the sort order")
+	if len(m.deckPane.list.Items()) == 0 {
+		t.Error("a search emptied the deck column")
+	}
+	if len(m.results.list.Items()) != len(testCards()) {
+		t.Errorf("the results list holds %d cards, want %d", len(m.results.list.Items()), len(testCards()))
+	}
+	if m.focus != focusResults {
+		t.Error("a search should hand focus to the results")
+	}
+
+	// With the deck in its own column, captioned there, the header line goes
+	// back to the sort order — which is what the search beside it uses.
+	header := stripANSI(m.resultsHeader())
+	if !strings.Contains(header, "Sort") {
+		t.Errorf("header did not show the sort order:\n%s", header)
+	}
+	if !strings.Contains(stripANSI(m.View()), "Test Deck") {
+		t.Error("the deck column is not captioned with the deck's name")
+	}
+}
+
+func TestNarrowTerminalSwapsBetweenListsInstead(t *testing.T) {
+	// Below the three-column width there's only room for one list beside
+	// the panel, so tab swaps which one is in it.
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 140, Height: 40})
+	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Test Deck", total: 34}, cards: deckFixture()})
+	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+
+	if m.deckColumn() {
+		t.Fatal("140 columns is not wide enough for three")
+	}
+	if m.focus != focusResults {
+		t.Fatalf("focus = %v, want the results", m.focus)
+	}
+	// The main list is showing the search results, so the header describes
+	// those.
+	if got := stripANSI(m.resultsHeader()); !strings.Contains(got, "Results") {
+		t.Errorf("header = %q, want the search results", got)
+	}
+
+	m = drive(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.focus != focusDeck {
+		t.Fatalf("tab did not move to the deck: focus = %v", m.focus)
+	}
+	if got := stripANSI(m.resultsHeader()); !strings.Contains(got, "Test Deck") {
+		t.Errorf("header = %q, want the deck once it holds the main list", got)
+	}
+
+	m = drive(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.focus != focusResults {
+		t.Errorf("tab did not come back to the results: focus = %v", m.focus)
 	}
 }
 
@@ -1177,7 +1241,7 @@ func taggedDeckModel(t *testing.T) model {
 
 func TestStatCountsMatchWhatFilteringGives(t *testing.T) {
 	m := taggedDeckModel(t)
-	entries := toEntries(m.baseItems)
+	entries := toEntries(m.active().baseItems)
 
 	// Every row's number has to be exactly what you get when you filter to
 	// it — that's the whole point of the rows carrying their own test.
@@ -1197,28 +1261,28 @@ func TestStatCountsMatchWhatFilteringGives(t *testing.T) {
 func TestStatNavigationFiltersTheList(t *testing.T) {
 	m := taggedDeckModel(t)
 
-	if m.statFilter != nil {
+	if m.active().statFilter != nil {
 		t.Fatal("opening the statistics panel filtered the list on its own")
 	}
-	full := len(m.resultList.Items())
+	full := len(m.active().list.Items())
 
 	// The first press enters the category list rather than stepping past it.
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
-	if m.statIndex != 0 || m.statFilter == nil {
-		t.Fatalf("first J did not select the first category (index %d)", m.statIndex)
+	if m.active().statIndex != 0 || m.active().statFilter == nil {
+		t.Fatalf("first J did not select the first category (index %d)", m.active().statIndex)
 	}
 
 	rows := flatRows(m.statPanel())
 	for i, want := range rows {
 		// Walk to row i.
-		for m.statIndex < i {
+		for m.active().statIndex < i {
 			m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
 		}
-		if !want.same(m.statFilter) {
-			t.Fatalf("at index %d the filter is %+v, want %s/%s", i, m.statFilter, want.group, want.label)
+		if !want.same(m.active().statFilter) {
+			t.Fatalf("at index %d the filter is %+v, want %s/%s", i, m.active().statFilter, want.group, want.label)
 		}
 
-		onScreen := toEntries(m.resultList.Items())
+		onScreen := toEntries(m.active().list.Items())
 		total := 0
 		for _, e := range onScreen {
 			total += e.qty
@@ -1265,26 +1329,26 @@ func TestStatNavigationFiltersTheList(t *testing.T) {
 	for i := 0; i < len(rows)+5; i++ {
 		m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
 	}
-	if m.statIndex != 0 {
-		t.Errorf("K past the top left index at %d", m.statIndex)
+	if m.active().statIndex != 0 {
+		t.Errorf("K past the top left index at %d", m.active().statIndex)
 	}
 
 	m = drive(m, tea.KeyMsg{Type: tea.KeyEsc})
-	if m.statFilter != nil || m.statIndex != -1 {
+	if m.active().statFilter != nil || m.active().statIndex != -1 {
 		t.Error("esc did not clear the category")
 	}
-	if len(m.resultList.Items()) != full {
-		t.Errorf("clearing left %d cards, want all %d", len(m.resultList.Items()), full)
+	if len(m.active().list.Items()) != full {
+		t.Errorf("clearing left %d cards, want all %d", len(m.active().list.Items()), full)
 	}
 }
 
 func TestStatLineMatchesRender(t *testing.T) {
 	m := taggedDeckModel(t)
 	groups := m.statPanel()
-	m.statFilter = &flatRows(groups)[0] // so the panel counts the whole deck
+	m.active().statFilter = &flatRows(groups)[0] // so the panel counts the whole deck
 
 	for i := range flatRows(groups) {
-		m.statIndex = i
+		m.active().statIndex = i
 		lines := strings.Split(stripANSI(m.renderStats(60)), "\n")
 
 		got := -1
@@ -1303,14 +1367,14 @@ func TestStatLineMatchesRender(t *testing.T) {
 func TestStatFilterSurvivesLeavingThePanel(t *testing.T) {
 	m := taggedDeckModel(t)
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
-	narrowed := len(m.resultList.Items())
+	narrowed := len(m.active().list.Items())
 
 	// Back to the card view: the filter stays, and the header says so.
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	if m.panel != panelCard {
 		t.Fatal("s did not return to the card view")
 	}
-	if len(m.resultList.Items()) != narrowed {
+	if len(m.active().list.Items()) != narrowed {
 		t.Error("leaving the statistics panel dropped the filter")
 	}
 	if !strings.Contains(stripANSI(m.resultsHeader()), m.statFilterLabel()) {
@@ -1321,16 +1385,16 @@ func TestStatFilterSurvivesLeavingThePanel(t *testing.T) {
 func TestNewResultsForgetTheCategory(t *testing.T) {
 	m := taggedDeckModel(t)
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
-	if m.statFilter == nil {
+	if m.active().statFilter == nil {
 		t.Fatal("no category selected")
 	}
 
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
-	if m.statFilter != nil || m.statIndex != -1 {
+	if m.active().statFilter != nil || m.active().statIndex != -1 {
 		t.Error("a new search kept the old category filter")
 	}
-	if len(m.resultList.Items()) != len(testCards()) {
-		t.Errorf("search results were narrowed to %d", len(m.resultList.Items()))
+	if len(m.active().list.Items()) != len(testCards()) {
+		t.Errorf("search results were narrowed to %d", len(m.active().list.Items()))
 	}
 }
 
@@ -1353,12 +1417,12 @@ func TestEscPeelsOffOneLayerAtATime(t *testing.T) {
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("Mountain")})
 	m = drive(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.resultList.FilterState() == list.Unfiltered {
+	if m.active().list.FilterState() == list.Unfiltered {
 		t.Fatal("the typed filter never applied")
 	}
 	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = next.(model)
-	if m.resultList.FilterState() != list.Unfiltered {
+	if m.active().list.FilterState() != list.Unfiltered {
 		t.Error("esc did not clear the typed filter")
 	}
 	if quits(cmd) {
@@ -1370,11 +1434,23 @@ func TestEscPeelsOffOneLayerAtATime(t *testing.T) {
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
 	next, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = next.(model)
-	if m.statFilter != nil {
+	if m.active().statFilter != nil {
 		t.Error("esc did not clear the category filter")
 	}
 	if quits(cmd) {
 		t.Fatal("esc quit while a category was still selected")
+	}
+
+	// Then the deck column hands focus back to the results beside it.
+	if m.focus == focusDeck {
+		next, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+		m = next.(model)
+		if quits(cmd) {
+			t.Fatal("esc quit while the deck still had focus")
+		}
+		if m.focus != focusResults {
+			t.Errorf("esc from the deck went to %v, want the results", m.focus)
+		}
 	}
 
 	// Only then does it quit.
@@ -1383,11 +1459,11 @@ func TestEscPeelsOffOneLayerAtATime(t *testing.T) {
 	}
 
 	// And it no longer walks back to the search bar — i does that.
-	if m.searchFocused {
+	if m.searchFocused() {
 		t.Fatal("focus should still be on the list")
 	}
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
-	if !next.(model).searchFocused {
+	if !next.(model).searchFocused() {
 		t.Error("i did not move focus to the search bar")
 	}
 }
@@ -1519,18 +1595,18 @@ func TestStatsScrollLeavesTheSelectionAlone(t *testing.T) {
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	m = walkTo(t, m, "Type", "Creature")
 
-	was, wasFilter := m.statIndex, m.statFilterLabel()
-	narrowed := len(m.resultList.Items())
+	was, wasFilter := m.active().statIndex, m.statFilterLabel()
+	narrowed := len(m.active().list.Items())
 
 	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlD})
 	if m.previewScroll == 0 {
 		t.Fatal("ctrl+d did not scroll the statistics panel")
 	}
-	if m.statIndex != was || m.statFilterLabel() != wasFilter {
+	if m.active().statIndex != was || m.statFilterLabel() != wasFilter {
 		t.Errorf("scrolling moved the selection from %d/%s to %d/%s",
-			was, wasFilter, m.statIndex, m.statFilterLabel())
+			was, wasFilter, m.active().statIndex, m.statFilterLabel())
 	}
-	if len(m.resultList.Items()) != narrowed {
+	if len(m.active().list.Items()) != narrowed {
 		t.Error("scrolling changed which cards are listed")
 	}
 
@@ -1539,14 +1615,14 @@ func TestStatsScrollLeavesTheSelectionAlone(t *testing.T) {
 	if m.previewScroll >= scrolled {
 		t.Errorf("ctrl+u did not scroll back: %d then %d", scrolled, m.previewScroll)
 	}
-	if m.statIndex != was {
+	if m.active().statIndex != was {
 		t.Error("scrolling back moved the selection")
 	}
 
 	// Moving the selection again brings it back into view.
 	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlD})
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
-	line := statLine(m.statPanel(), m.statIndex)
+	line := statLine(m.statPanel(), m.active().statIndex)
 	height := m.resultsLayout().panelH - 1
 	if line < m.previewScroll || line >= m.previewScroll+height {
 		t.Errorf("selected row on line %d is outside the visible %d..%d",

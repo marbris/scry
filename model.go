@@ -46,21 +46,27 @@ type model struct {
 	state       state
 	prevState   state // where stateRules was entered from
 	searchInput textinput.Model
-	// searchFocused routes typing to the search bar instead of the list
-	searchFocused bool
-	searching     bool
-	sortIndex     int
-	resultList    list.Model
-	cards         []ScryfallCard
-	totalCards    int
-	err           error
-	width         int
-	height        int
-	initialQuery  string
-	helpScroll    int
+	// focus routes keys to the search bar, the results, or the deck;
+	// returnFocus is the list to go back to when leaving the search bar.
+	focus        focusArea
+	returnFocus  focusArea
+	searching    bool
+	sortIndex    int
+	cards        []ScryfallCard
+	totalCards   int
+	err          error
+	width        int
+	height       int
+	initialQuery string
+	helpScroll   int
 
-	// An open deck replaces the search results with the deck's cards; nil
-	// whenever the list is holding search results instead.
+	// The two lists of cards on screen: what you searched for, and the deck
+	// you're building. The deck pane is empty until one is open, and the
+	// column only appears when it isn't.
+	results  pane
+	deckPane pane
+
+	// The open deck, or nil when the list is only holding search results.
 	deck *deckInfo
 	// deckCards is the open deck as a deck, keeping the quantities, tags and
 	// command zone that the flat card list drops. Saving and editing both
@@ -74,13 +80,6 @@ type model struct {
 	// notice is a one-off confirmation ("saved as …") shown beside the
 	// counts until the next keypress.
 	notice string
-
-	// The result list before the statistics panel narrows it, and which
-	// category it's narrowed to. statIndex is -1 when the panel's category
-	// list hasn't been entered.
-	baseItems  []list.Item
-	statIndex  int
-	statFilter *statRow
 
 	// The panel beside the list shows one of card / stats / rules,
 	// each keeping its own scroll position.
@@ -162,14 +161,21 @@ func initialModel() model {
 	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(gruvGray)
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(gruvOrange)
 
-	l := list.New([]list.Item{}, compactDelegate{}, 40, 30)
-	// The header above the list carries query/sort/count now.
-	l.SetShowTitle(false)
-	l.Styles.FilterPrompt = lipgloss.NewStyle().Foreground(gruvYellow)
-	l.Styles.FilterCursor = lipgloss.NewStyle().Foreground(gruvOrange)
-	l.SetShowStatusBar(true)
-	l.SetFilteringEnabled(true)
-	l.SetShowHelp(true)
+	newCardList := func(help bool) list.Model {
+		l := list.New([]list.Item{}, compactDelegate{}, 40, 30)
+		// The header above the list carries query/sort/count now.
+		l.SetShowTitle(false)
+		l.Styles.FilterPrompt = lipgloss.NewStyle().Foreground(gruvYellow)
+		l.Styles.FilterCursor = lipgloss.NewStyle().Foreground(gruvOrange)
+		l.SetShowStatusBar(help)
+		l.SetFilteringEnabled(true)
+		l.SetShowHelp(help)
+		return l
+	}
+	// Only the results list carries the help line; two copies of it in one
+	// screen is noise, and the deck column is the narrower of the two.
+	l := newCardList(true)
+	dl := newCardList(false)
 
 	rl := list.New([]list.Item{}, ruleDelegate{}, 40, 30)
 	rl.Title = "Rules"
@@ -185,18 +191,18 @@ func initialModel() model {
 	rl.SetShowHelp(true)
 
 	return model{
-		state:         stateResults,
-		searchInput:   ti,
-		searchFocused: true,
-		resultList:    l,
-		rulesList:     rl,
-		sortIndex:     9,
-		statIndex:     -1,
-		rulings:       make(map[string][]Ruling),
-		rulingErr:     make(map[string]error),
-		inflight:      make(map[string]bool),
-		histories:     make(map[string]*cardHistory),
-		originals:     make(map[string]map[string]string),
+		state:       stateResults,
+		searchInput: ti,
+		focus:       focusSearch,
+		results:     pane{list: l, statIndex: -1},
+		deckPane:    pane{list: dl, statIndex: -1},
+		rulesList:   rl,
+		sortIndex:   9,
+		rulings:     make(map[string][]Ruling),
+		rulingErr:   make(map[string]error),
+		inflight:    make(map[string]bool),
+		histories:   make(map[string]*cardHistory),
+		originals:   make(map[string]map[string]string),
 	}
 }
 

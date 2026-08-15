@@ -251,8 +251,8 @@ func (m model) statPanel() []statGroup {
 	// With a category selected the list on screen is already narrowed to
 	// it, so the rows have to come from the full set to stay still.
 	rowSource := counted
-	if m.statFilter != nil {
-		rowSource = toEntries(m.baseItems)
+	if m.active().statFilter != nil {
+		rowSource = toEntries(m.active().baseItems)
 	}
 	return statGroups(rowSource, counted)
 }
@@ -370,7 +370,7 @@ func (m model) renderStats(maxW int) string {
 			count := lipgloss.NewStyle().Foreground(countColor).Render(fmt.Sprintf(" %d", r.count))
 
 			row := fmt.Sprintf("%s %s%s", label, bar, count)
-			if index == m.statIndex {
+			if index == m.active().statIndex {
 				row = lipgloss.NewStyle().Foreground(gruvOrange).Render("▸ ") +
 					lipgloss.NewStyle().Background(gruvBgLight).Render(row)
 			} else {
@@ -389,7 +389,7 @@ func (m model) renderStats(maxW int) string {
 // getVisibleEntries is the cards on screen with their deck quantities, so a
 // deck running 30 Mountains counts as 30.
 func (m model) getVisibleEntries() []cardItem {
-	return toEntries(m.resultList.VisibleItems())
+	return toEntries(m.active().list.VisibleItems())
 }
 
 func toEntries(items []list.Item) []cardItem {
@@ -415,8 +415,8 @@ func (m model) statMove(delta int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	index := m.statIndex + delta
-	if m.statIndex < 0 {
+	index := m.active().statIndex + delta
+	if m.active().statIndex < 0 {
 		// The first press enters the list rather than stepping through it.
 		index = 0
 		if delta < 0 {
@@ -430,9 +430,9 @@ func (m model) statMove(delta int) (tea.Model, tea.Cmd) {
 		index = len(rows) - 1
 	}
 
-	m.statIndex = index
+	m.active().statIndex = index
 	row := rows[index]
-	m.statFilter = &row
+	m.active().statFilter = &row
 
 	// Scroll last: changing the list moves the cursor onto a different
 	// card, and syncHover resets the panel's scroll when it does.
@@ -443,10 +443,10 @@ func (m model) statMove(delta int) (tea.Model, tea.Cmd) {
 	// result set, which can shift positions if a typed filter was in play.
 	// Follow the category rather than the index.
 	groups := scrolled.statPanel()
-	if i := rowIndex(flatRows(groups), scrolled.statFilter); i >= 0 {
-		scrolled.statIndex = i
+	if i := rowIndex(flatRows(groups), scrolled.active().statFilter); i >= 0 {
+		scrolled.active().statIndex = i
 	}
-	scrolled.scrollStatIntoView(statLine(groups, scrolled.statIndex))
+	scrolled.scrollStatIntoView(statLine(groups, scrolled.active().statIndex))
 	return scrolled, cmd
 }
 
@@ -467,39 +467,40 @@ func (m *model) scrollStatIntoView(line int) {
 
 // clearStatFilter puts every card back in the list.
 func (m model) clearStatFilter() (tea.Model, tea.Cmd) {
-	m.statFilter = nil
-	m.statIndex = -1
+	m.active().statFilter = nil
+	m.active().statIndex = -1
 	return m.applyStatFilter()
 }
 
 // applyStatFilter rebuilds the list from the full result set, keeping only
 // the selected category's cards if one is selected.
 func (m model) applyStatFilter() (tea.Model, tea.Cmd) {
-	items := m.baseItems
-	if m.statFilter != nil {
+	p := m.active()
+	items := p.baseItems
+	if p.statFilter != nil {
 		kept := make([]list.Item, 0, len(items))
 		for _, it := range items {
 			ci, ok := it.(cardItem)
 			if !ok {
 				continue
 			}
-			if m.statFilter.match(ci) {
+			if p.statFilter.match(ci) {
 				kept = append(kept, it)
 			}
 		}
 		items = kept
 	}
 
-	m.resultList.SetItems(items)
-	m.resultList.ResetSelected()
+	p.list.SetItems(items)
+	p.list.ResetSelected()
 	next, cmd := m.syncHover()
 	return next, cmd
 }
 
 // statFilterLabel names the active category for the header.
 func (m model) statFilterLabel() string {
-	if m.statFilter == nil {
+	if m.active().statFilter == nil {
 		return ""
 	}
-	return m.statFilter.group + ": " + m.statFilter.label
+	return m.active().statFilter.group + ": " + m.active().statFilter.label
 }

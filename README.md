@@ -368,9 +368,10 @@ scry "t:dragon c:R"
 | Key | Action |
 |---|---|
 | `↑/↓` or `j/k` | Navigate list |
+| `tab` / `shift+tab` | Move between the search results and the deck |
 | `/` | Fuzzy filter (searches name + oracle text) |
 | `i` | Edit the search query |
-| `esc` | Clear the filter — or quit, if there isn't one |
+| `esc` | Clear the filter, then the category, then the deck — then quit |
 | `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
 | `ctrl+d` / `ctrl+u` | Scroll the panel half a screen, leaving the selection put |
 | `r` | Rules for this card (press again for the card view) |
@@ -458,7 +459,15 @@ There's nothing to configure — it works out of the box. Sorting defaults to ED
 
 `SCRY_DECKS_DIR` is the one exception: set it to keep your decks somewhere other than `~/.local/share/scry/decks/` — a directory you back up, or one already under version control, in which case scry uses that repository rather than making its own.
 
-The layout adapts to the terminal width: at 120 columns and up the panel sits beside the list, below that it sits underneath. The panel shows the card by default; `r` and `s` swap it for the rules or the statistics, and pressing the same key again brings the card back.
+The layout adapts to the terminal width. The panel shows the card by default; `r` and `s` swap it for the rules or the statistics, and pressing the same key again brings the card back.
+
+| Width | Layout |
+|---|---|
+| 160+ | search results │ deck │ panel — all three at once |
+| 120–159 | one list │ panel, with `tab` swapping the deck in and out of the list |
+| under 120 | stacked: list on top, panel underneath |
+
+With a deck open, `tab` moves between the search results and the deck. The panel follows whichever has focus, so the card text, rules and statistics all describe the list you're working in — and each list keeps its own filter and its own statistics category.
 
 ## How It Works
 

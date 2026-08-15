@@ -336,7 +336,7 @@ func normalizeText(s string) string {
 // card can mean a lot of set downloads, this only ever fetches when the
 // user presses the key — never as a side effect of moving the cursor.
 func (m model) toggleHistory() (tea.Model, tea.Cmd) {
-	card, ok := m.resultList.SelectedItem().(cardItem)
+	card, ok := m.active().selected()
 	if !ok {
 		return m, nil
 	}
