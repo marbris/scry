@@ -212,16 +212,33 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.notice = ""
 	}
 
+	// The tag prompt takes every key while it's open.
+	if m.tagging {
+		return m.updateTagging(msg)
+	}
+
 	if !m.active().filtering() {
 		switch msg.String() {
+		case " ":
+			return m.toggleMark()
+		case "v":
+			return m.markVisible()
+		case "V":
+			return m.clearMarks()
+		case "T":
+			return m.openTagPrompt()
 		case "i", "ctrl+f":
 			return m.setFocus(focusSearch), textinput.Blink
 		case "tab", "shift+tab":
 			// Between the results and the deck beside them.
 			return m.cycleFocus(), nil
 		case "esc":
-			// esc peels one layer off at a time: the typed filter, then
-			// the statistics category, then the deck column, then the app.
+			// esc peels one layer off at a time: the marks, then the typed
+			// filter, then the statistics category, then the deck column,
+			// then the app.
+			if len(m.marks) > 0 {
+				return m.clearMarks()
+			}
 			if m.active().list.FilterState() != list.Unfiltered {
 				m.active().list.ResetFilter()
 				return m, nil
@@ -625,6 +642,10 @@ func (m model) resultsSummary() string {
 // whichever statistics category the list is narrowed to.
 func (m model) noticeText() string {
 	out := ""
+	if n := m.markCount(); n > 0 {
+		out += lipgloss.NewStyle().Foreground(gruvGreen).
+			Render(fmt.Sprintf("  ● %d marked", n))
+	}
 	if label := m.statFilterLabel(); label != "" {
 		out += lipgloss.NewStyle().Foreground(gruvOrange).Render("  ▸ " + label)
 	}
@@ -649,15 +670,19 @@ func (m model) viewResults() string {
 	// Only the list taking keys is drawn in full colour. Whichever isn't
 	// goes dim, which is a far clearer signal than the colour of the rule
 	// between the columns.
-	m.results.list.SetDelegate(compactDelegate{blurred: m.focus == focusDeck})
-	m.deckPane.list.SetDelegate(compactDelegate{blurred: m.focus != focusDeck})
+	m.results.list.SetDelegate(compactDelegate{blurred: m.focus == focusDeck, marks: m.marks})
+	m.deckPane.list.SetDelegate(compactDelegate{blurred: m.focus != focusDeck, marks: m.marks})
 
 	// The list's own help line can render wider than the width it was
 	// given, which would reflow everything beside it.
 	listView := lipgloss.NewStyle().MaxWidth(l.listW).Render(main.list.View())
 
+	hint := m.panelHint()
+	if m.tagging {
+		hint = m.tagInput.View()
+	}
 	panel := scrollView(m.panelContent(l.panelW-4), m.panelScroll(), l.panelH-1) +
-		"\n" + m.panelHint()
+		"\n" + hint
 
 	var body string
 	switch {
@@ -847,7 +872,7 @@ func (m model) panelHint() string {
 // something it no longer describes.
 func leavesNotice(key string) bool {
 	switch key {
-	case "w", "a", "x", "c", "+", "=", "-", "_":
+	case "w", "a", "x", "c", "v", "V", "T", "+", "=", "-", "_":
 		return true
 	}
 	return false

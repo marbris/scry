@@ -86,6 +86,13 @@ type model struct {
 	// counts until the next keypress.
 	notice string
 
+	// marks are the cards picked out for tagging, by lowercased name so
+	// they survive the list being filtered or rebuilt beneath them.
+	// tagging is the inline tag prompt, open only while you're typing in it.
+	marks    map[string]bool
+	tagging  bool
+	tagInput textinput.Model
+
 	// The panel beside the list shows one of card / stats / rules,
 	// each keeping its own scroll position.
 	panel         panelMode

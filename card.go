@@ -134,8 +134,21 @@ type RulingsResponse struct {
 // ── Single-line delegate ────────────────────────────────────────
 
 // compactDelegate draws one card per line. blurred is set on whichever list
-// doesn't have focus.
-type compactDelegate struct{ blurred bool }
+// doesn't have focus; marks are the cards picked out for tagging.
+type compactDelegate struct {
+	blurred bool
+	marks   map[string]bool
+}
+
+// markGutter is the column in front of every row showing whether the card is
+// marked. It's always there, marked or not, so rows don't shift sideways as
+// you mark them.
+func (d compactDelegate) markGutter(c ScryfallCard) string {
+	if d.marks[strings.ToLower(c.Name)] {
+		return lipgloss.NewStyle().Foreground(gruvGreen).Bold(true).Render("●")
+	}
+	return " "
+}
 
 func (d compactDelegate) Height() int                             { return 1 }
 func (d compactDelegate) Spacing() int                            { return 0 }
@@ -149,8 +162,9 @@ func listColumns(total int) (nameW, manaW, typeW int) {
 	// {3}{W}{U} is three characters wide. The handful that run longer are
 	// truncated rather than made everything else sit behind a gap.
 	manaW = 6
-	// 2 columns for the cursor, and 2 between each pair of columns.
-	rest := total - 2 - manaW - 4
+	// 1 for the mark gutter, 2 for the cursor, and 2 between each pair of
+	// columns.
+	rest := total - 1 - 2 - manaW - 4
 	if rest < 18 {
 		rest = 18
 	}
@@ -202,7 +216,7 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		if selected {
 			cursor = "▹ "
 		}
-		fmt.Fprint(w, dim.Render(cursor+
+		fmt.Fprint(w, d.markGutter(c)+dim.Render(cursor+
 			padTo(truncate(name, nameW), nameW)+"  "+
 			mana+strings.Repeat(" ", pad)+"  "+
 			truncate(c.TypeLine, typeW)))
@@ -250,7 +264,7 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		line = "  " + line
 	}
 
-	fmt.Fprint(w, line)
+	fmt.Fprint(w, d.markGutter(c)+line)
 }
 
 // ── List item adapter ───────────────────────────────────────────

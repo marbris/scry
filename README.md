@@ -298,9 +298,35 @@ Press `d` (or `ctrl+o`, which also works before you've searched for anything) to
 
 Decks saved by a much older version of scry, which kept only a Moxfield address in `decks.json`, are no longer read. That file is left alone and `scry deck list` prints what's still in it, so you can import those decks and then delete it.
 
+#### Tagging in bulk
+
+Tags are your own labels on the cards in a deck — `ramp`, `removal`, `flying`, whatever you sort by. They live in the deck file, next to the card:
+
+```
+1 Anguished Unmaking [removal, instant]
+```
+
+The point of them is applying them to a lot of cards at once. Filter the deck down to what you mean, mark that lot, and tag them:
+
+```
+/flying    ⏎     narrow the list to what matches — name or oracle text
+v                mark all three of them
+T  flying  ⏎     tag them
+```
+
+`space` marks one card at a time and steps to the next, so a run of cards is one key held down. `V` clears the marks, and so does `esc`, before it touches anything else. A marked card stays marked while you filter, sort or edit around it — marks are held by card, not by row.
+
+In the prompt, a leading `-` removes instead of adding, and commas separate several at once: `flying, evasion, -needs-review`. With nothing marked, `T` tags just the card under the cursor — never everything the filter is showing, which is what `v` is for.
+
+The whole lot is one commit:
+
+```
+1222b50  retag Dragonlord Ojutai, retag Goldspan Dragon, retag Serra Angel
+```
+
 #### Card tags
 
-If the deck's author tagged their cards on Moxfield — `Ramp`, `Removal`, `Protection` — those tags come down with the deck and get their own breakdown in the statistics panel, counted by copies and commonest first:
+Tags — your own, or the author's if the deck came from Moxfield — get their own breakdown in the statistics panel, counted by copies and commonest first:
 
 ```
 Tags
@@ -310,7 +336,7 @@ Tags
   C.) Removal/Interaction       █████████████████ 16
 ```
 
-Tags are per deck and set by whoever built it, so an untagged deck simply doesn't show the section.
+Tags are per deck, so an untagged deck simply doesn't show the section.
 
 ### Statistics as a filter
 
@@ -400,6 +426,9 @@ scry "t:dragon c:R"
 | `t` | Printed text history (press again for the card view) |
 | `a` | Add the selected card to the open deck |
 | `c` | Mark it a commander, or unmark it (adds it if it isn't in the deck) |
+| `space` | Mark the card for tagging, and step to the next |
+| `v` / `V` | Mark everything the list is showing / clear the marks |
+| `T` | Tag the marked cards — `-tag` removes, commas separate |
 | `x` | Remove it from the deck (from either list) |
 | `+` / `-` | Another copy, or one fewer — `-` on the last copy removes it |
 | `w` | Save now; or save the deck you're browsing as one of your own |
