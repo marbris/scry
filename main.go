@@ -157,6 +157,7 @@ const deckUsage = `Usage:
   scry deck <name>                Open one of your decks
   scry deck <id | url>            Browse a deck on Moxfield, without saving it
   scry deck list                  List your decks
+  scry deck new <name> [format]   Start an empty deck
   scry deck import <id|url> [as]  Copy a Moxfield deck in so you can edit it
   scry deck rm <name>             Delete a deck
   scry deck log <name>            What you've changed, and when
@@ -179,6 +180,9 @@ func runDeck(m model, args []string) {
 	switch args[0] {
 	case "list", "ls":
 		runDeckList()
+		return
+	case "new", "create":
+		runDeckNew(args[1:])
 		return
 	case "import", "save":
 		runDeckImport(args[1:])
@@ -275,6 +279,50 @@ func runDeckList() {
 	}
 
 	fmt.Print(notice)
+}
+
+func runDeckNew(args []string) {
+	if len(args) < 1 {
+		fmt.Println("Usage: scry deck new <name> [format]")
+		os.Exit(1)
+	}
+
+	format := ""
+	name := strings.Join(args, " ")
+	// A trailing format is a convenience, not a requirement: "scry deck new
+	// Ghen commander" and "scry deck new Ghen" both work.
+	if len(args) > 1 && knownFormat(args[len(args)-1]) {
+		format = strings.ToLower(args[len(args)-1])
+		name = strings.Join(args[:len(args)-1], " ")
+	}
+
+	slug, d, err := newDeck(name, format)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	if _, warning, err := saveDeckVersioned(slug, d); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	} else if warning != "" {
+		fmt.Println(lipgloss.NewStyle().Foreground(gruvOrange).Render("  " + warning))
+	}
+
+	fmt.Printf("Created %q (%s)\n", d.Name, d.Format)
+	fmt.Printf("  %s\n", deckFilePath(slug))
+	fmt.Printf("Open it with: scry deck %s\n", slug)
+	fmt.Println(lipgloss.NewStyle().Foreground(gruvGray).
+		Render("Search for a card and press a to add it, or c to make it a commander."))
+}
+
+// knownFormat is the set of formats worth recognising as a trailing word.
+func knownFormat(s string) bool {
+	switch strings.ToLower(s) {
+	case "commander", "standard", "pioneer", "modern", "legacy",
+		"vintage", "pauper", "brawl", "oathbreaker", "limited":
+		return true
+	}
+	return false
 }
 
 func runDeckImport(args []string) {

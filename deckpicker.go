@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -129,6 +130,7 @@ func (m model) openDeckPicker() (tea.Model, tea.Cmd) {
 	m.prevState = m.state
 	m.state = stateDecks
 	m.deckPickerErr = nil
+	m.naming = false
 
 	if len(m.deckPicker.Items()) == 0 {
 		m.deckPicker = newDeckPickerList(m.width, m.height)
@@ -166,10 +168,17 @@ func (m model) updateDeckPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.naming {
+			return m.updateDeckNaming(msg)
+		}
 		if m.deckPicker.FilterState() == list.Filtering {
 			break
 		}
 		switch msg.String() {
+		case "n":
+			m.naming = true
+			m.deckNameInput = newDeckNameInput()
+			return m, textinput.Blink
 		case "esc", "q":
 			m.state = m.prevState
 			return m, nil
@@ -194,26 +203,87 @@ func (m model) updateDeckPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// ── Naming a new deck ───────────────────────────────────────────
+
+func newDeckNameInput() textinput.Model {
+	ti := textinput.New()
+	ti.Placeholder = "deck name"
+	ti.Prompt = "New deck: "
+	ti.CharLimit = 80
+	ti.Width = 40
+	ti.Focus()
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(gruvAqua).Bold(true)
+	ti.TextStyle = lipgloss.NewStyle().Foreground(gruvFg)
+	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(gruvGray)
+	return ti
+}
+
+func (m model) updateDeckNaming(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.naming = false
+		return m, nil
+
+	case "enter":
+		slug, d, err := newDeck(m.deckNameInput.Value(), "")
+		if err != nil {
+			m.deckPickerErr = err
+			return m, nil
+		}
+		if _, _, err := saveDeckVersioned(slug, d); err != nil {
+			m.deckPickerErr = err
+			return m, nil
+		}
+
+		// Straight into the deck you just made, rather than back to a list
+		// to find it in.
+		m.naming = false
+		m.deckPickerErr = nil
+		m.state = m.prevState
+		m.deckLoading = true
+		return m, openLocalDeckCmd(slug)
+	}
+
+	m.deckPickerErr = nil
+	var cmd tea.Cmd
+	m.deckNameInput, cmd = m.deckNameInput.Update(msg)
+	return m, cmd
+}
+
 // ── View ────────────────────────────────────────────────────────
 
 func (m model) viewDeckPicker() string {
-	m.deckPicker.SetSize(m.width, m.height-2)
+	m.deckPicker.SetSize(m.width, m.height-3)
 
+	// An error goes above the list rather than in place of it: it's usually
+	// something you can act on ("you already have a deck called that"), and
+	// replacing the screen would hide the prompt you'd act in.
+	errLine := ""
 	if m.deckPickerErr != nil {
-		return lipgloss.NewStyle().Padding(1, 2).Foreground(gruvRed).
-			Render(m.deckPickerErr.Error())
+		errLine = lipgloss.NewStyle().Foreground(gruvRed).
+			Render("  " + m.deckPickerErr.Error())
 	}
-	if len(m.deckPicker.Items()) == 0 {
+
+	if len(m.deckPicker.Items()) == 0 && !m.naming {
 		return lipgloss.NewStyle().Padding(1, 2).Render(
 			lipgloss.NewStyle().Foreground(gruvAqua).Bold(true).Render("No decks yet") + "\n\n" +
 				lipgloss.NewStyle().Foreground(gruvGray).Render(
-					"Copy one in from Moxfield:\n"+
-						"  scry deck import <moxfield url>\n\n"+
+					"n            start an empty one\n"+
+						"\n"+
+						"or copy one in from Moxfield:\n"+
+						"  scry deck import <moxfield url>\n"+
 						"or paste a Moxfield URL into the search bar and press w.\n\n"+
 						"esc: back") + "\n" + legacyNotice())
 	}
 
+	if m.naming {
+		return lipgloss.JoinVertical(lipgloss.Left,
+			m.deckPicker.View(), errLine,
+			"  "+m.deckNameInput.View(),
+			lipgloss.NewStyle().Foreground(gruvGray).Render("  enter: create  esc: cancel"))
+	}
+
 	hint := lipgloss.NewStyle().Foreground(gruvGray).
-		Render("  enter: open  /: filter  esc: back")
-	return lipgloss.JoinVertical(lipgloss.Left, m.deckPicker.View(), hint)
+		Render("  enter: open  n: new deck  /: filter  esc: back")
+	return lipgloss.JoinVertical(lipgloss.Left, m.deckPicker.View(), errLine, hint)
 }

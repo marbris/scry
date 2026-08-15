@@ -129,12 +129,12 @@ func openLocalDeck(slug string) (deckInfo, []deckCard, error) {
 		return deckInfo{}, nil, err
 	}
 
+	// An empty deck is a deck — `scry deck new` makes one, and you fill it
+	// by adding cards to it. Only a deck whose cards all failed to resolve
+	// is a problem worth refusing to open.
 	cards, resolveErr := resolveEntries(d.mainEntries())
-	if len(cards) == 0 {
-		if resolveErr != nil {
-			return deckInfo{}, nil, resolveErr
-		}
-		return deckInfo{}, nil, fmt.Errorf("deck %q has no cards", slug)
+	if len(cards) == 0 && len(d.mainEntries()) > 0 {
+		return deckInfo{}, nil, resolveErr
 	}
 
 	total, unique := d.counts()

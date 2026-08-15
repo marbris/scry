@@ -231,9 +231,11 @@ Private and unlisted decks aren't accessible; the deck has to be public.
 
 #### Your own decks
 
-Press `w` on a deck you're browsing to copy it in as one of your own, or do it from the shell:
+Start an empty one, or copy in a deck you're browsing with `w`:
 
 ```bash
+scry deck new "Ghen reanimator"
+scry deck new "Winota aggro" modern     # commander unless you say otherwise
 scry deck import https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
 scry deck marchesa-political      # open it
 scry deck list                    # what you have
@@ -270,6 +272,8 @@ c57a6a5  +Dragonlord Ojutai, requantify Plains
 ```
 
 `w` writes immediately if you'd rather not wait, and quitting always writes first — an edit made a second before you quit is still an edit.
+
+`c` marks the selected card as a commander, and adds it first if it isn't in the deck yet — which is how a new deck starts: `scry deck new`, search for your commander, press `c`. Pressing `c` again unmarks it. scry doesn't know the rules and doesn't try to: how many commanders a deck has is between you and your playgroup, so several and none are both fine. It only records what you said, under a `[commander]` heading in the file.
 
 A deck you're browsing off Moxfield is read-only; press `w` to make it yours first.
 
@@ -395,6 +399,7 @@ scry "t:dragon c:R"
 | `s` | Statistics for these results (press again for the card view) |
 | `t` | Printed text history (press again for the card view) |
 | `a` | Add the selected card to the open deck |
+| `c` | Mark it a commander, or unmark it (adds it if it isn't in the deck) |
 | `x` | Remove it from the deck (from either list) |
 | `+` / `-` | Another copy, or one fewer — `-` on the last copy removes it |
 | `w` | Save now; or save the deck you're browsing as one of your own |
@@ -410,6 +415,7 @@ scry "t:dragon c:R"
 |---|---|
 | `↑/↓` or `j/k` | Move through your decks |
 | `/` | Filter by name or format |
+| `n` | Start a new deck |
 | `enter` | Open it |
 | `esc` or `q` | Back |
 

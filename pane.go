@@ -66,8 +66,10 @@ func (m *model) active() *pane {
 	return &m.results
 }
 
-// deckOpen reports whether there's a deck to give a column to.
-func (m model) deckOpen() bool { return m.deck != nil && !m.deckPane.empty() }
+// deckOpen reports whether a deck is open. An empty one still counts: a
+// deck you've just created is empty by definition, and you can't fill it if
+// nothing will show it to you.
+func (m model) deckOpen() bool { return m.deck != nil }
 
 // deckInMainList reports whether the deck is what the main list is showing,
 // rather than sitting in a column of its own. The header describes the main

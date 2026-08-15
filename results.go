@@ -261,6 +261,8 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.changeQty(1)
 		case "-", "_":
 			return m.changeQty(-1)
+		case "c":
+			return m.toggleCommander()
 		case "d":
 			// Your decks, to open one without quitting to the shell.
 			return m.openDeckPicker()
@@ -845,7 +847,7 @@ func (m model) panelHint() string {
 // something it no longer describes.
 func leavesNotice(key string) bool {
 	switch key {
-	case "w", "a", "x", "+", "=", "-", "_":
+	case "w", "a", "x", "c", "+", "=", "-", "_":
 		return true
 	}
 	return false

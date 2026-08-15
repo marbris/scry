@@ -392,3 +392,28 @@ func writeDeck(slug string, d *deckFile) error {
 func deleteDeck(slug string) error {
 	return os.Remove(deckFilePath(slug))
 }
+
+// defaultFormat is what a deck is assumed to be when you don't say. This is
+// a Commander tool first.
+const defaultFormat = "commander"
+
+// newDeck creates an empty deck and returns the name it was filed under.
+// Empty is a legitimate state: you fill it by adding cards, and until then
+// there's nothing to write but a header.
+func newDeck(name, format string) (slug string, d *deckFile, err error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", nil, fmt.Errorf("a deck needs a name")
+	}
+	slug = slugify(name)
+	if slug == "" {
+		return "", nil, fmt.Errorf("%q doesn't make a usable file name", name)
+	}
+	if deckExists(slug) {
+		return "", nil, fmt.Errorf("you already have a deck called %q", slug)
+	}
+	if format == "" {
+		format = defaultFormat
+	}
+	return slug, &deckFile{Name: name, Format: format}, nil
+}

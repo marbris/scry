@@ -109,6 +109,10 @@ type model struct {
 	// the shell to remember what it was called.
 	deckPicker    list.Model
 	deckPickerErr error
+	// naming is the inline prompt for a new deck's name, open only while
+	// you're typing one.
+	deckNameInput textinput.Model
+	naming        bool
 
 	// The open deck's git history, and the diff of whichever commit is
 	// under the cursor.

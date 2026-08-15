@@ -153,6 +153,40 @@ func (m model) changeQty(delta int) (tea.Model, tea.Cmd) {
 	return m.deckChanged(card.Name)
 }
 
+// toggleCommander marks the selected card as a commander, or unmarks it. A
+// card that isn't in the deck is added as one, which is how a new deck
+// starts: search for your commander and press c.
+//
+// Nothing here knows the rules. How many commanders a deck may have, and
+// what may be one, is between you and your playgroup — this only records
+// what you said, so several commanders and none are both fine.
+func (m model) toggleCommander() (tea.Model, tea.Cmd) {
+	if ok, why := m.editable(); !ok {
+		m.notice = why
+		return m, nil
+	}
+	card, ok := m.selectedCard()
+	if !ok {
+		return m, nil
+	}
+
+	i := m.deckIndexOf(card.Name)
+	if i < 0 {
+		m.deckCards = append(m.deckCards, deckCard{card: card, qty: 1, commander: true})
+		m.notice = "+1 " + card.Name + " · commander"
+		return m.deckChanged(card.Name)
+	}
+
+	m.deckCards = append([]deckCard(nil), m.deckCards...)
+	m.deckCards[i].commander = !m.deckCards[i].commander
+	if m.deckCards[i].commander {
+		m.notice = card.Name + " · commander"
+	} else {
+		m.notice = card.Name + " · no longer a commander"
+	}
+	return m.deckChanged(card.Name)
+}
+
 // setTags replaces one card's tags. Mass tagging in phase 7 works through
 // this, a card at a time.
 func (m *model) setTags(index int, tags []string) {
