@@ -258,6 +258,21 @@ source: https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
 
 Edit them in the app or in your editor — both work, and neither surprises the other. Cards are named rather than pinned to a printing, so the file stays readable; add `(c21) 263` after a name if you want a particular one. `SCRY_DECKS_DIR` moves the directory somewhere you'd rather keep it.
 
+#### Editing
+
+With one of your decks open, `a` adds the selected card and `x` takes it out — from either list, so a card you've just found in a search can go straight in, and one you spot in the search that you no longer want can come straight out. `+` and `-` change how many copies; `-` on the last one removes it. Adding a card that's already there won't quietly double it, since nearly every deck this is built for is singleton — `+` is how you ask for a second copy.
+
+Edits are written a couple of seconds after you stop making them, so a burst of changes becomes one commit rather than twelve:
+
+```
+c57a6a5  +Dragonlord Ojutai, requantify Plains
+0d7945a  Add Ghen
+```
+
+`w` writes immediately if you'd rather not wait, and quitting always writes first — an edit made a second before you quit is still an edit.
+
+A deck you're browsing off Moxfield is read-only; press `w` to make it yours first.
+
 #### History
 
 That directory is a git repository, and every change scry makes to a deck is a commit:
@@ -379,7 +394,10 @@ scry "t:dragon c:R"
 | `r` | Rules for this card (press again for the card view) |
 | `s` | Statistics for these results (press again for the card view) |
 | `t` | Printed text history (press again for the card view) |
-| `w` | Save the deck you're browsing as one of your own (decks only) |
+| `a` | Add the selected card to the open deck |
+| `x` | Remove it from the deck (from either list) |
+| `+` / `-` | Another copy, or one fewer — `-` on the last copy removes it |
+| `w` | Save now; or save the deck you're browsing as one of your own |
 | `d` or `ctrl+o` | Your decks — pick one to open |
 | `ctrl+g` | History of the open deck — browse versions and restore one |
 | `enter` | Browse the rules this card's text matched |

@@ -140,7 +140,7 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "esc":
 		if len(m.cards) == 0 && !m.deckOpen() {
-			return m, tea.Quit
+			return m.quitAfterSaving()
 		}
 		return m.setFocus(m.lastListFocus()), nil
 
@@ -206,8 +206,9 @@ func (m model) saveCurrentDeck() model {
 
 // updateList handles keys while the result list has focus.
 func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Any key moves on from the last confirmation.
-	if msg.String() != "w" {
+	// Any key moves on from the last confirmation, except the ones that
+	// leave one behind.
+	if !leavesNotice(msg.String()) {
 		m.notice = ""
 	}
 
@@ -231,7 +232,7 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.focus == focusDeck && m.bothLists() {
 				return m.setFocus(focusResults), nil
 			}
-			return m, tea.Quit
+			return m.quitAfterSaving()
 		case "?":
 			m.helpScroll = 0
 			m.state = stateHelp
@@ -246,7 +247,20 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "t":
 			return m.toggleHistory()
 		case "w":
+			// An explicit save is also a "write it now", ahead of the
+			// delay an edit would otherwise wait out.
+			if m.deckDirty {
+				return m.saveDeckNow()
+			}
 			return m.saveCurrentDeck(), nil
+		case "a":
+			return m.addToDeck()
+		case "x":
+			return m.removeFromDeck()
+		case "+", "=":
+			return m.changeQty(1)
+		case "-", "_":
+			return m.changeQty(-1)
 		case "d":
 			// Your decks, to open one without quitting to the shell.
 			return m.openDeckPicker()
@@ -824,4 +838,15 @@ func (m model) panelHint() string {
 		parts = append(parts, "w: save")
 	}
 	return lipgloss.NewStyle().Foreground(gruvGray).Render(strings.Join(parts, "  "))
+}
+
+// leavesNotice reports whether a key is one that says something afterwards.
+// Every other key clears the last message rather than letting it linger over
+// something it no longer describes.
+func leavesNotice(key string) bool {
+	switch key {
+	case "w", "a", "x", "+", "=", "-", "_":
+		return true
+	}
+	return false
 }

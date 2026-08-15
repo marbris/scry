@@ -74,6 +74,10 @@ type model struct {
 	// work from this rather than going back to where the deck came from.
 	deckCards   []deckCard
 	deckLoading bool
+	// deckDirty means there are edits not yet written. deckSeq rises with
+	// every edit so a save scheduled by an earlier one can tell it's stale.
+	deckDirty bool
+	deckSeq   int
 	// What to open on startup: a Moxfield id to browse, or the slug of a
 	// deck file to open. At most one is ever set.
 	initialDeck     string
@@ -241,8 +245,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
-			return m, tea.Quit
+			return m.quitAfterSaving()
 		}
+
+	// Saving the open deck happens on a delay, so a burst of edits is one
+	// commit. Both arrive whichever screen is up.
+	case deckSaveTickMsg:
+		return m.handleDeckSaveTick(msg)
+
+	case deckSavedMsg:
+		return m.handleDeckSaved(msg)
 
 	// Rulings and rules arrive regardless of which screen is up, so they
 	// are handled here rather than in a per-state update.
