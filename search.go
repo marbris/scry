@@ -171,26 +171,27 @@ const (
 	collectionDelay = 100 * time.Millisecond
 )
 
-// fetchCollection looks up cards by Scryfall id, 75 at a time. The response
-// isn't ordered, so it comes back keyed by id for the caller to arrange.
-func fetchCollection(ids []string) (map[string]ScryfallCard, error) {
-	out := make(map[string]ScryfallCard, len(ids))
+// fetchIdentifiers resolves Scryfall collection identifiers — {"id": …},
+// {"name": …} or {"set": …, "collector_number": …} — 75 at a time. The
+// response is unordered, so both the cards and the identifiers Scryfall
+// couldn't match come back for the caller to arrange.
+func fetchIdentifiers(idents []map[string]string) ([]ScryfallCard, []map[string]string, error) {
+	var found []ScryfallCard
+	var missing []map[string]string
 
-	for start := 0; start < len(ids); start += collectionChunk {
+	for start := 0; start < len(idents); start += collectionChunk {
 		end := start + collectionChunk
-		if end > len(ids) {
-			end = len(ids)
+		if end > len(idents) {
+			end = len(idents)
 		}
 
 		var req struct {
 			Identifiers []map[string]string `json:"identifiers"`
 		}
-		for _, id := range ids[start:end] {
-			req.Identifiers = append(req.Identifiers, map[string]string{"id": id})
-		}
+		req.Identifiers = idents[start:end]
 		payload, err := json.Marshal(req)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if start > 0 {
@@ -198,18 +199,36 @@ func fetchCollection(ids []string) (map[string]ScryfallCard, error) {
 		}
 		body, err := doPost("https://api.scryfall.com/cards/collection", payload)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		var cr struct {
-			Data []ScryfallCard `json:"data"`
+			Data     []ScryfallCard      `json:"data"`
+			NotFound []map[string]string `json:"not_found"`
 		}
 		if err := json.Unmarshal(body, &cr); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		for _, c := range cr.Data {
-			out[c.ID] = c
-		}
+		found = append(found, cr.Data...)
+		missing = append(missing, cr.NotFound...)
+	}
+	return found, missing, nil
+}
+
+// fetchCollection looks up cards by Scryfall id, keyed by id for the caller
+// to arrange.
+func fetchCollection(ids []string) (map[string]ScryfallCard, error) {
+	idents := make([]map[string]string, len(ids))
+	for i, id := range ids {
+		idents[i] = map[string]string{"id": id}
+	}
+	cards, _, err := fetchIdentifiers(idents)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]ScryfallCard, len(cards))
+	for _, c := range cards {
+		out[c.ID] = c
 	}
 	return out, nil
 }

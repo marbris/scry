@@ -28,6 +28,7 @@ type ScryfallCard struct {
 	OracleID        string `json:"oracle_id"`
 	PrintsSearchURI string `json:"prints_search_uri"`
 	Set             string `json:"set"`
+	CollectorNumber string `json:"collector_number"`
 	ReleasedAt      string `json:"released_at"`
 	Lang            string `json:"lang"`
 	Digital         bool   `json:"digital"`
