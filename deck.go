@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ── Deck model ──────────────────────────────────────────────────
@@ -17,6 +20,22 @@ type deckInfo struct {
 	url    string
 	total  int // cards counting quantities
 	unique int // distinct cards
+
+	// slug names the file this deck was read from, and is empty for a deck
+	// being browsed straight off Moxfield. Editing needs somewhere to write
+	// to, so it's what tells an editable deck from a borrowed one.
+	slug string
+}
+
+func (d deckInfo) local() bool { return d.slug != "" }
+
+// ref is what the search bar shows while the deck is open: the URL it came
+// from, or the command that would reopen it.
+func (d deckInfo) ref() string {
+	if d.local() {
+		return "deck " + d.slug
+	}
+	return d.url
 }
 
 type deckCard struct {
@@ -67,6 +86,78 @@ func primaryType(typeLine string) string {
 		}
 	}
 	return "Other"
+}
+
+// deckFileFrom builds a deck file out of a deck that's already open, so
+// saving what's on screen never needs to fetch it again — and works with no
+// network at all.
+func deckFileFrom(info deckInfo, cards []deckCard) *deckFile {
+	d := &deckFile{Name: info.name, Format: info.format, Source: info.url}
+	for _, dc := range cards {
+		section := "mainboard"
+		if dc.commander {
+			section = "commander"
+		}
+		d.Entries = append(d.Entries, deckEntry{
+			Qty:     dc.qty,
+			Name:    dc.card.Name,
+			Tags:    dc.tags,
+			Section: section,
+		})
+	}
+	return d
+}
+
+// ── Opening a local deck ────────────────────────────────────────
+
+func openLocalDeckCmd(slug string) tea.Cmd {
+	return func() tea.Msg {
+		info, cards, err := openLocalDeck(slug)
+		return deckLoadedMsg{info: info, cards: cards, err: err}
+	}
+}
+
+// openLocalDeck reads a deck file and resolves its card names. Cards that
+// won't resolve don't stop the deck opening — the error rides alongside the
+// cards that did, for the caller to show as a notice.
+func openLocalDeck(slug string) (deckInfo, []deckCard, error) {
+	d, err := readDeck(slug)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return deckInfo{}, nil, fmt.Errorf("no saved deck %q", slug)
+		}
+		return deckInfo{}, nil, err
+	}
+
+	cards, resolveErr := resolveEntries(d.mainEntries())
+	if len(cards) == 0 {
+		if resolveErr != nil {
+			return deckInfo{}, nil, resolveErr
+		}
+		return deckInfo{}, nil, fmt.Errorf("deck %q has no cards", slug)
+	}
+
+	total, unique := d.counts()
+	info := deckInfo{
+		name:   d.Name,
+		format: d.Format,
+		url:    d.Source,
+		slug:   slug,
+		total:  total,
+		unique: unique,
+	}
+	return info, cards, resolveErr
+}
+
+// mainEntries is the deck proper — everything a maybeboard shortlist isn't.
+func (d *deckFile) mainEntries() []deckEntry {
+	out := make([]deckEntry, 0, len(d.Entries))
+	for _, e := range d.Entries {
+		if e.Section != "maybeboard" {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // ── List layout ─────────────────────────────────────────────────

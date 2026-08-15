@@ -43,6 +43,7 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.err = nil
 		m.deck = nil
+		m.deckCards = nil
 		m.cards = msg.cards
 		m.totalCards = msg.totalCards
 		items := make([]list.Item, len(msg.cards))
@@ -61,14 +62,22 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case deckLoadedMsg:
 		m.searching = false
 		m.deckLoading = false
-		if msg.err != nil {
+		// A deck can open and still have something to say — cards whose
+		// names no longer resolve, or a lookup that couldn't be made. That's
+		// a notice beside the counts, not a screen instead of the deck.
+		if msg.err != nil && len(msg.cards) == 0 {
 			m.err = msg.err
 			return m, nil
+		}
+		m.notice = ""
+		if msg.err != nil {
+			m.notice = msg.err.Error()
 		}
 
 		m.err = nil
 		info := msg.info
 		m.deck = &info
+		m.deckCards = msg.cards
 		m.cards = make([]ScryfallCard, 0, len(msg.cards))
 		for _, dc := range msg.cards {
 			m.cards = append(m.cards, dc.card)
@@ -77,7 +86,7 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m = m.setResults(deckItems(msg.cards))
 
-		m.searchInput.SetValue(info.url)
+		m.searchInput.SetValue(info.ref())
 		m.searchFocused = false
 		m.searchInput.Blur()
 		m.applyLayout()
@@ -144,24 +153,38 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// saveCurrentDeck files the deck on screen under a name made from its title,
-// so it can be reopened with `scry deck <name>`.
+// saveCurrentDeck copies the Moxfield deck on screen into a deck file of
+// your own, which is the point at which it becomes editable. A deck that is
+// already local has nothing to import.
 func (m model) saveCurrentDeck() model {
 	if m.deck == nil {
 		m.notice = "nothing to save — open a deck first"
 		return m
 	}
-
-	alias := slugify(m.deck.name)
-	if alias == "" {
-		alias = m.deck.id
+	if m.deck.local() {
+		m.notice = fmt.Sprintf("already saved · %s", m.deck.slug)
+		return m
 	}
-	err := saveDeck(alias, savedDeck{Name: m.deck.name, ID: m.deck.id, URL: m.deck.url})
-	if err != nil {
+
+	slug := slugify(m.deck.name)
+	if slug == "" {
+		slug = m.deck.id
+	}
+
+	// Re-importing an existing deck is how you pull changes down from
+	// Moxfield, so it overwrites — but say which happened, because the two
+	// read very differently when you didn't mean the second.
+	verb := "saved"
+	if deckExists(slug) {
+		verb = "updated"
+	}
+
+	if err := writeDeck(slug, deckFileFrom(*m.deck, m.deckCards)); err != nil {
 		m.notice = fmt.Sprintf("could not save: %v", err)
 		return m
 	}
-	m.notice = fmt.Sprintf("saved · scry deck %s", alias)
+
+	m.notice = fmt.Sprintf("%s · scry deck %s", verb, slug)
 	return m
 }
 

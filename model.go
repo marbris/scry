@@ -58,11 +58,18 @@ type model struct {
 	initialQuery  string
 	helpScroll    int
 
-	// A loaded Moxfield deck replaces the search results with the deck's
-	// cards; nil whenever the list is holding search results instead.
-	deck        *deckInfo
+	// An open deck replaces the search results with the deck's cards; nil
+	// whenever the list is holding search results instead.
+	deck *deckInfo
+	// deckCards is the open deck as a deck, keeping the quantities, tags and
+	// command zone that the flat card list drops. Saving and editing both
+	// work from this rather than going back to where the deck came from.
+	deckCards   []deckCard
 	deckLoading bool
-	initialDeck string
+	// What to open on startup: a Moxfield id to browse, or the slug of a
+	// deck file to open. At most one is ever set.
+	initialDeck     string
+	initialDeckSlug string
 	// notice is a one-off confirmation ("saved as …") shown beside the
 	// counts until the next keypress.
 	notice string
@@ -192,6 +199,9 @@ func (m model) Init() tea.Cmd {
 	}
 	if m.initialDeck != "" {
 		cmds = append(cmds, loadDeckCmd(m.initialDeck))
+	}
+	if m.initialDeckSlug != "" {
+		cmds = append(cmds, openLocalDeckCmd(m.initialDeckSlug))
 	}
 	if m.initialQuery != "" {
 		cmds = append(cmds, searchScryfall(m.initialQuery, sortOptions[m.sortIndex], maxResults))

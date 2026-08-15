@@ -727,9 +727,16 @@ func TestDeckReferenceParsing(t *testing.T) {
 		}
 	}
 
-	// `scry deck` is explicit, so it takes the bare id too.
-	if id, ok := deckRef("Y8dZ7"); !ok || id != "Y8dZ7" {
-		t.Errorf("deckRef(bare id) = %q, %t; want Y8dZ7, true", id, ok)
+	// `scry deck` is explicit, so it takes a bare id too — but only one
+	// long enough to be a real Moxfield id, since a short bare word is far
+	// more likely to be one of your own decks, mistyped. Moxfield's ids are
+	// 22 characters; see moxfieldIDLen.
+	const bare = "j-0aJlxuOUm9FnKRvJcfZw"
+	if id, ok := deckRef(bare); !ok || id != bare {
+		t.Errorf("deckRef(bare id) = %q, %t; want %s, true", id, ok, bare)
+	}
+	if id, ok := deckRef("Y8dZ7"); ok {
+		t.Errorf("deckRef(%q) = %q; a short bare word is a deck name, not an id", "Y8dZ7", id)
 	}
 	if id, ok := deckRef("https://moxfield.com/decks/Y8dZ7"); !ok || id != "Y8dZ7" {
 		t.Errorf("deckRef(url) = %q, %t; want Y8dZ7, true", id, ok)
@@ -1118,12 +1125,23 @@ func TestSaveDeckFromTheApp(t *testing.T) {
 	})
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
 
-	saved, ok := lookupSavedDeck("winota-snowball-stax")
-	if !ok {
+	// w writes a deck file of your own, built from the cards already on
+	// screen — no second trip to Moxfield, so this works offline.
+	if !deckExists("winota-snowball-stax") {
 		t.Fatalf("w did not save the deck; notice was %q", m.notice)
 	}
-	if saved.ID != "Y8dZ7" {
+	saved, err := readDeck("winota-snowball-stax")
+	if err != nil {
+		t.Fatalf("saved deck does not read back: %v", err)
+	}
+	if saved.Name != "Winota: Snowball Stax" {
 		t.Errorf("saved the wrong deck: %+v", saved)
+	}
+	if saved.Source != "https://moxfield.com/decks/Y8dZ7" {
+		t.Errorf("saved deck lost where it came from: %q", saved.Source)
+	}
+	if len(saved.Entries) != len(deckFixture()) {
+		t.Errorf("saved %d cards, deck had %d", len(saved.Entries), len(deckFixture()))
 	}
 	if !strings.Contains(m.notice, "winota-snowball-stax") {
 		t.Errorf("notice does not say how to reopen it: %q", m.notice)
