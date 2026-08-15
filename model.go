@@ -1,0 +1,294 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+// The Bubbletea model itself — what the app is holding, the messages that
+// change it, and the Init/Update/View trio that dispatch to a screen. The
+// screens live in results.go, help.go and rulesview.go.
+
+// ── App state ───────────────────────────────────────────────────
+
+type state int
+
+const (
+	stateResults state = iota // the only main screen: search bar, list, panel
+	stateRules
+	stateHelp
+)
+
+// panelMode is what the panel beside the result list is showing.
+type panelMode int
+
+const (
+	panelCard panelMode = iota
+	panelStats
+	panelRules
+	panelHistory
+)
+
+// toggle switches to mode, or back to the card if already there.
+func (p panelMode) toggle(mode panelMode) panelMode {
+	if p == mode {
+		return panelCard
+	}
+	return mode
+}
+
+type model struct {
+	state       state
+	prevState   state // where stateRules was entered from
+	searchInput textinput.Model
+	// searchFocused routes typing to the search bar instead of the list
+	searchFocused bool
+	searching     bool
+	sortIndex     int
+	resultList    list.Model
+	cards         []ScryfallCard
+	totalCards    int
+	err           error
+	width         int
+	height        int
+	initialQuery  string
+	helpScroll    int
+
+	// A loaded Moxfield deck replaces the search results with the deck's
+	// cards; nil whenever the list is holding search results instead.
+	deck        *deckInfo
+	deckLoading bool
+	initialDeck string
+	// notice is a one-off confirmation ("saved as …") shown beside the
+	// counts until the next keypress.
+	notice string
+
+	// The result list before the statistics panel narrows it, and which
+	// category it's narrowed to. statIndex is -1 when the panel's category
+	// list hasn't been entered.
+	baseItems  []list.Item
+	statIndex  int
+	statFilter *statRow
+
+	// The panel beside the list shows one of card / stats / rules,
+	// each keeping its own scroll position.
+	panel         panelMode
+	previewScroll int
+	rulesScroll   int
+	historyScroll int
+
+	// Printed-text history, keyed by oracle id, plus the per-set printed
+	// text it's assembled from
+	histories map[string]*cardHistory
+	originals map[string]map[string]string
+
+	// Rulings, fetched lazily as the cursor moves
+	rulings   map[string][]Ruling
+	rulingErr map[string]error
+	inflight  map[string]bool
+	hoverKey  string
+	hoverSeq  int
+
+	// Comprehensive rules
+	rules        RulesData
+	rulesErr     error
+	rulesList    list.Model
+	showGlossary bool
+	browseScroll int
+}
+
+func cardKey(c ScryfallCard) string {
+	if c.ID != "" {
+		return c.ID
+	}
+	return c.Name + "|" + c.SetName
+}
+
+// ── Messages ────────────────────────────────────────────────────
+
+type searchResultMsg struct {
+	cards      []ScryfallCard
+	totalCards int
+	err        error
+}
+
+// rulingsTickMsg fires once a card has been hovered long enough to be
+// worth a request; seq is compared against the model to drop stale ticks.
+type rulingsTickMsg struct {
+	key string
+	uri string
+	seq int
+}
+
+type rulingsMsg struct {
+	key     string
+	rulings []Ruling
+	err     error
+}
+
+type rulesLoadedMsg struct {
+	data RulesData
+	err  error
+}
+
+// ── Init ────────────────────────────────────────────────────────
+
+func initialModel() model {
+	ti := textinput.New()
+	ti.Placeholder = "e.g. t:creature c:R cmc<=3 otag:removal"
+	ti.Prompt = "⌕ "
+	ti.Focus()
+	ti.Width = 60
+	ti.TextStyle = lipgloss.NewStyle().Foreground(gruvFg)
+	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(gruvGray)
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(gruvOrange)
+
+	l := list.New([]list.Item{}, compactDelegate{}, 40, 30)
+	// The header above the list carries query/sort/count now.
+	l.SetShowTitle(false)
+	l.Styles.FilterPrompt = lipgloss.NewStyle().Foreground(gruvYellow)
+	l.Styles.FilterCursor = lipgloss.NewStyle().Foreground(gruvOrange)
+	l.SetShowStatusBar(true)
+	l.SetFilteringEnabled(true)
+	l.SetShowHelp(true)
+
+	rl := list.New([]list.Item{}, ruleDelegate{}, 40, 30)
+	rl.Title = "Rules"
+	rl.Styles.Title = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(gruvOrange).
+		Background(gruvBgLight).
+		Padding(0, 1)
+	rl.Styles.FilterPrompt = lipgloss.NewStyle().Foreground(gruvYellow)
+	rl.Styles.FilterCursor = lipgloss.NewStyle().Foreground(gruvOrange)
+	rl.SetShowStatusBar(true)
+	rl.SetFilteringEnabled(true)
+	rl.SetShowHelp(true)
+
+	return model{
+		state:         stateResults,
+		searchInput:   ti,
+		searchFocused: true,
+		resultList:    l,
+		rulesList:     rl,
+		sortIndex:     9,
+		statIndex:     -1,
+		rulings:       make(map[string][]Ruling),
+		rulingErr:     make(map[string]error),
+		inflight:      make(map[string]bool),
+		histories:     make(map[string]*cardHistory),
+		originals:     make(map[string]map[string]string),
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	cmds := []tea.Cmd{textinput.Blink}
+	if !m.rules.loaded() {
+		cmds = append(cmds, loadRulesCmd())
+	}
+	if m.initialDeck != "" {
+		cmds = append(cmds, loadDeckCmd(m.initialDeck))
+	}
+	if m.initialQuery != "" {
+		cmds = append(cmds, searchScryfall(m.initialQuery, sortOptions[m.sortIndex], maxResults))
+	}
+	return tea.Batch(cmds...)
+}
+
+// ── Update ──────────────────────────────────────────────────────
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.applyLayout()
+		return m, nil
+
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+
+	// Rulings and rules arrive regardless of which screen is up, so they
+	// are handled here rather than in a per-state update.
+	case rulesLoadedMsg:
+		if msg.err != nil {
+			m.rulesErr = msg.err
+			return m, nil
+		}
+		m.rules = msg.data
+		// Don't clobber a list that was already populated (e.g. the
+		// `rules <query>` entry point starts out pre-filtered).
+		if len(m.rulesList.Items()) == 0 {
+			items := buildRuleItems(m.rules)
+			m.rulesList.SetItems(items)
+			m.rulesList.Title = fmt.Sprintf("Rules (%d)", len(items))
+		}
+		return m, nil
+
+	case rulingsTickMsg:
+		if msg.seq != m.hoverSeq || msg.key != m.hoverKey {
+			return m, nil // cursor moved on; never mind
+		}
+		if _, done := m.rulings[msg.key]; done || m.inflight[msg.key] {
+			return m, nil
+		}
+		m.inflight[msg.key] = true
+		return m, fetchRulings(msg.key, msg.uri)
+
+	case printingsMsg:
+		return m.handlePrintings(msg)
+
+	case setOriginalsMsg:
+		return m.handleSetOriginals(msg)
+
+	case rulingsMsg:
+		delete(m.inflight, msg.key)
+		if msg.err != nil {
+			m.rulingErr[msg.key] = msg.err
+			return m, nil
+		}
+		delete(m.rulingErr, msg.key)
+		m.rulings[msg.key] = msg.rulings
+		return m, nil
+	}
+
+	switch m.state {
+	case stateResults:
+		return m.updateResults(msg)
+	case stateRules:
+		return m.updateRulesBrowse(msg)
+	case stateHelp:
+		return m.updateHelp(msg)
+	}
+	return m, nil
+}
+
+// ── View ────────────────────────────────────────────────────────
+
+func (m model) View() string {
+	base := lipgloss.NewStyle().
+		Background(gruvBg).
+		Foreground(gruvFg).
+		Width(m.width).
+		Height(m.height).
+		MaxWidth(m.width).
+		MaxHeight(m.height)
+
+	var content string
+	switch m.state {
+	case stateResults:
+		content = m.viewResults()
+	case stateRules:
+		content = m.viewRulesBrowse()
+	case stateHelp:
+		content = m.viewHelp()
+	}
+
+	return base.Render(content)
+}

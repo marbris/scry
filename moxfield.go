@@ -1,18 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"regexp"
-	"sort"
 	"strings"
-	"time"
 
-	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -21,15 +15,7 @@ import (
 // the deck itself is only a list of ids and quantities — the card data all
 // comes from Scryfall, and deck cards behave like search results everywhere
 // else in the app.
-const (
-	moxfieldDeckURL = "https://api2.moxfield.com/v3/decks/all/%s"
-
-	// Scryfall takes up to 75 identifiers per collection request.
-	collectionChunk = 75
-
-	// Scryfall asks for a pause between requests; a Commander deck is two.
-	collectionDelay = 100 * time.Millisecond
-)
+const moxfieldDeckURL = "https://api2.moxfield.com/v3/decks/all/%s"
 
 // ── Moxfield types ──────────────────────────────────────────────
 
@@ -61,68 +47,6 @@ type moxEntry struct {
 		ScryfallID string `json:"scryfall_id"`
 		Name       string `json:"name"`
 	} `json:"card"`
-}
-
-// ── Deck model ──────────────────────────────────────────────────
-
-type deckInfo struct {
-	name   string
-	author string
-	format string
-	id     string
-	url    string
-	total  int // cards counting quantities
-	unique int // distinct cards
-}
-
-type deckCard struct {
-	card      ScryfallCard
-	qty       int
-	commander bool
-	tags      []string
-}
-
-// section is the heading a card is listed under.
-func (d deckCard) section() string {
-	if d.commander {
-		return "Commander"
-	}
-	return primaryType(d.card.TypeLine)
-}
-
-type deckLoadedMsg struct {
-	info  deckInfo
-	cards []deckCard
-	err   error
-}
-
-// deckSections is the order the list is grouped in: the command zone first,
-// then spells roughly in the order they get cast, then lands.
-var deckSections = []string{
-	"Commander", "Creature", "Planeswalker", "Battle",
-	"Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Other",
-}
-
-// typePrecedence decides the one section a card with several types lands in.
-// Creature wins over everything, so an Artifact Creature is a creature; Land
-// comes before Artifact and Enchantment, so an artifact land is a land.
-var typePrecedence = []string{
-	"Creature", "Planeswalker", "Battle", "Land",
-	"Instant", "Sorcery", "Artifact", "Enchantment",
-}
-
-func primaryType(typeLine string) string {
-	// Modal double-faced cards join their halves with "//"; the front face
-	// is the one that decides where the card is listed.
-	if i := strings.Index(typeLine, "//"); i >= 0 {
-		typeLine = typeLine[:i]
-	}
-	for _, t := range typePrecedence {
-		if strings.Contains(typeLine, t) {
-			return t
-		}
-	}
-	return "Other"
 }
 
 // ── Deck references ─────────────────────────────────────────────
@@ -250,98 +174,4 @@ func loadDeck(id string) (deckInfo, []deckCard, error) {
 	}
 
 	return info, cards, nil
-}
-
-// fetchCollection looks up cards by Scryfall id, 75 at a time. The response
-// isn't ordered, so it comes back keyed by id for the caller to arrange.
-func fetchCollection(ids []string) (map[string]ScryfallCard, error) {
-	out := make(map[string]ScryfallCard, len(ids))
-
-	for start := 0; start < len(ids); start += collectionChunk {
-		end := start + collectionChunk
-		if end > len(ids) {
-			end = len(ids)
-		}
-
-		var req struct {
-			Identifiers []map[string]string `json:"identifiers"`
-		}
-		for _, id := range ids[start:end] {
-			req.Identifiers = append(req.Identifiers, map[string]string{"id": id})
-		}
-		payload, err := json.Marshal(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if start > 0 {
-			time.Sleep(collectionDelay)
-		}
-		body, err := doPost("https://api.scryfall.com/cards/collection", payload)
-		if err != nil {
-			return nil, err
-		}
-
-		var cr struct {
-			Data []ScryfallCard `json:"data"`
-		}
-		if err := json.Unmarshal(body, &cr); err != nil {
-			return nil, err
-		}
-		for _, c := range cr.Data {
-			out[c.ID] = c
-		}
-	}
-	return out, nil
-}
-
-func doPost(u string, payload []byte) ([]byte, error) {
-	req, err := http.NewRequest("POST", u, bytes.NewReader(payload))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s (%d)", hostOf(u), resp.StatusCode)
-	}
-	return body, nil
-}
-
-// ── List layout ─────────────────────────────────────────────────
-
-// deckItems orders the deck the way a decklist reads — commanders, then
-// creatures, spells and lands, alphabetically inside each group. The groups
-// aren't labelled: the statistics panel already breaks the deck down by
-// type, and headings in the list only get in the way of scrolling it.
-func deckItems(cards []deckCard) []list.Item {
-	bySection := map[string][]deckCard{}
-	for _, dc := range cards {
-		sec := dc.section()
-		bySection[sec] = append(bySection[sec], dc)
-	}
-
-	var items []list.Item
-	for _, sec := range deckSections {
-		group := bySection[sec]
-		sort.Slice(group, func(i, j int) bool {
-			return group[i].card.Name < group[j].card.Name
-		})
-		for _, dc := range group {
-			items = append(items, cardItem{card: dc.card, qty: dc.qty, tags: dc.tags})
-		}
-	}
-	return items
 }
