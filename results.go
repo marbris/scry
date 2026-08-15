@@ -179,12 +179,16 @@ func (m model) saveCurrentDeck() model {
 		verb = "updated"
 	}
 
-	if err := writeDeck(slug, deckFileFrom(*m.deck, m.deckCards)); err != nil {
+	_, warning, err := saveDeckVersioned(slug, deckFileFrom(*m.deck, m.deckCards))
+	if err != nil {
 		m.notice = fmt.Sprintf("could not save: %v", err)
 		return m
 	}
 
 	m.notice = fmt.Sprintf("%s · scry deck %s", verb, slug)
+	if warning != "" {
+		m.notice += " · " + warning
+	}
 	return m
 }
 
@@ -225,6 +229,10 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.toggleHistory()
 		case "w":
 			return m.saveCurrentDeck(), nil
+		case "ctrl+g":
+			// g and G are the list's own top and bottom, so history takes
+			// the modifier.
+			return m.openDeckHistory()
 		case "J", "shift+down":
 			// The statistics panel is a list rather than a wall of text,
 			// so J/K walks its categories and filters to them.

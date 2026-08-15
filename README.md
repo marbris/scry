@@ -23,8 +23,10 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 - **Comprehensive rules built in** — press `r` to swap the card panel for the rules its text invokes, and browse the full rulebook and glossary (merged in from `mtg-rules`)
 - **Statistics you can filter by** — `s` breaks the results down by colour, rarity, mana value and type; `J/K` walks those categories, narrows the list to whichever one you're on, and re-cuts every histogram for what's left
 - **Configurable sort** — cycle sort orders; every search returns up to 175 cards
-- **Moxfield decks** — paste a public deck URL (or `scry deck <id>`) to browse someone's list, with every card behaving like a search result; save decks by name and reopen them with `scry deck <name>`
-- **Deck tags in statistics** — the author's own card tags come down with the deck and get their own breakdown
+- **Moxfield decks** — paste a public deck URL (or `scry deck <id>`) to browse someone's list, with every card behaving like a search result
+- **Decks of your own** — import a deck and keep it as a plain text file, one card per line, editable here or in your editor
+- **Version history** — the decks directory is a git repository, so every change is a commit; browse the versions with `ctrl+g` and restore any of them
+- **Deck tags in statistics** — card tags travel with the deck and get their own breakdown
 - **Both faces of double-faced cards** — transforming and modal cards show each side's cost, type, P/T and rules text
 - **Quick lookup mode** — pass a query that returns one card and get plain text output, no TUI
 - **Built-in syntax reference** — press `?` for a comprehensive Scryfall syntax guide focused on Commander
@@ -227,18 +229,53 @@ Only the command zone and mainboard are loaded; sideboards and maybeboards are s
 
 Private and unlisted decks aren't accessible; the deck has to be public.
 
-#### Saving decks
+#### Your own decks
 
-Press `w` on a deck to save it under a name made from its title, or name it yourself from the shell:
+Press `w` on a deck you're browsing to copy it in as one of your own, or do it from the shell:
 
 ```bash
-scry deck save marchesa-political https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
-scry deck marchesa-political      # open it again
-scry deck list                    # what's saved
-scry deck rm marchesa-political   # forget it
+scry deck import https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
+scry deck marchesa-political      # open it
+scry deck list                    # what you have
+scry deck rm marchesa-political   # delete it
 ```
 
-Saved decks live in `~/.local/share/scry/decks.json` and hold only the name and address — the deck itself is re-fetched each time, so an edited deck comes back current rather than stale.
+Your decks are files in `~/.local/share/scry/decks/`, one card per line, and they're meant to be read:
+
+```
+name: Marchesa, political
+format: commander
+source: https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
+
+[commander]
+1 Queen Marchesa [wincon]
+
+[mainboard]
+1 Arcane Signet [ramp]
+1 Anguished Unmaking [removal]
+7 Plains
+```
+
+Edit them in the app or in your editor — both work, and neither surprises the other. Cards are named rather than pinned to a printing, so the file stays readable; add `(c21) 263` after a name if you want a particular one. `SCRY_DECKS_DIR` moves the directory somewhere you'd rather keep it.
+
+#### History
+
+That directory is a git repository, and every change scry makes to a deck is a commit:
+
+```bash
+scry deck log marchesa-political         # what changed, and when
+scry deck restore marchesa-political 4de01ba
+```
+
+or press `ctrl+g` in the app to browse the versions with their diffs and restore one. Restoring writes a new commit rather than rewinding, so the version you restored over is still there. Changes you make in your own editor are committed too, the next time scry writes the deck — so they're never quietly overwritten.
+
+Since it's an ordinary repository, `git log`, `git diff` and `git revert` all work on your decks:
+
+```bash
+git -C "$(scry deck dir)" log --patch marchesa-political.deck
+```
+
+Decks saved by an older version of scry, which kept only a Moxfield address, still open; `scry deck list` shows them with the command to import one properly.
 
 #### Card tags
 
@@ -339,10 +376,21 @@ scry "t:dragon c:R"
 | `r` | Rules for this card (press again for the card view) |
 | `s` | Statistics for these results (press again for the card view) |
 | `t` | Printed text history (press again for the card view) |
-| `w` | Save the current deck (decks only) |
+| `w` | Save the deck you're browsing as one of your own (decks only) |
+| `ctrl+g` | History of the open deck — browse versions and restore one |
 | `enter` | Browse the rules this card's text matched |
 | `ctrl+r` | Browse all comprehensive rules |
 | `?` | Scryfall syntax reference |
+
+### Deck History
+
+| Key | Action |
+|---|---|
+| `↑/↓` or `j/k` | Move through the versions |
+| `J/K` | Scroll the diff |
+| `/` | Search the history |
+| `enter` | Restore this version (as a new commit — nothing is lost) |
+| `esc` or `q` | Back |
 
 ### Rules Browser
 
@@ -407,6 +455,8 @@ Attacking doesn't cause Serra Angel to tap.
 ## Configuration
 
 There's nothing to configure — it works out of the box. Sorting defaults to EDHREC rank, and every search returns up to 175 cards.
+
+`SCRY_DECKS_DIR` is the one exception: set it to keep your decks somewhere other than `~/.local/share/scry/decks/` — a directory you back up, or one already under version control, in which case scry uses that repository rather than making its own.
 
 The layout adapts to the terminal width: at 120 columns and up the panel sits beside the list, below that it sits underneath. The panel shows the card by default; `r` and `s` swap it for the rules or the statistics, and pressing the same key again brings the card back.
 

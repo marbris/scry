@@ -18,9 +18,10 @@ import (
 type state int
 
 const (
-	stateResults state = iota // the only main screen: search bar, list, panel
+	stateResults state = iota // the main screen: search bar, list, panel
 	stateRules
 	stateHelp
+	stateDeckHistory
 )
 
 // panelMode is what the panel beside the result list is showing.
@@ -99,6 +100,13 @@ type model struct {
 	inflight  map[string]bool
 	hoverKey  string
 	hoverSeq  int
+
+	// The open deck's git history, and the diff of whichever commit is
+	// under the cursor.
+	historyList list.Model
+	historyDiff string
+	historyErr  error
+	diffScroll  int
 
 	// Comprehensive rules
 	rules        RulesData
@@ -275,6 +283,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateRulesBrowse(msg)
 	case stateHelp:
 		return m.updateHelp(msg)
+	case stateDeckHistory:
+		return m.updateDeckHistory(msg)
 	}
 	return m, nil
 }
@@ -298,6 +308,8 @@ func (m model) View() string {
 		content = m.viewRulesBrowse()
 	case stateHelp:
 		content = m.viewHelp()
+	case stateDeckHistory:
+		content = m.viewDeckHistory()
 	}
 
 	return base.Render(content)

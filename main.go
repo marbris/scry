@@ -159,9 +159,13 @@ const deckUsage = `Usage:
   scry deck list                  List your decks
   scry deck import <id|url> [as]  Copy a Moxfield deck in so you can edit it
   scry deck rm <name>             Delete a deck
+  scry deck log <name>            What you've changed, and when
+  scry deck restore <name> <ref>  Bring back an earlier version
 
 Decks are files in ` + "`" + `scry deck dir` + "`" + `, one card per line — edit them here or in
-your editor. Inside the app, w imports the Moxfield deck you're looking at.`
+your editor. That directory is a git repository, so every change is kept and
+` + "`" + `git log` + "`" + ` works on your decks like anything else. Inside the app, w imports
+the Moxfield deck you're looking at.`
 
 // runDeck opens a deck, or handles one of the deck subcommands. References
 // are checked here so a typo fails on the terminal; the deck itself loads
@@ -181,6 +185,12 @@ func runDeck(m model, args []string) {
 		return
 	case "rm", "remove", "forget", "delete":
 		runDeckRemove(args[1:])
+		return
+	case "log", "history":
+		runDeckLog(args[1:])
+		return
+	case "restore":
+		runDeckRestore(args[1:])
 		return
 	case "dir":
 		fmt.Println(decksDir())
@@ -322,7 +332,8 @@ func runDeckImport(args []string) {
 	if deckExists(slug) {
 		verb = "Updated"
 	}
-	if err := writeDeck(slug, d); err != nil {
+	subject, warning, err := saveDeckVersioned(slug, d)
+	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -330,7 +341,73 @@ func runDeckImport(args []string) {
 	total, unique := d.counts()
 	fmt.Printf("%s %q — %d cards, %d distinct\n", verb, d.Name, total, unique)
 	fmt.Printf("  %s\n", deckFilePath(slug))
+	if warning != "" {
+		fmt.Printf("  %s\n", lipgloss.NewStyle().Foreground(gruvOrange).Render(warning))
+	} else {
+		fmt.Printf("  %s\n", lipgloss.NewStyle().Foreground(gruvGray).Render("committed: "+subject))
+	}
 	fmt.Printf("Open it with: scry deck %s\n", slug)
+}
+
+const deckLogLimit = 50
+
+func runDeckLog(args []string) {
+	if len(args) != 1 {
+		fmt.Println("Usage: scry deck log <name>")
+		os.Exit(1)
+	}
+	slug := args[0]
+	if !deckExists(slug) {
+		fmt.Printf("No deck called %q.\n", slug)
+		os.Exit(1)
+	}
+
+	commits, err := deckHistory(slug, deckLogLimit)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	if len(commits) == 0 {
+		fmt.Printf("No history for %s yet.\n", slug)
+		return
+	}
+
+	hashStyle := lipgloss.NewStyle().Foreground(gruvYellow)
+	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
+	for _, c := range commits {
+		fmt.Printf("%s  %s\n", hashStyle.Render(c.short), c.subject)
+		fmt.Printf("%s  %s\n", strings.Repeat(" ", len(c.short)), dimStyle.Render(c.when))
+	}
+	fmt.Printf("\n%s\n", dimStyle.Render("scry deck restore "+slug+" <ref>  ·  git -C "+deckRepoPath()+" show <ref>"))
+}
+
+func runDeckRestore(args []string) {
+	if len(args) != 2 {
+		fmt.Println("Usage: scry deck restore <name> <ref>")
+		os.Exit(1)
+	}
+	slug, ref := args[0], args[1]
+	if !deckExists(slug) {
+		fmt.Printf("No deck called %q.\n", slug)
+		os.Exit(1)
+	}
+
+	// Show what's coming back before it lands, since this overwrites the
+	// deck you have open.
+	old, err := deckAt(slug, ref)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	if err := restoreDeck(slug, ref); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	total, unique := old.counts()
+	fmt.Printf("Restored %s to %s — %d cards, %d distinct\n", slug, ref, total, unique)
+	fmt.Println(lipgloss.NewStyle().Foreground(gruvGray).
+		Render("The version you restored over is still in the history."))
 }
 
 func runDeckRemove(args []string) {
@@ -342,7 +419,7 @@ func runDeckRemove(args []string) {
 
 	removed := false
 	if deckExists(name) {
-		if err := deleteDeck(name); err != nil {
+		if err := deleteDeckCommitted(name); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
