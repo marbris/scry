@@ -107,6 +107,14 @@ func loadCachedRules() RulesData {
 func main() {
 	m := initialModel()
 
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "-h", "--help", "help":
+			printUsage()
+			return
+		}
+	}
+
 	// `scry rules [update | query…]` — the old mtg-rules entry point.
 	if len(os.Args) > 1 && os.Args[1] == "rules" {
 		runRules(m, os.Args[2:])

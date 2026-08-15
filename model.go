@@ -23,6 +23,7 @@ const (
 	stateHelp
 	stateDeckHistory
 	stateDecks
+	stateKeys
 )
 
 // panelMode is what the panel beside the result list is showing.
@@ -92,6 +93,11 @@ type model struct {
 	marks    map[string]bool
 	tagging  bool
 	tagInput textinput.Model
+
+	// leader is set between pressing the leader key and the key that says
+	// what to do; keysScroll is the key reference's scroll position.
+	leader     bool
+	keysScroll int
 
 	// The panel beside the list shows one of card / stats / rules,
 	// each keeping its own scroll position.
@@ -322,6 +328,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateDeckHistory(msg)
 	case stateDecks:
 		return m.updateDeckPicker(msg)
+	case stateKeys:
+		return m.updateKeyReference(msg)
 	}
 	return m, nil
 }
@@ -349,6 +357,8 @@ func (m model) View() string {
 		content = m.viewDeckHistory()
 	case stateDecks:
 		content = m.viewDeckPicker()
+	case stateKeys:
+		content = m.viewKeyReference()
 	}
 
 	return base.Render(content)

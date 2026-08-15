@@ -94,7 +94,7 @@ func TestNewDeckFromThePicker(t *testing.T) {
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 120, Height: 30})
-	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = leaderPress(m, "d")
 
 	// n opens the prompt.
 	m = press(m, "n")
@@ -127,7 +127,7 @@ func TestNewDeckFromThePicker(t *testing.T) {
 
 func TestPickerNameClashIsRecoverable(t *testing.T) {
 	m := pickerModel(t)
-	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = leaderPress(m, "d")
 	m = press(m, "n")
 	// pickerModel already has a deck filed under "ghen", and this
 	// slugifies to the same name.

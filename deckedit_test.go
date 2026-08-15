@@ -310,7 +310,7 @@ func TestAMoxfieldDeckIsReadOnly(t *testing.T) {
 	if len(m.deckCards) != before {
 		t.Error("a browsed Moxfield deck was edited")
 	}
-	if !strings.Contains(m.notice, "w to make it yours") {
+	if !strings.Contains(m.notice, ",i to make it yours") {
 		t.Errorf("notice = %q, should say how to make it editable", m.notice)
 	}
 	if m.deckDirty {

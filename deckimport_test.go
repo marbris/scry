@@ -310,10 +310,16 @@ func TestLocalDeckInTheApp(t *testing.T) {
 		t.Errorf("search bar = %q, want %q", got, "deck ghen")
 	}
 
-	// A deck that already lives on disk has nothing to import.
+	// w writes the open deck; with nothing changed there is nothing to write.
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	if !strings.Contains(m.notice, "up to date") {
+		t.Errorf("w on an unchanged local deck said %q", m.notice)
+	}
+
+	// And a deck that already lives on disk has nothing to import.
+	m = leaderPress(m, "i")
 	if !strings.Contains(m.notice, "already saved") {
-		t.Errorf("w on a local deck said %q", m.notice)
+		t.Errorf(",i on a local deck said %q", m.notice)
 	}
 	if deckExists("ghen-reanimator") {
 		t.Error("w wrote a second copy of a deck that was already local")

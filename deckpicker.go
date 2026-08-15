@@ -138,6 +138,16 @@ func (m model) openDeckPicker() (tea.Model, tea.Cmd) {
 	return m, listDecksCmd()
 }
 
+// openNewDeckPrompt goes straight to naming a new deck, without stopping at
+// the list of the ones you already have.
+func (m model) openNewDeckPrompt() (tea.Model, tea.Cmd) {
+	next, cmd := m.openDeckPicker()
+	opened := next.(model)
+	opened.naming = true
+	opened.deckNameInput = newDeckNameInput()
+	return opened, tea.Batch(cmd, textinput.Blink)
+}
+
 func newDeckPickerList(width, height int) list.Model {
 	w := width
 	if w < 20 {
@@ -175,6 +185,8 @@ func (m model) updateDeckPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		switch msg.String() {
+		case "?":
+			return m.openKeyReference()
 		case "n":
 			m.naming = true
 			m.deckNameInput = newDeckNameInput()

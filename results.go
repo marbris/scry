@@ -22,15 +22,13 @@ import (
 func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+r" {
-			return m.openRulesBrowser(nil, "")
-		}
-		// Your decks have to be reachable from a standing start. On a fresh
-		// launch the search bar has focus and there's no list to press d in,
-		// so without this there'd be no way to open a deck without typing a
-		// query first.
-		if msg.String() == "ctrl+o" {
-			return m.openDeckPicker()
+		// The leader is waiting for the key that says what to do.
+		if m.leader {
+			if msg.String() == "esc" {
+				m.leader = false
+				return m, nil
+			}
+			return m.handleLeader(msg.String())
 		}
 		if m.searchFocused() {
 			return m.updateSearchBar(msg)
@@ -121,6 +119,15 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // updateSearchBar handles keys while the query is being edited.
 func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// A comma is a character you might type in a query, so it only opens
+	// the leader menu when there's no query to type it into. That is the
+	// case that needs it: a fresh launch, where the search bar has focus
+	// and there's no list to press a letter in.
+	if msg.String() == leaderKey && m.searchInput.Value() == "" {
+		m.leader = true
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "enter":
 		query := strings.TrimSpace(m.searchInput.Value())
@@ -219,6 +226,11 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if !m.active().filtering() {
 		switch msg.String() {
+		case leaderKey:
+			m.leader = true
+			return m, nil
+		case "q":
+			return m.quitAfterSaving()
 		case " ":
 			return m.toggleMark()
 		case "v":
@@ -251,9 +263,7 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m.quitAfterSaving()
 		case "?":
-			m.helpScroll = 0
-			m.state = stateHelp
-			return m, nil
+			return m.openKeyReference()
 		case "s":
 			m.panel = m.panel.toggle(panelStats)
 			m.previewScroll = 0
@@ -264,12 +274,11 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "t":
 			return m.toggleHistory()
 		case "w":
-			// An explicit save is also a "write it now", ahead of the
-			// delay an edit would otherwise wait out.
-			if m.deckDirty {
-				return m.saveDeckNow()
-			}
-			return m.saveCurrentDeck(), nil
+			// w writes the open deck. Importing a Moxfield deck as one of
+			// your own is a different thing and lives on the leader, so
+			// one key no longer means two things.
+			next, cmd := m.saveDeckNow()
+			return next, cmd
 		case "a":
 			return m.addToDeck()
 		case "x":
@@ -280,13 +289,6 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.changeQty(-1)
 		case "c":
 			return m.toggleCommander()
-		case "d":
-			// Your decks, to open one without quitting to the shell.
-			return m.openDeckPicker()
-		case "ctrl+g":
-			// g and G are the list's own top and bottom, so history takes
-			// the modifier.
-			return m.openDeckHistory()
 		case "J", "shift+down":
 			// The statistics panel is a list rather than a wall of text,
 			// so J/K walks its categories and filters to them.
@@ -712,7 +714,25 @@ func (m model) viewResults() string {
 		)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, m.resultsHeader(), body)
+	frame := lipgloss.JoinVertical(lipgloss.Left, m.resultsHeader(), body)
+	if m.leader {
+		// The menu needs the whole width — squeezed into the panel column
+		// it loses half its entries — and the frame is a fixed height, so
+		// it takes the bottom line rather than adding one.
+		frame = replaceLastLine(frame, m.leaderBar(m.width))
+	}
+	return frame
+}
+
+// replaceLastLine swaps the final line of a rendered block, keeping the
+// block the same height.
+func replaceLastLine(block, line string) string {
+	lines := strings.Split(block, "\n")
+	if len(lines) == 0 {
+		return line
+	}
+	lines[len(lines)-1] = line
+	return strings.Join(lines, "\n")
 }
 
 // deckChrome is what the deck column's frame costs its contents: one column
@@ -861,9 +881,10 @@ func (m model) panelHint() string {
 	default:
 		parts = append(parts, "r: rules", "s: stats", "t: text history")
 	}
-	if m.deck != nil {
-		parts = append(parts, "w: save")
+	if m.deck != nil && m.deck.local() {
+		parts = append(parts, "a/x: add/remove", "w: write")
 	}
+	parts = append(parts, ",: more", "?: keys")
 	return lipgloss.NewStyle().Foreground(gruvGray).Render(strings.Join(parts, "  "))
 }
 

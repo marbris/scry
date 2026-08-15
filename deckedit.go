@@ -34,9 +34,9 @@ type deckSavedMsg struct {
 func (m model) editable() (bool, string) {
 	switch {
 	case m.deck == nil:
-		return false, "no deck open — d to pick one"
+		return false, "no deck open — ,d to pick one, ,n for a new one"
 	case !m.deck.local():
-		return false, "this deck is Moxfield's — w to make it yours first"
+		return false, "this deck is Moxfield's — ,i to make it yours first"
 	}
 	return true, ""
 }
@@ -245,7 +245,15 @@ func selectCard(p *pane, name string) {
 // saveDeckNow writes the deck and commits it. Used both by the debounce and
 // by anything that can't wait for it — quitting, most importantly.
 func (m model) saveDeckNow() (model, tea.Cmd) {
-	if !m.deckDirty || m.deck == nil || !m.deck.local() {
+	if m.deck == nil || !m.deck.local() {
+		ok, why := m.editable()
+		if !ok {
+			m.notice = why
+		}
+		return m, nil
+	}
+	if !m.deckDirty {
+		m.notice = "nothing to write — " + m.deck.slug + " is up to date"
 		return m, nil
 	}
 	m.deckDirty = false
@@ -276,8 +284,9 @@ func (m model) quitAfterSaving() (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleDeckSaveTick(msg deckSaveTickMsg) (tea.Model, tea.Cmd) {
-	// A later edit has restarted the clock, so this tick is stale.
-	if msg.seq != m.deckSeq {
+	// A later edit has restarted the clock, so this tick is stale. Nothing
+	// pending means it's already been written, by w or by quitting.
+	if msg.seq != m.deckSeq || !m.deckDirty {
 		return m, nil
 	}
 	return m.saveDeckNow()

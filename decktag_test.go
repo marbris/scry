@@ -324,7 +324,7 @@ func TestTaggingNeedsAnEditableDeck(t *testing.T) {
 	if m.tagging {
 		t.Error("the tag prompt opened on a deck that can't be saved")
 	}
-	if !strings.Contains(m.notice, "w to make it yours") {
+	if !strings.Contains(m.notice, ",i to make it yours") {
 		t.Errorf("notice = %q", m.notice)
 	}
 }

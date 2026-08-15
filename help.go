@@ -16,58 +16,11 @@ func syntaxHelp() string {
 ║                    Scryfall Syntax Guide                     ║
 ╚══════════════════════════════════════════════════════════════╝
 
-KEYS — SEARCH BAR
-  enter                   Run the search, then move to the results
-  tab / shift+tab         Cycle sort order
-  ↑/↓                     Move through the results while typing
-  esc                     Back to the results (quits if there are none)
+This is the query language. For the app's keys, press ? — they're listed
+per screen there, so the two can't disagree with each other.
 
-DECKS
-  Paste a Moxfield deck URL into the search bar to load that deck
-  instead of running a search — moxfield.com/decks/<id>. The deck is
-  listed in decklist order, and r / s / t / enter work on its cards
-  as they do on search results. The author's own card tags, if the
-  deck has any, are broken down under s.
-
-  w                       Save the deck you're looking at
-
-  From the shell:
-    scry deck <name>      A deck you've saved
-    scry deck <id>        The id out of the deck's URL
-    scry <moxfield url>   Same thing, pasted whole
-    scry deck list        The decks you've saved
-    scry deck save <name> <id|url>
-    scry deck rm <name>
-
-KEYS — RESULTS
-  j/k, ↑/↓                Move through cards
-  /                       Filter the results (name + oracle text)
-  i                       Edit the search query
-  esc                     Clear the filter, or quit if there isn't one
-  J/K, shift+↑/↓          Scroll the panel — in the statistics panel,
-                          walk the categories and filter the cards to
-                          whichever one the cursor is on
-  ctrl+d / ctrl+u         Scroll the panel half a screen; in the
-                          statistics panel this moves the view without
-                          moving the selected category
-  r                       Rules for this card (again for the card view)
-  s                       Statistics for these results (again for the card).
-                          J/K there filters to a colour, rarity, mana
-                          value, type or — for a deck — an author's tag,
-                          and the histograms redraw for the cards that
-                          category leaves on screen
-  t                       Printed text history — how the card's wording
-                          changed across printings (again for the card view)
-  w                       Save the current deck (decks only)
-  enter                   Browse the rules matched by this card
-  ctrl+r                  Browse all comprehensive rules
-  ?                       This help
-
-KEYS — RULES BROWSER
-  /                       Search rules and glossary
-  g                       Toggle rules / glossary
-  J/K                     Scroll the rule text
-  esc                     Back
+  scry 't:creature c:rw cmc<=3'      from the shell
+  ,s                                 this reference, from the app
 
 BASIC SEARCH
   lightning bolt          Fuzzy name search

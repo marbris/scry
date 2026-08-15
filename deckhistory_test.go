@@ -8,7 +8,7 @@ import (
 )
 
 // openHistoryOn builds an app with a local deck open and a couple of commits
-// behind it, then presses ctrl+g.
+// behind it, then opens the history with ,g.
 func openHistoryOn(t *testing.T) model {
 	t.Helper()
 	gitRepo(t)
@@ -28,14 +28,14 @@ func openHistoryOn(t *testing.T) model {
 		info:  deckInfo{name: "Ghen", slug: "ghen", format: "commander", total: 10},
 		cards: deckFixture(),
 	})
-	return drive(m, tea.KeyMsg{Type: tea.KeyCtrlG})
+	return leaderPress(m, "g")
 }
 
 func TestDeckHistoryOpens(t *testing.T) {
 	m := openHistoryOn(t)
 
 	if m.state != stateDeckHistory {
-		t.Fatalf("ctrl+g left the app in state %v", m.state)
+		t.Fatalf(",g left the app in state %v", m.state)
 	}
 	if m.historyErr != nil {
 		t.Fatalf("history errored: %v", m.historyErr)
@@ -127,9 +127,9 @@ func TestDeckHistoryNeedsADeckOfYourOwn(t *testing.T) {
 
 	// On search results there's no deck at all.
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
-	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = leaderPress(m, "g")
 	if m.state == stateDeckHistory {
-		t.Error("ctrl+g opened a history for search results")
+		t.Error(",g opened a history for search results")
 	}
 	if !strings.Contains(m.notice, "no history") {
 		t.Errorf("notice = %q", m.notice)
@@ -140,9 +140,9 @@ func TestDeckHistoryNeedsADeckOfYourOwn(t *testing.T) {
 		info:  deckInfo{name: "Someone else's", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7"},
 		cards: deckFixture(),
 	})
-	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = leaderPress(m, "g")
 	if m.state == stateDeckHistory {
-		t.Error("ctrl+g opened a history for a deck browsed off Moxfield")
+		t.Error(",g opened a history for a deck browsed off Moxfield")
 	}
 	if !strings.Contains(m.notice, "your own") {
 		t.Errorf("notice = %q", m.notice)

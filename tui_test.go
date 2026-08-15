@@ -1150,7 +1150,9 @@ func TestSaveDeckFromTheApp(t *testing.T) {
 	// filing an empty deck. (With no results at all the search bar has
 	// focus, so w is just typing.)
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
-	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	// Importing lives on the leader now: w writes the open deck, ,i makes
+	// a Moxfield deck yours, so one key no longer means two things.
+	m = leaderPress(m, "i")
 	if !strings.Contains(m.notice, "nothing to save") {
 		t.Errorf("notice on search results = %q", m.notice)
 	}
@@ -1162,12 +1164,12 @@ func TestSaveDeckFromTheApp(t *testing.T) {
 		info:  deckInfo{name: "Winota: Snowball Stax", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7", total: 34},
 		cards: deckFixture(),
 	})
-	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	m = leaderPress(m, "i")
 
-	// w writes a deck file of your own, built from the cards already on
+	// ,i writes a deck file of your own, built from the cards already on
 	// screen — no second trip to Moxfield, so this works offline.
 	if !deckExists("winota-snowball-stax") {
-		t.Fatalf("w did not save the deck; notice was %q", m.notice)
+		t.Fatalf(",i did not save the deck; notice was %q", m.notice)
 	}
 	saved, err := readDeck("winota-snowball-stax")
 	if err != nil {
@@ -1376,6 +1378,13 @@ func TestNewResultsForgetTheCategory(t *testing.T) {
 // ── esc and i ───────────────────────────────────────────────────
 
 // quits reports whether a command asks the program to quit.
+// leaderPress runs a leader command: the leader key, then the one that says
+// what to do.
+func leaderPress(m model, key string) model {
+	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(leaderKey)})
+	return drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+}
+
 func quits(cmd tea.Cmd) bool {
 	if cmd == nil {
 		return false

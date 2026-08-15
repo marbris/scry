@@ -129,6 +129,8 @@ func (m model) updateRulesBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		switch msg.String() {
+		case "?":
+			return m.openKeyReference()
 		case "esc", "q":
 			m.state = m.prevState
 			return m, nil

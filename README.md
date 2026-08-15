@@ -25,11 +25,11 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 - **Configurable sort** — cycle sort orders; every search returns up to 175 cards
 - **Moxfield decks** — paste a public deck URL (or `scry deck <id>`) to browse someone's list, with every card behaving like a search result
 - **Decks of your own** — import a deck and keep it as a plain text file, one card per line, editable here or in your editor
-- **Version history** — the decks directory is a git repository, so every change is a commit; browse the versions with `ctrl+g` and restore any of them
+- **Version history** — the decks directory is a git repository, so every change is a commit; browse the versions with `,g` and restore any of them
 - **Deck tags in statistics** — card tags travel with the deck and get their own breakdown
 - **Both faces of double-faced cards** — transforming and modal cards show each side's cost, type, P/T and rules text
 - **Quick lookup mode** — pass a query that returns one card and get plain text output, no TUI
-- **Built-in syntax reference** — press `?` for a comprehensive Scryfall syntax guide focused on Commander
+- **Built-in references** — `?` lists the keys for the screen you're on; `,s` is a Scryfall syntax guide focused on Commander
 - **Gruvbox dark theme**
 
 ## Screenshots
@@ -275,7 +275,7 @@ c57a6a5  +Dragonlord Ojutai, requantify Plains
 
 `c` marks the selected card as a commander, and adds it first if it isn't in the deck yet — which is how a new deck starts: `scry deck new`, search for your commander, press `c`. Pressing `c` again unmarks it. scry doesn't know the rules and doesn't try to: how many commanders a deck has is between you and your playgroup, so several and none are both fine. It only records what you said, under a `[commander]` heading in the file.
 
-A deck you're browsing off Moxfield is read-only; press `w` to make it yours first.
+A deck you're browsing off Moxfield is read-only; press `,i` to make it yours first.
 
 #### History
 
@@ -286,7 +286,7 @@ scry deck log marchesa-political         # what changed, and when
 scry deck restore marchesa-political 4de01ba
 ```
 
-or press `ctrl+g` in the app to browse the versions with their diffs and restore one. Restoring writes a new commit rather than rewinding, so the version you restored over is still there. Changes you make in your own editor are committed too, the next time scry writes the deck — so they're never quietly overwritten.
+or press `,g` in the app to browse the versions with their diffs and restore one. Restoring writes a new commit rather than rewinding, so the version you restored over is still there. Changes you make in your own editor are committed too, the next time scry writes the deck — so they're never quietly overwritten.
 
 Since it's an ordinary repository, `git log`, `git diff` and `git revert` all work on your decks:
 
@@ -294,7 +294,7 @@ Since it's an ordinary repository, `git log`, `git diff` and `git revert` all wo
 git -C "$(scry deck dir)" log --patch marchesa-political.deck
 ```
 
-Press `d` (or `ctrl+o`, which also works before you've searched for anything) to pick a deck without going back to the shell.
+Press `,d` to pick a deck without going back to the shell, or `,n` to start a new one.
 
 Decks saved by a much older version of scry, which kept only a Moxfield address in `decks.json`, are no longer read. That file is left alone and `scry deck list` prints what's still in it, so you can import those decks and then delete it.
 
@@ -400,43 +400,82 @@ scry "t:dragon c:R"
 
 ## Key Bindings
 
-### Search Bar
+The scheme, in three rules:
+
+- **A plain letter does something to what's in front of you** — add this card, remove it, swap the panel.
+- **The leader, `,`, followed by one letter, goes somewhere else** — another screen, or something you do once a session rather than once a card. A hint bar lists the options, so nothing has to be remembered.
+- **`q` leaves whatever you're on**, and leaves the app from the main screen. **`esc` peels one layer at a time** — marks, then the filter, then the statistics category, then the deck column — and quits when there's nothing left.
+
+`?` shows the keys for the screen you're on. It's generated from the same table the app dispatches from, so it can't fall out of date.
+
+### The leader
 
 | Key | Action |
 |---|---|
-| `enter` | Run search — or load the deck, if the text is a Moxfield URL |
-| `tab` / `shift+tab` | Cycle sort order |
-| `↑/↓` | Move through the results while typing |
-| `ctrl+r` | Browse the comprehensive rules |
-| `esc` | Back to the results (quits if there are none) |
+| `,d` | Decks — pick one to open |
+| `,n` | New deck |
+| `,g` | Deck history — browse versions and restore one |
+| `,i` | Import the Moxfield deck you're browsing as one of your own |
+| `,r` | Rules browser |
+| `,s` | Scryfall query syntax |
+| `,k` | Keys (same as `?`) |
+
+In the search bar a comma is a comma — card names have them — so the leader only opens there when nothing has been typed. That's the case that needs it: a fresh launch, where the search bar has focus and there's no list to press a letter in.
 
 ### Results
 
 | Key | Action |
 |---|---|
-| `↑/↓` or `j/k` | Navigate list |
-| `tab` / `shift+tab` | Move between the search results and the deck |
-| `/` | Fuzzy filter (searches name + oracle text) |
+| `↑/↓` or `j/k` | Move through the list |
+| `tab` / `shift+tab` | Between the search results and the deck |
+| `/` | Fuzzy filter (name + oracle text) |
 | `i` | Edit the search query |
-| `esc` | Clear the filter, then the category, then the deck — then quit |
 | `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
-| `ctrl+d` / `ctrl+u` | Scroll the panel half a screen, leaving the selection put |
+| `ctrl+d` / `ctrl+u` | Scroll the panel half a screen |
 | `r` | Rules for this card (press again for the card view) |
-| `s` | Statistics for these results (press again for the card view) |
+| `s` | Statistics for the list (press again for the card view) |
 | `t` | Printed text history (press again for the card view) |
-| `a` | Add the selected card to the open deck |
-| `c` | Mark it a commander, or unmark it (adds it if it isn't in the deck) |
-| `space` | Mark the card for tagging, and step to the next |
-| `v` / `V` | Mark everything the list is showing / clear the marks |
-| `T` | Tag the marked cards — `-tag` removes, commas separate |
-| `x` | Remove it from the deck (from either list) |
-| `+` / `-` | Another copy, or one fewer — `-` on the last copy removes it |
-| `w` | Save now; or save the deck you're browsing as one of your own |
-| `d` or `ctrl+o` | Your decks — pick one to open |
-| `ctrl+g` | History of the open deck — browse versions and restore one |
 | `enter` | Browse the rules this card's text matched |
-| `ctrl+r` | Browse all comprehensive rules |
-| `?` | Scryfall syntax reference |
+| `esc` | Peel one layer; quit when there's nothing left |
+| `q` | Quit |
+| `?` | Keys for this screen |
+
+### The deck
+
+| Key | Action |
+|---|---|
+| `a` | Add the selected card |
+| `x` | Remove it (from either list) |
+| `c` | Mark it a commander, or unmark it |
+| `+` / `-` | Another copy, or one fewer |
+| `w` | Write the deck now |
+
+### Tagging
+
+| Key | Action |
+|---|---|
+| `space` | Mark this card, and step to the next |
+| `v` / `V` | Mark everything the list is showing / clear the marks |
+| `T` | Tag the marked cards — a leading `-` removes, commas separate |
+
+### Search Bar
+
+| Key | Action |
+|---|---|
+| `enter` | Run the search — or load the deck, if the text is a Moxfield URL |
+| `tab` / `shift+tab` | Cycle sort order |
+| `↑/↓` | Move through the results while typing |
+| `esc` | Back to the results (quits if there are none) |
+
+### Rules Browser
+
+| Key | Action |
+|---|---|
+| `↑/↓` or `j/k` | Navigate rules |
+| `/` | Search rules and glossary |
+| `g` | Toggle rules / glossary |
+| `J/K` | Scroll the rule text |
+| `esc` or `q` | Back |
 
 ### Decks
 
@@ -444,8 +483,8 @@ scry "t:dragon c:R"
 |---|---|
 | `↑/↓` or `j/k` | Move through your decks |
 | `/` | Filter by name or format |
-| `n` | Start a new deck |
 | `enter` | Open it |
+| `n` | Start a new deck |
 | `esc` or `q` | Back |
 
 ### Deck History
@@ -458,29 +497,11 @@ scry "t:dragon c:R"
 | `enter` | Restore this version (as a new commit — nothing is lost) |
 | `esc` or `q` | Back |
 
-### Rules Browser
-
-| Key | Action |
-|---|---|
-| `↑/↓` or `j/k` | Navigate rules |
-| `/` | Search rules and glossary |
-| `g` | Toggle rules / glossary |
-| `J/K` | Scroll the rule text |
-| `esc` or `q` | Back |
-
-### Syntax Help
-
-| Key | Action |
-|---|---|
-| `↑/↓` or `j/k` | Scroll |
-| `d` / `u` | Page down / up |
-| `esc`, `q`, or `?` | Back to search |
-
 ### Global
 
 | Key | Action |
 |---|---|
-| `ctrl+c` | Quit |
+| `ctrl+c` | Quit (writing any pending deck edit first) |
 
 ## Printed text history
 

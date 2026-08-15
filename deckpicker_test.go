@@ -41,10 +41,10 @@ func pickerModel(t *testing.T) model {
 
 func TestDeckPickerListsYourDecks(t *testing.T) {
 	m := pickerModel(t)
-	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = leaderPress(m, "d")
 
 	if m.state != stateDecks {
-		t.Fatalf("d left the app in state %v", m.state)
+		t.Fatalf(",d left the app in state %v", m.state)
 	}
 	if m.deckPickerErr != nil {
 		t.Fatalf("picker errored: %v", m.deckPickerErr)
@@ -73,7 +73,7 @@ func TestDeckPickerListsYourDecks(t *testing.T) {
 
 func TestDeckPickerOpensADeck(t *testing.T) {
 	m := pickerModel(t)
-	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = leaderPress(m, "d")
 	m = drive(m, tea.KeyMsg{Type: tea.KeyEnter})
 
 	if m.state != stateResults {
@@ -101,7 +101,7 @@ func TestDeckPickerWithNoDecks(t *testing.T) {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 100, Height: 30})
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
-	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m = leaderPress(m, "d")
 
 	if m.state != stateDecks {
 		t.Fatalf("state = %v", m.state)
@@ -130,13 +130,14 @@ func TestDeckPickerSurvivesABrokenDeckFile(t *testing.T) {
 	}
 
 	// From a standing start the search bar has focus and there is no list
-	// to press d in, so ctrl+o is the way in.
+	// to press a letter in. The leader works there too, as long as no query
+	// has been typed for the comma to belong to.
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 100, Height: 30})
-	m = drive(m, tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = leaderPress(m, "d")
 
 	if m.state != stateDecks {
-		t.Fatalf("ctrl+o from the search bar left the app in state %v", m.state)
+		t.Fatalf(",d from an empty search bar left the app in state %v", m.state)
 	}
 	if got := len(m.deckPicker.Items()); got != 2 {
 		t.Fatalf("listed %d decks, want both the good and the broken one", got)
