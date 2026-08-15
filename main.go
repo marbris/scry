@@ -210,19 +210,12 @@ func runDeck(m model, args []string) {
 		return
 	}
 
-	// A deck saved as a bare Moxfield reference by an older version still
-	// opens, straight off Moxfield.
-	id := ""
-	if saved, ok := lookupSavedDeck(arg); ok {
-		id = saved.ID
-	} else {
-		var ok bool
-		if id, ok = deckRef(arg); !ok {
-			fmt.Printf("No deck called %q, and that isn't a Moxfield id or URL.\n", arg)
-			fmt.Println("Your decks:")
-			runDeckList()
-			os.Exit(1)
-		}
+	id, ok := deckRef(arg)
+	if !ok {
+		fmt.Printf("No deck called %q, and that isn't a Moxfield id or URL.\n", arg)
+		fmt.Println("Your decks:")
+		runDeckList()
+		os.Exit(1)
 	}
 
 	m.searching = true
@@ -245,11 +238,12 @@ func runDeckList() {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-	legacy, _ := loadSavedDecks()
 
-	if len(slugs) == 0 && len(legacy) == 0 {
+	notice := legacyNotice()
+	if len(slugs) == 0 {
 		fmt.Println("No decks yet. Copy one in from Moxfield with:")
 		fmt.Println("  scry deck import <moxfield url>")
+		fmt.Print(notice)
 		return
 	}
 
@@ -262,22 +256,16 @@ func runDeckList() {
 			width = len(s)
 		}
 	}
-	for a := range legacy {
-		if len(a) > width {
-			width = len(a)
-		}
-	}
-
-	pad := func(s string) string { return s + strings.Repeat(" ", width-len(s)) }
 
 	for _, slug := range slugs {
+		pad := strings.Repeat(" ", width-len(slug))
 		d, err := readDeck(slug)
 		if err != nil {
-			fmt.Printf("%s  %s\n", nameStyle.Render(pad(slug)), dimStyle.Render(err.Error()))
+			fmt.Printf("%s  %s\n", nameStyle.Render(slug+pad), dimStyle.Render(err.Error()))
 			continue
 		}
 		total, unique := d.counts()
-		fmt.Printf("%s  %s\n", nameStyle.Render(pad(slug)), d.Name)
+		fmt.Printf("%s  %s\n", nameStyle.Render(slug+pad), d.Name)
 
 		detail := fmt.Sprintf("%d cards, %d distinct", total, unique)
 		if d.Format != "" {
@@ -286,15 +274,7 @@ func runDeckList() {
 		fmt.Printf("%s  %s\n", strings.Repeat(" ", width), dimStyle.Render(detail))
 	}
 
-	// Decks an older version saved as a Moxfield reference rather than a
-	// file. They still open; importing one makes it editable.
-	for _, a := range aliasesSorted(legacy) {
-		if deckExists(a) {
-			continue // already imported, the file above is the real one
-		}
-		fmt.Printf("%s  %s %s\n", nameStyle.Render(pad(a)), legacy[a].Name,
-			dimStyle.Render("(on Moxfield — `scry deck import "+a+"` to edit it here)"))
-	}
+	fmt.Print(notice)
 }
 
 func runDeckImport(args []string) {
@@ -303,11 +283,7 @@ func runDeckImport(args []string) {
 		os.Exit(1)
 	}
 
-	ref := args[0]
-	if saved, ok := lookupSavedDeck(ref); ok {
-		ref = saved.ID
-	}
-	id, ok := deckRef(ref)
+	id, ok := deckRef(args[0])
 	if !ok {
 		fmt.Println("Not a Moxfield deck id or URL:", args[0])
 		os.Exit(1)
@@ -425,10 +401,6 @@ func runDeckRemove(args []string) {
 		}
 		removed = true
 	}
-	if forgotten, err := forgetDeck(name); err == nil && forgotten {
-		removed = true
-	}
-
 	if !removed {
 		fmt.Printf("No deck called %q.\n", name)
 		os.Exit(1)

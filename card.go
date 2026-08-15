@@ -133,7 +133,9 @@ type RulingsResponse struct {
 
 // ── Single-line delegate ────────────────────────────────────────
 
-type compactDelegate struct{}
+// compactDelegate draws one card per line. blurred is set on whichever list
+// doesn't have focus.
+type compactDelegate struct{ blurred bool }
 
 func (d compactDelegate) Height() int                             { return 1 }
 func (d compactDelegate) Spacing() int                            { return 0 }
@@ -143,7 +145,10 @@ func (d compactDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
 // a fixed share, wide enough for most costs, and the name and type line
 // share what's left — name first, since that's what you're scanning for.
 func listColumns(total int) (nameW, manaW, typeW int) {
-	manaW = 10
+	// Six is enough for almost every cost once the braces are stripped —
+	// {3}{W}{U} is three characters wide. The handful that run longer are
+	// truncated rather than made everything else sit behind a gap.
+	manaW = 6
 	// 2 columns for the cursor, and 2 between each pair of columns.
 	rest := total - 2 - manaW - 4
 	if rest < 18 {
@@ -168,6 +173,41 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 
 	selected := index == m.Index()
 	c := ci.card
+
+	// With two lists on screen only one of them is taking keys. The inactive
+	// one drops to a single dim colour and loses its cursor highlight, so
+	// which list you're driving is obvious at a glance rather than a matter
+	// of noticing the colour of a rule between columns.
+	if d.blurred {
+		name := c.Name
+		if ci.qty > 1 {
+			name = fmt.Sprintf("%dx %s", ci.qty, name)
+		}
+		nameW, manaW, typeW := listColumns(m.Width())
+		dim := lipgloss.NewStyle().Foreground(gruvGray)
+
+		mana, manaLen := renderManaWidth(c.displayManaCost(), manaW)
+		mana = stripStyle(mana)
+		if manaLen == 0 {
+			mana, manaLen = "·", 1
+		}
+		pad := manaW - manaLen
+		if pad < 0 {
+			pad = 0
+		}
+
+		// A hollow marker, so the two lists still read differently where
+		// colour alone won't carry it — a mono terminal, or a screenshot.
+		cursor := "  "
+		if selected {
+			cursor = "▹ "
+		}
+		fmt.Fprint(w, dim.Render(cursor+
+			padTo(truncate(name, nameW), nameW)+"  "+
+			mana+strings.Repeat(" ", pad)+"  "+
+			truncate(c.TypeLine, typeW)))
+		return
+	}
 
 	nameW, manaW, typeW := listColumns(m.Width())
 

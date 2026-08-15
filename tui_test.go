@@ -836,18 +836,31 @@ func TestDeckHeaderShowsDeckNotSort(t *testing.T) {
 		cards: deckFixture(),
 	})
 
-	// Whose deck it is stays on the header line, beside the sort order the
-	// search will use.
+	// A deck opened on its own is all there is to show, so it takes the
+	// main list and the header describes it.
+	if m.deckColumn() {
+		t.Error("a deck with no search beside it should not be in a column")
+	}
 	header := stripANSI(m.resultsHeader())
-	for _, want := range []string{"Deck", "Winota: Snowball Stax", "by ComedIan", "commander"} {
+	for _, want := range []string{"Deck", "Winota: Snowball Stax", "by ComedIan", "commander", "100 cards", "98 unique"} {
 		if !strings.Contains(header, want) {
 			t.Errorf("deck header missing %q:\n%s", want, header)
 		}
 	}
 
-	// Its size belongs to the column, which is what's being counted.
-	view := stripANSI(m.View())
-	if !strings.Contains(view, "100 · 98") {
+	// Once there's a search beside it the deck moves into its own column,
+	// captioned with its name and size, and the header line carries both.
+	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+	if !m.deckColumn() {
+		t.Fatal("a deck and a search at 160 columns should be side by side")
+	}
+	header = stripANSI(m.resultsHeader())
+	for _, want := range []string{"Sort", "Deck", "Winota: Snowball Stax"} {
+		if !strings.Contains(header, want) {
+			t.Errorf("header missing %q:\n%s", want, header)
+		}
+	}
+	if view := stripANSI(m.View()); !strings.Contains(view, "100 · 98") {
 		t.Errorf("the deck column is not captioned with its size:\n%s", view)
 	}
 	// The layout budget is fixed, so the deck header has to be the same
@@ -867,11 +880,16 @@ func TestSearchKeepsTheDeckOpen(t *testing.T) {
 	if m.deck == nil {
 		t.Fatal("deck did not load")
 	}
-	if !m.deckColumn() {
-		t.Fatal("a deck at 200 columns should have a column of its own")
+	// On its own the deck is the whole screen; a column of its own is for
+	// when there's a search to sit beside.
+	if m.deckColumn() {
+		t.Fatal("a deck with nothing beside it should not be in a column")
 	}
 
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+	if !m.deckColumn() {
+		t.Fatal("a deck and a search at 200 columns should be side by side")
+	}
 	if m.deck == nil {
 		t.Error("a search closed the deck")
 	}
@@ -1106,49 +1124,6 @@ func TestAuthorTagsInStatistics(t *testing.T) {
 }
 
 // ── Saved decks ─────────────────────────────────────────────────
-
-func TestSavedDeckRoundTrip(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-
-	if decks, err := loadSavedDecks(); err != nil || len(decks) != 0 {
-		t.Fatalf("a fresh install should have no saved decks: %v, %v", decks, err)
-	}
-
-	err := saveDeck("ghen", savedDeck{
-		Name: "Ghen reanimator", ID: "pdxwlk", URL: "https://moxfield.com/decks/pdxwlk",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	got, ok := lookupSavedDeck("ghen")
-	if !ok || got.ID != "pdxwlk" || got.Name != "Ghen reanimator" {
-		t.Fatalf("lookup returned %+v, %t", got, ok)
-	}
-	if got.Saved == "" {
-		t.Error("saved deck has no timestamp")
-	}
-
-	// Saving again under the same name replaces it rather than duplicating.
-	if err := saveDeck("ghen", savedDeck{Name: "Ghen v2", ID: "other"}); err != nil {
-		t.Fatal(err)
-	}
-	decks, _ := loadSavedDecks()
-	if len(decks) != 1 || decks["ghen"].ID != "other" {
-		t.Errorf("re-saving did not replace the entry: %+v", decks)
-	}
-
-	found, err := forgetDeck("ghen")
-	if err != nil || !found {
-		t.Fatalf("forget returned %t, %v", found, err)
-	}
-	if _, ok := lookupSavedDeck("ghen"); ok {
-		t.Error("deck survived being forgotten")
-	}
-	if found, _ := forgetDeck("ghen"); found {
-		t.Error("forgetting an unknown deck reported success")
-	}
-}
 
 func TestSlugify(t *testing.T) {
 	cases := map[string]string{
@@ -1441,8 +1416,9 @@ func TestEscPeelsOffOneLayerAtATime(t *testing.T) {
 		t.Fatal("esc quit while a category was still selected")
 	}
 
-	// Then the deck column hands focus back to the results beside it.
-	if m.focus == focusDeck {
+	// Then the deck column hands focus back to the results beside it —
+	// when there are results to go back to.
+	if m.focus == focusDeck && m.bothLists() {
 		next, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 		m = next.(model)
 		if quits(cmd) {

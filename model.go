@@ -22,6 +22,7 @@ const (
 	stateRules
 	stateHelp
 	stateDeckHistory
+	stateDecks
 )
 
 // panelMode is what the panel beside the result list is showing.
@@ -99,6 +100,11 @@ type model struct {
 	inflight  map[string]bool
 	hoverKey  string
 	hoverSeq  int
+
+	// The deck picker: your decks, for opening one without going back to
+	// the shell to remember what it was called.
+	deckPicker    list.Model
+	deckPickerErr error
 
 	// The open deck's git history, and the diff of whichever commit is
 	// under the cursor.
@@ -291,6 +297,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateHelp(msg)
 	case stateDeckHistory:
 		return m.updateDeckHistory(msg)
+	case stateDecks:
+		return m.updateDeckPicker(msg)
 	}
 	return m, nil
 }
@@ -316,6 +324,8 @@ func (m model) View() string {
 		content = m.viewHelp()
 	case stateDeckHistory:
 		content = m.viewDeckHistory()
+	case stateDecks:
+		content = m.viewDeckPicker()
 	}
 
 	return base.Render(content)

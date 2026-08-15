@@ -19,14 +19,6 @@ type pane struct {
 	statIndex  int
 }
 
-func newPane(delegate list.ItemDelegate) pane {
-	l := list.New(nil, delegate, 0, 0)
-	l.SetShowTitle(false)
-	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(true)
-	return pane{list: l, statIndex: -1}
-}
-
 // setItems installs a fresh set of cards, forgetting whichever statistics
 // category the last lot was narrowed to.
 func (p *pane) setItems(items []list.Item) {
@@ -81,15 +73,26 @@ func (m model) deckOpen() bool { return m.deck != nil && !m.deckPane.empty() }
 // rather than sitting in a column of its own. The header describes the main
 // list, so it needs to know which of the two is in there.
 func (m model) deckInMainList() bool {
-	return m.deckOpen() && m.focus == focusDeck && !m.deckColumn()
+	if !m.deckOpen() {
+		return false
+	}
+	// A deck opened on its own is all there is to show.
+	if m.results.empty() {
+		return true
+	}
+	return m.focus == focusDeck && !m.deckColumn()
 }
+
+// bothLists reports whether there are two lists to move between. With only
+// one there's nowhere for tab or esc to go.
+func (m model) bothLists() bool { return m.deckOpen() && !m.results.empty() }
 
 // cycleFocus moves between the two lists. The search bar isn't in the cycle
 // because tab already cycles the sort order while you're typing a query,
 // which is the only place sort means anything; i and esc move in and out of
 // it as they always have.
 func (m model) cycleFocus() model {
-	if !m.deckOpen() {
+	if !m.bothLists() {
 		return m
 	}
 	if m.focus == focusDeck {

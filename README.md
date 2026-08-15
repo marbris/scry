@@ -275,7 +275,9 @@ Since it's an ordinary repository, `git log`, `git diff` and `git revert` all wo
 git -C "$(scry deck dir)" log --patch marchesa-political.deck
 ```
 
-Decks saved by an older version of scry, which kept only a Moxfield address, still open; `scry deck list` shows them with the command to import one properly.
+Press `d` (or `ctrl+o`, which also works before you've searched for anything) to pick a deck without going back to the shell.
+
+Decks saved by a much older version of scry, which kept only a Moxfield address in `decks.json`, are no longer read. That file is left alone and `scry deck list` prints what's still in it, so you can import those decks and then delete it.
 
 #### Card tags
 
@@ -378,10 +380,20 @@ scry "t:dragon c:R"
 | `s` | Statistics for these results (press again for the card view) |
 | `t` | Printed text history (press again for the card view) |
 | `w` | Save the deck you're browsing as one of your own (decks only) |
+| `d` or `ctrl+o` | Your decks — pick one to open |
 | `ctrl+g` | History of the open deck — browse versions and restore one |
 | `enter` | Browse the rules this card's text matched |
 | `ctrl+r` | Browse all comprehensive rules |
 | `?` | Scryfall syntax reference |
+
+### Decks
+
+| Key | Action |
+|---|---|
+| `↑/↓` or `j/k` | Move through your decks |
+| `/` | Filter by name or format |
+| `enter` | Open it |
+| `esc` or `q` | Back |
 
 ### Deck History
 

@@ -4,11 +4,41 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/charmbracelet/x/term"
 )
 
 // Small helpers with no home of their own.
+
+// padTo pads a string out to a rune width, for lining columns up by hand
+// where a lipgloss Width() would also repaint the colour.
+func padTo(s string, width int) string {
+	if n := runeLen(s); n < width {
+		return s + strings.Repeat(" ", width-n)
+	}
+	return s
+}
+
+// stripStyle removes ANSI colour, so text can be recoloured wholesale — a
+// nested style would otherwise end at the first reset the inner one wrote.
+func stripStyle(s string) string {
+	var b strings.Builder
+	inEsc := false
+	for _, r := range s {
+		switch {
+		case r == '\x1b':
+			inEsc = true
+		case inEsc:
+			if r == 'm' {
+				inEsc = false
+			}
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
 
 // truncate cuts to a rune count, not a byte count — an em dash in a type
 // line is three bytes, and slicing through one renders as a replacement
@@ -61,4 +91,22 @@ func stdoutWidth() int {
 		w = 30
 	}
 	return w
+}
+
+// slugify turns a deck's title into a name worth typing: "Winota:
+// Snowball Stax" becomes "winota-snowball-stax".
+func slugify(name string) string {
+	var b strings.Builder
+	lastDash := true // no leading dash
+	for _, r := range strings.ToLower(name) {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+			lastDash = false
+		case !lastDash:
+			b.WriteRune('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }

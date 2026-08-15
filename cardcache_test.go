@@ -65,11 +65,11 @@ func TestResolveEntriesSurvivesAnUnreachableScryfall(t *testing.T) {
 	})
 
 	// A deck holding one cached card and one that would need fetching. With
-	// the network unavailable the cached card must still come back, and the
+	// the lookup unreachable the cached card must still come back, and the
 	// error must describe the real problem rather than claiming the card
 	// doesn't exist.
-	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:1") // nothing listening
-	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
+	defer func(u string) { scryfallCollectionURL = u }(scryfallCollectionURL)
+	scryfallCollectionURL = "http://127.0.0.1:1/nothing-listening"
 
 	cards, err := resolveEntries([]deckEntry{
 		{Qty: 1, Name: "Sol Ring", Section: "mainboard"},

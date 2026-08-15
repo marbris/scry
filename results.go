@@ -25,6 +25,13 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+r" {
 			return m.openRulesBrowser(nil, "")
 		}
+		// Your decks have to be reachable from a standing start. On a fresh
+		// launch the search bar has focus and there's no list to press d in,
+		// so without this there'd be no way to open a deck without typing a
+		// query first.
+		if msg.String() == "ctrl+o" {
+			return m.openDeckPicker()
+		}
 		if m.searchFocused() {
 			return m.updateSearchBar(msg)
 		}
@@ -221,7 +228,7 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.active().statFilter != nil {
 				return m.clearStatFilter()
 			}
-			if m.focus == focusDeck {
+			if m.focus == focusDeck && m.bothLists() {
 				return m.setFocus(focusResults), nil
 			}
 			return m, tea.Quit
@@ -240,6 +247,9 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.toggleHistory()
 		case "w":
 			return m.saveCurrentDeck(), nil
+		case "d":
+			// Your decks, to open one without quitting to the shell.
+			return m.openDeckPicker()
 		case "ctrl+g":
 			// g and G are the list's own top and bottom, so history takes
 			// the modifier.
@@ -388,9 +398,11 @@ const (
 )
 
 // deckColumn reports whether the deck is drawn beside the results rather
-// than in place of the panel.
+// than in place of the panel. It takes both a deck and something to put
+// beside it: opening a deck on its own should show the deck, not the deck
+// and an empty column where a search isn't.
 func (m model) deckColumn() bool {
-	return m.deckOpen() && m.width >= threeColumnWidth
+	return m.deckOpen() && !m.results.empty() && m.width >= threeColumnWidth
 }
 
 func (m model) resultsLayout() resultsLayout {
@@ -613,10 +625,16 @@ func (m model) viewResults() string {
 	// screen at once; without one, the slot shows whichever has focus, and
 	// tab swaps them.
 	main := &m.results
-	if m.focus == focusDeck && l.deckW == 0 {
+	if m.deckInMainList() {
 		main = &m.deckPane
 	}
 	main.list.SetSize(l.listW, l.listH)
+
+	// Only the list taking keys is drawn in full colour. Whichever isn't
+	// goes dim, which is a far clearer signal than the colour of the rule
+	// between the columns.
+	m.results.list.SetDelegate(compactDelegate{blurred: m.focus == focusDeck})
+	m.deckPane.list.SetDelegate(compactDelegate{blurred: m.focus != focusDeck})
 
 	// The list's own help line can render wider than the width it was
 	// given, which would reflow everything beside it.
@@ -680,8 +698,16 @@ func (m model) deckBox(content string, w, h int) string {
 		counts = fmt.Sprintf(" %d · %d", m.deck.total, m.deck.unique)
 		title = truncate(m.deck.name, inner-runeLen(counts))
 	}
-	heading := lipgloss.NewStyle().Foreground(gruvAqua).Bold(true).Render(title) +
-		lipgloss.NewStyle().Foreground(gruvGray).Render(counts)
+
+	// The caption carries the focus too: filled in when the column is
+	// taking keys, dim when it isn't.
+	titleStyle := lipgloss.NewStyle().Foreground(gruvGray)
+	countStyle := titleStyle
+	if m.focus == focusDeck {
+		titleStyle = lipgloss.NewStyle().Foreground(gruvBg).Background(gruvOrange).Bold(true)
+		countStyle = lipgloss.NewStyle().Foreground(gruvOrange)
+	}
+	heading := titleStyle.Render(" "+title+" ") + countStyle.Render(counts)
 
 	// Hard-clip, as the panel does: one over-long row would otherwise wrap
 	// and push everything below it down a line.

@@ -163,6 +163,12 @@ func loadRulesCmd() tea.Cmd {
 	}
 }
 
+// scryfallCollectionURL is a variable so a test can point it somewhere
+// unreachable. Simulating a failure by setting HTTP_PROXY doesn't work:
+// Go resolves the proxy once per process, so it leaks into every request
+// made afterwards.
+var scryfallCollectionURL = "https://api.scryfall.com/cards/collection"
+
 const (
 	// Scryfall takes up to 75 identifiers per collection request.
 	collectionChunk = 75
@@ -197,7 +203,7 @@ func fetchIdentifiers(idents []map[string]string) ([]ScryfallCard, []map[string]
 		if start > 0 {
 			time.Sleep(collectionDelay)
 		}
-		body, err := doPost("https://api.scryfall.com/cards/collection", payload)
+		body, err := doPost(scryfallCollectionURL, payload)
 		if err != nil {
 			return nil, nil, err
 		}
