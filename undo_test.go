@@ -187,7 +187,7 @@ func TestSearchResultsShowWhatTheDeckHolds(t *testing.T) {
 	sel, _ := m.active().selected()
 	m = press(m, "a")
 
-	inDeck, _ := m.deckMembership()
+	inDeck := m.deckMembership()
 	if !inDeck[strings.ToLower(sel.card.Name)] {
 		t.Fatalf("%q is not counted as in the deck", sel.card.Name)
 	}
@@ -204,8 +204,7 @@ func TestCommandersAreFlaggedInTheDeck(t *testing.T) {
 	selectCard(&m.deckPane, "Sol Ring")
 	m = press(m, "c")
 
-	_, commanders := m.deckMembership()
-	if !commanders["sol ring"] {
+	if i := m.deckIndexOf("Sol Ring"); i < 0 || !m.deckCards[i].commander {
 		t.Fatal("the commander was not recorded")
 	}
 	if !strings.Contains(stripANSI(m.View()), "★") {
@@ -221,15 +220,18 @@ func TestGutterKeepsRowsAlignedWhateverTheFlags(t *testing.T) {
 	key := map[string]bool{"serra angel": true}
 
 	widths := map[string]int{}
-	for name, d := range map[string]compactDelegate{
-		"plain":     {},
-		"marked":    {marks: key},
-		"in deck":   {inDeck: key},
-		"commander": {commanders: key},
-		"both":      {marks: key, inDeck: key},
+	for name, tc := range map[string]struct {
+		d  compactDelegate
+		it cardItem
+	}{
+		"plain":     {compactDelegate{}, cardItem{card: card}},
+		"marked":    {compactDelegate{marks: key}, cardItem{card: card}},
+		"in deck":   {compactDelegate{inDeck: key}, cardItem{card: card}},
+		"commander": {compactDelegate{}, cardItem{card: card, commander: true}},
+		"both":      {compactDelegate{marks: key}, cardItem{card: card, commander: true}},
 	} {
 		var b strings.Builder
-		d.Render(&b, l, 0, cardItem{card: card})
+		tc.d.Render(&b, l, 0, tc.it)
 		widths[name] = visibleLen(b.String())
 	}
 

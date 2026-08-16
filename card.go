@@ -139,13 +139,10 @@ type RulingsResponse struct {
 //   - marks are the cards picked out for tagging.
 //   - inDeck says which cards the open deck holds, so a search result you
 //     already run is obvious without looking across at the other column.
-//   - commanders is set on the deck's own list, where the useful thing to
-//     flag is which cards are in the command zone.
 type compactDelegate struct {
-	blurred    bool
-	marks      map[string]bool
-	inDeck     map[string]bool
-	commanders map[string]bool
+	blurred bool
+	marks   map[string]bool
+	inDeck  map[string]bool
 }
 
 // gutterWidth is the two columns in front of every row: one for the tagging
@@ -154,8 +151,8 @@ type compactDelegate struct {
 const gutterWidth = 2
 
 // gutter is those two columns for one card.
-func (d compactDelegate) gutter(c ScryfallCard) string {
-	key := strings.ToLower(c.Name)
+func (d compactDelegate) gutter(it cardItem) string {
+	key := strings.ToLower(it.card.Name)
 
 	mark := " "
 	if d.marks[key] {
@@ -164,7 +161,7 @@ func (d compactDelegate) gutter(c ScryfallCard) string {
 
 	role := " "
 	switch {
-	case d.commanders[key]:
+	case it.commander:
 		role = lipgloss.NewStyle().Foreground(gruvYellow).Bold(true).Render("★")
 	case d.inDeck[key]:
 		role = lipgloss.NewStyle().Foreground(gruvAqua).Render("▪")
@@ -237,7 +234,7 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		if selected {
 			cursor = "▹ "
 		}
-		fmt.Fprint(w, d.gutter(c)+dim.Render(cursor+
+		fmt.Fprint(w, d.gutter(ci)+dim.Render(cursor+
 			padTo(truncate(name, nameW), nameW)+"  "+
 			mana+strings.Repeat(" ", pad)+"  "+
 			truncate(c.TypeLine, typeW)))
@@ -285,13 +282,17 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		line = "  " + line
 	}
 
-	fmt.Fprint(w, d.gutter(c)+line)
+	fmt.Fprint(w, d.gutter(ci)+line)
 }
 
 // ── List item adapter ───────────────────────────────────────────
 
 type cardItem struct {
-	card ScryfallCard
+	// commander is set on a deck's own cards, so the row can be flagged.
+	// It has no bearing on sorting — a commander sorts by mana value like
+	// anything else.
+	commander bool
+	card      ScryfallCard
 	// qty is how many copies a deck runs; zero for search results.
 	qty int
 	// tags are the deck author's own, and only ever set for deck cards.

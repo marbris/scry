@@ -180,25 +180,21 @@ func deckItems(cards []deckCard) []list.Item {
 			return group[i].card.Name < group[j].card.Name
 		})
 		for _, dc := range group {
-			items = append(items, cardItem{card: dc.card, qty: dc.qty, tags: dc.tags})
+			items = append(items, cardItem{
+				card: dc.card, qty: dc.qty, tags: dc.tags, commander: dc.commander,
+			})
 		}
 	}
 	return items
 }
 
-// deckMembership is what the open deck holds, by lowercased name: every card
-// in it, and separately the ones in the command zone. Used to flag rows in
-// both lists — a search result you already run, and a deck card that's a
-// commander.
-func (m model) deckMembership() (inDeck, commanders map[string]bool) {
-	inDeck = make(map[string]bool, len(m.deckCards))
-	commanders = map[string]bool{}
+// deckMembership is what the open deck holds, by lowercased name. Used to
+// flag search results the deck already runs; a deck row knows for itself
+// whether it's a commander, from the item.
+func (m model) deckMembership() map[string]bool {
+	inDeck := make(map[string]bool, len(m.deckCards))
 	for _, dc := range m.deckCards {
-		key := strings.ToLower(dc.card.Name)
-		inDeck[key] = true
-		if dc.commander {
-			commanders[key] = true
-		}
+		inDeck[strings.ToLower(dc.card.Name)] = true
 	}
-	return inDeck, commanders
+	return inDeck
 }

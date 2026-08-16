@@ -188,6 +188,7 @@ func keysFor(s state) []keyGroup {
 			{"tab", "Between the search results and the deck"},
 			{"i", "Edit the search query"},
 			{"/", "Filter by name or oracle text"},
+			{"o / O", "Reorder the list — name, mana value, type, colour, rank"},
 			{"J/K", "Scroll the panel"},
 			{"ctrl+d, ctrl+u", "Scroll the panel half a screen"},
 			{"esc", "Clear marks, then the filter, then the category, then quit"},

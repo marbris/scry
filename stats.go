@@ -476,22 +476,7 @@ func (m model) clearStatFilter() (tea.Model, tea.Cmd) {
 // the selected category's cards if one is selected.
 func (m model) applyStatFilter() (tea.Model, tea.Cmd) {
 	p := m.active()
-	items := p.baseItems
-	if p.statFilter != nil {
-		kept := make([]list.Item, 0, len(items))
-		for _, it := range items {
-			ci, ok := it.(cardItem)
-			if !ok {
-				continue
-			}
-			if p.statFilter.match(ci) {
-				kept = append(kept, it)
-			}
-		}
-		items = kept
-	}
-
-	p.list.SetItems(items)
+	p.refresh()
 	p.list.ResetSelected()
 	next, cmd := m.syncHover()
 	return next, cmd

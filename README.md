@@ -22,7 +22,7 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 - **Printed text history** — press `t` to see how a card's wording changed across its printings, from Alpha to today (via MTGJSON, since Scryfall only serves current oracle text)
 - **Comprehensive rules built in** — press `r` to swap the card panel for the rules its text invokes, and browse the full rulebook and glossary (merged in from `mtg-rules`)
 - **Statistics you can filter by** — `s` breaks the results down by colour, rarity, mana value and type; `J/K` walks those categories, narrows the list to whichever one you're on, and re-cuts every histogram for what's left
-- **Configurable sort** — cycle sort orders; every search returns up to 175 cards
+- **Two kinds of sort** — `tab` sets the order the query asks Scryfall for, which decides which 175 cards come back; `o` reorders whatever is already on screen, results or deck, by name, mana value, type, colour or EDHREC rank
 - **Moxfield decks** — paste a public deck URL (or `scry deck <id>`) to browse someone's list, with every card behaving like a search result
 - **Decks of your own** — import a deck and keep it as a plain text file, one card per line, editable here or in your editor
 - **Version history** — the decks directory is a git repository, so every change is a commit; browse the versions with `,g` and restore any of them
@@ -344,6 +344,20 @@ Tags
 
 Tags are per deck, so an untagged deck simply doesn't show the section.
 
+### Sorting what's on screen
+
+There are two orderings, and they do different jobs.
+
+`tab` in the search bar sets the order the **query** asks Scryfall for. That's part of the search — with a result cap of 175, it decides *which* cards come back — so changing it means running the search again.
+
+`o` reorders **what's already in front of you**, without asking anyone anything: by name, mana value, type, colour or EDHREC rank. `O` goes the other way round the cycle. It applies to whichever list has focus, and each keeps its own, so the search results can be in EDHREC order while the deck is by mana value. The header names the order whenever it isn't the one the list arrived in:
+
+```
+  Cards    100 cards · 88 unique  ↕ EDHREC rank
+```
+
+Sorting composes with everything else: narrowing to a statistics category leaves the sort alone, the sort survives a new search, and the cursor stays on the card it was on. In decklist order a deck reads the way a decklist does — commanders, then creatures, spells and lands — and in any other order a commander sorts by that order like any other card.
+
 ### Statistics as a filter
 
 `s` swaps the card panel for a breakdown of everything in the list — colour, rarity, mana value, type, and the author's tags if it's a tagged deck. The breakdown is a list in its own right: `J/K` walks it, and the cards narrow to whichever category the cursor is on.
@@ -437,6 +451,7 @@ In the search bar a comma is a comma — card names have them — so the leader 
 | `tab` / `shift+tab` | Between the search results and the deck |
 | `/` | Filter by name + oracle text (literal, not fuzzy) |
 | `i` | Edit the search query |
+| `o` / `O` | Reorder the list — name, mana value, type, colour, EDHREC rank |
 | `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
 | `ctrl+d` / `ctrl+u` | Scroll the panel half a screen |
 | `r` | Rules for this card (press again for the card view) |
@@ -471,7 +486,7 @@ In the search bar a comma is a comma — card names have them — so the leader 
 | Key | Action |
 |---|---|
 | `enter` | Run the search — or load the deck, if the text is a Moxfield URL |
-| `tab` / `shift+tab` | Cycle sort order |
+| `tab` / `shift+tab` | Cycle the order the *query* asks Scryfall for |
 | `↑/↓` | Move through the results while typing |
 | `esc` | Back to the results (quits if there are none) |
 

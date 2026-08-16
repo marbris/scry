@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // A pane is a list of cards and the statistics narrowing applied to it. The
@@ -17,15 +18,48 @@ type pane struct {
 	// when the panel's category list hasn't been entered.
 	statFilter *statRow
 	statIndex  int
+
+	// How the cards on screen are ordered, and what to call the order they
+	// arrived in — "search order" for results, "decklist" for a deck.
+	sort        cardSort
+	arrivedName string
 }
+
+// refresh rebuilds the list from baseItems: narrowed to the statistics
+// category if one is chosen, then sorted. Everything that changes what's on
+// screen goes through here, so the two can't be applied in the wrong order
+// or one of them forgotten.
+func (p *pane) refresh() {
+	items := p.baseItems
+	if p.statFilter != nil {
+		kept := make([]list.Item, 0, len(items))
+		for _, it := range items {
+			ci, ok := it.(cardItem)
+			if !ok {
+				continue
+			}
+			if p.statFilter.match(ci) {
+				kept = append(kept, it)
+			}
+		}
+		items = kept
+	}
+	p.list.SetItems(sortItems(items, p.sort))
+}
+
+// sortName is what the header calls the pane's current order.
+func (p pane) sortName() string { return p.sort.name(p.arrivedName) }
 
 // setItems installs a fresh set of cards, forgetting whichever statistics
 // category the last lot was narrowed to.
+// setItems installs a fresh set of cards, forgetting whichever statistics
+// category the last lot was narrowed to. The sort is deliberately kept: it's
+// a way of reading a list, not a property of one particular set of results.
 func (p *pane) setItems(items []list.Item) {
 	p.baseItems = items
 	p.statFilter = nil
 	p.statIndex = -1
-	p.list.SetItems(items)
+	p.refresh()
 	p.list.ResetSelected()
 }
 
@@ -64,6 +98,38 @@ func (m *model) active() *pane {
 		return &m.deckPane
 	}
 	return &m.results
+}
+
+// activeView is the focused pane by value, for the places that only read it.
+// active() needs a pointer and an addressable model; this doesn't.
+func (m model) activeView() pane {
+	if m.focus == focusDeck {
+		return m.deckPane
+	}
+	return m.results
+}
+
+// cycleSort reorders the focused list. The sort belongs to the pane, so the
+// results and the deck can be read different ways at the same time.
+func (m model) cycleSort(delta int) (tea.Model, tea.Cmd) {
+	p := m.active()
+	p.sort = p.sort.next(delta)
+
+	// Keep the cursor on the card it was on; sorting moves the rows, not
+	// what you were looking at.
+	on := ""
+	if it, ok := p.selected(); ok {
+		on = it.card.Name
+	}
+	p.refresh()
+	if on != "" {
+		selectCard(p, on)
+	}
+
+	// No notice: the header carries the order for as long as it applies,
+	// and saying it twice for one keypress is just noise.
+	next, cmd := m.syncHover()
+	return next, cmd
 }
 
 // deckOpen reports whether a deck is open. An empty one still counts: a

@@ -291,6 +291,11 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.toggleCommander()
 		case "u":
 			return m.undoLast()
+		case "o", "O":
+			// Reorders what's on screen. The sort order in the header above
+			// belongs to the next Scryfall query, which is a different
+			// thing and stays on tab in the search bar.
+			return m.cycleSort(map[bool]int{true: 1, false: -1}[msg.String() == "o"])
 		case "J", "shift+down":
 			// The statistics panel is a list rather than a wall of text,
 			// so J/K walks its categories and filters to them.
@@ -646,6 +651,9 @@ func (m model) resultsSummary() string {
 // whichever statistics category the list is narrowed to.
 func (m model) noticeText() string {
 	out := ""
+	if p := m.activeView(); p.sort != sortNone {
+		out += lipgloss.NewStyle().Foreground(gruvBlue).Render("  ↕ " + p.sortName())
+	}
 	if n := m.markCount(); n > 0 {
 		out += lipgloss.NewStyle().Foreground(gruvGreen).
 			Render(fmt.Sprintf("  ● %d marked", n))
@@ -674,14 +682,14 @@ func (m model) viewResults() string {
 	// Only the list taking keys is drawn in full colour. Whichever isn't
 	// goes dim, which is a far clearer signal than the colour of the rule
 	// between the columns.
-	// The results are flagged with what the deck already holds; the deck is
-	// flagged with what's in the command zone. Neither needs the other's.
-	inDeck, commanders := m.deckMembership()
+	// The results are flagged with what the deck already holds; a deck row
+	// carries its own commander flag, so it needs nothing passed in.
+	inDeck := m.deckMembership()
 	m.results.list.SetDelegate(compactDelegate{
 		blurred: m.focus == focusDeck, marks: m.marks, inDeck: inDeck,
 	})
 	m.deckPane.list.SetDelegate(compactDelegate{
-		blurred: m.focus != focusDeck, marks: m.marks, commanders: commanders,
+		blurred: m.focus != focusDeck, marks: m.marks,
 	})
 
 	// The list's own help line can render wider than the width it was
@@ -896,7 +904,7 @@ func (m model) panelHint() string {
 	if m.deck != nil && m.deck.local() {
 		parts = append(parts, "a/x: add/remove", "w: write")
 	}
-	parts = append(parts, ",: more", "?: keys")
+	parts = append(parts, "o: sort", ",: more", "?: keys")
 	return lipgloss.NewStyle().Foreground(gruvGray).Render(strings.Join(parts, "  "))
 }
 
