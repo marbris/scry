@@ -234,3 +234,82 @@ func TestCLIUsage(t *testing.T) {
 		}
 	}
 }
+
+func TestHintsAreSaidOnceEach(t *testing.T) {
+	// ? used to be explained in three places at once — the header, the
+	// panel's own hint, and the list's built-in help line — and in one of
+	// them by a name it no longer went by.
+	for _, tt := range []struct {
+		name string
+		m    model
+	}{
+		{"results", deckAndSearch(t, 160, 30)},
+		{"search bar", drive(deckAndSearch(t, 160, 30), tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})},
+	} {
+		frame := stripANSI(tt.m.View())
+		for _, key := range []string{"?", "/ filter", "o / O sort"} {
+			if n := strings.Count(frame, key); n > 1 {
+				t.Errorf("%s: %q appears %d times in one frame:\n%s", tt.name, key, n, frame)
+			}
+		}
+	}
+}
+
+func TestHintLineFollowsFocusNotTheDeck(t *testing.T) {
+	// The search bar's hints used to live on a header line that a deck took
+	// over, so opening a deck hid "tab: cycle" while you were still typing.
+	for _, withDeck := range []bool{false, true} {
+		m := initialModel()
+		m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 30})
+		m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+		if withDeck {
+			m = drive(m, deckLoadedMsg{
+				info:  deckInfo{name: "Ghen", slug: "ghen", total: 10},
+				cards: deckFixture(),
+			})
+		}
+		m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+
+		hint := stripANSI(m.hintLine(160))
+		for _, want := range []string{"tab", "query order", "history"} {
+			if !strings.Contains(hint, want) {
+				t.Errorf("deck=%v: the search bar hint is missing %q: %q", withDeck, want, hint)
+			}
+		}
+	}
+}
+
+func TestHintLineKeepsTheKeysThatLeadElsewhere(t *testing.T) {
+	m := deckAndSearch(t, 200, 30)
+	for _, w := range []int{50, 60, 80, 120, 200} {
+		hint := stripANSI(m.hintLine(w))
+		if visibleLen(m.hintLine(w)) > w {
+			t.Errorf("at %d columns the hint line is %d wide", w, visibleLen(m.hintLine(w)))
+		}
+		// However narrow it gets, it keeps the two hints that would have
+		// told you about everything it had to drop.
+		for _, want := range []string{", more", "? keys"} {
+			if !strings.Contains(hint, want) {
+				t.Errorf("at %d columns the hint drops %q: %q", w, want, hint)
+			}
+		}
+	}
+}
+
+func TestEveryScreenHasAHintLine(t *testing.T) {
+	// Each screen's hints come from its own table, so a screen that gains a
+	// key gains the hint with it.
+	for _, s := range []state{stateResults, stateRules, stateDeckHistory, stateDecks, stateMoxUser, stateHelp} {
+		var hinted int
+		for _, g := range keysFor(s) {
+			for _, b := range g.bindings {
+				if b.hint != "" {
+					hinted++
+				}
+			}
+		}
+		if hinted == 0 {
+			t.Errorf("state %v has no hints at all", s)
+		}
+	}
+}

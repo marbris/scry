@@ -123,7 +123,16 @@ func leaderBarWidth(long bool, gap string) int {
 
 // ── The key reference ───────────────────────────────────────────
 
-type binding struct{ keys, what string }
+// binding is one key and what it does. `what` is the sentence the reference
+// prints; `hint` is the two-or-three words the hint line has room for, and
+// an empty one keeps the binding out of that line. needsDeck holds back the
+// ones that would only mislead with no deck open.
+type binding struct {
+	keys      string
+	what      string
+	hint      string
+	needsDeck bool
+}
 
 type keyGroup struct {
 	title    string
@@ -133,90 +142,163 @@ type keyGroup struct {
 // keysFor is what `?` shows: the keys for the screen you're on, and nothing
 // else. A reference you have to scroll past three other screens to use is
 // one you stop opening.
+//
+// It's also what the hint line at the bottom is built from, so the two can't
+// come to disagree — which they had, with `?` explained in three places at
+// once and in one of them by the wrong name.
 func keysFor(s state) []keyGroup {
 	switch s {
 	case stateRules:
 		return []keyGroup{{"Rules browser", []binding{
-			{"↑/↓, j/k", "Move through the rules"},
-			{"/", "Search the rules and glossary"},
-			{"g", "Switch between rules and glossary"},
-			{"J/K", "Scroll the rule text"},
-			{"esc, q", "Back"},
+			{keys: "↑/↓, j/k", what: "Move through the rules"},
+			{keys: "/", what: "Search the rules and glossary", hint: "search"},
+			{keys: "g", what: "Switch between rules and glossary", hint: "glossary"},
+			{keys: "J/K", what: "Scroll the rule text", hint: "scroll"},
+			{keys: "?", what: "These keys", hint: "keys"},
+			{keys: "esc, q", what: "Back", hint: "back"},
 		}}}
 
 	case stateDeckHistory:
 		return []keyGroup{{"Deck history", []binding{
-			{"↑/↓, j/k", "Move through the versions"},
-			{"J/K", "Scroll the diff"},
-			{"/", "Search the history"},
-			{"enter", "Restore this version (as a new commit)"},
-			{"esc, q", "Back"},
-		}}}
-
-	case stateMoxUser:
-		return []keyGroup{{"Decks on Moxfield", []binding{
-			{"↑/↓, j/k", "Move through their decks"},
-			{"enter, i", "Import it as one of yours"},
-			{"b", "Browse it without importing"},
-			{"u", "Someone else's decks"},
-			{"/", "Filter by name or format"},
-			{"esc, q", "Back"},
+			{keys: "↑/↓, j/k", what: "Move through the versions"},
+			{keys: "J/K", what: "Scroll the diff", hint: "scroll"},
+			{keys: "/", what: "Search the history", hint: "search"},
+			{keys: "enter", what: "Restore this version (as a new commit)", hint: "restore"},
+			{keys: "?", what: "These keys", hint: "keys"},
+			{keys: "esc, q", what: "Back", hint: "back"},
 		}}}
 
 	case stateDecks:
 		return []keyGroup{{"Decks", []binding{
-			{"↑/↓, j/k", "Move through your decks"},
-			{"/", "Filter by name or format"},
-			{"enter", "Open it"},
-			{"n", "Start a new deck"},
-			{"m", "Someone's decks on Moxfield"},
-			{"esc, q", "Back"},
+			{keys: "↑/↓, j/k", what: "Move through your decks"},
+			{keys: "enter", what: "Open it", hint: "open"},
+			{keys: "n", what: "Start a new deck", hint: "new deck"},
+			{keys: "m", what: "Someone's decks on Moxfield", hint: "moxfield"},
+			{keys: "/", what: "Filter by name or format", hint: "filter"},
+			{keys: "?", what: "These keys", hint: "keys"},
+			{keys: "esc, q", what: "Back", hint: "back"},
+		}}}
+
+	case stateMoxUser:
+		return []keyGroup{{"Decks on Moxfield", []binding{
+			{keys: "↑/↓, j/k", what: "Move through their decks"},
+			{keys: "enter, i", what: "Import it as one of yours", hint: "import"},
+			{keys: "b", what: "Browse it without importing", hint: "browse"},
+			{keys: "u", what: "Someone else's decks", hint: "someone else"},
+			{keys: "/", what: "Filter by name or format", hint: "filter"},
+			{keys: "?", what: "These keys", hint: "keys"},
+			{keys: "esc, q", what: "Back", hint: "back"},
 		}}}
 
 	case stateHelp:
 		return []keyGroup{{"Query syntax", []binding{
-			{"↑/↓, j/k", "Scroll"},
-			{"d/u", "Page down / up"},
-			{"esc, q", "Back"},
+			{keys: "↑/↓, j/k", what: "Scroll"},
+			{keys: "d/u", what: "Page down / up"},
+			{keys: "?", what: "These keys", hint: "keys"},
+			{keys: "esc, q", what: "Back", hint: "back"},
 		}}}
 	}
 
 	// The main screen, which has most of them.
 	return []keyGroup{
+		{"The search bar", []binding{
+			{keys: "enter", what: "Run the search", hint: "search"},
+			{keys: "↑/↓", what: "Walk back through the queries you've run", hint: "history"},
+			{keys: "tab", what: "Cycle the order the query asks Scryfall for", hint: "query order"},
+			{keys: "pgup/pgdn", what: "Move through the results without leaving the bar"},
+			{keys: "esc", what: "Back to the list"},
+		}},
 		{"Move", []binding{
-			{"↑/↓, j/k", "Through the list"},
-			{"tab", "Between the search results and the deck"},
-			{"i", "Edit the search query"},
-			{"/", "Filter by name or oracle text"},
-			{"o / O", "Reorder the list — name, mana value, type, colour, rank"},
-			{"J/K", "Scroll the panel"},
-			{"ctrl+d, ctrl+u", "Scroll the panel half a screen"},
-			{"esc", "Clear marks, then the filter, then the category, then quit"},
-			{"q", "Quit"},
+			{keys: "↑/↓, j/k", what: "Through the list"},
+			{keys: "tab", what: "Between the search results and the deck", hint: "switch list", needsDeck: true},
+			{keys: "i", what: "Edit the search query", hint: "search"},
+			{keys: "/", what: "Filter by name or oracle text", hint: "filter"},
+			{keys: "o / O", what: "Reorder the list — name, mana value, type, colour, rank", hint: "sort"},
+			{keys: "J/K", what: "Scroll the panel"},
+			{keys: "ctrl+d, ctrl+u", what: "Scroll the panel half a screen"},
+			{keys: "esc", what: "Clear marks, then the filter, then the category, then quit"},
+			{keys: "q", what: "Quit"},
 		}},
 		{"The panel", []binding{
-			{"r", "Rules this card invokes"},
-			{"s", "Statistics for the list"},
-			{"t", "How the card's printed text changed"},
-			{"J/K", "In statistics: walk the categories, narrowing the list"},
-			{"enter", "Browse the rules this card matched"},
+			{keys: "r", what: "Rules this card invokes", hint: "rules"},
+			{keys: "s", what: "Statistics for the list", hint: "stats"},
+			{keys: "t", what: "How the card's printed text changed", hint: "text"},
+			{keys: "J/K", what: "In statistics: walk the categories, narrowing the list"},
+			{keys: "enter", what: "Browse the rules this card matched"},
 		}},
 		{"The deck", []binding{
-			{"a", "Add the selected card"},
-			{"x", "Remove it"},
-			{"c", "Mark it a commander, or unmark it"},
-			{"+ / -", "Another copy, or one fewer"},
-			{"u", "Undo the last change"},
-			{"w", "Write the deck now"},
+			{keys: "a", what: "Add the selected card", hint: "add", needsDeck: true},
+			{keys: "x", what: "Remove it", hint: "remove", needsDeck: true},
+			{keys: "c", what: "Mark it a commander, or unmark it", needsDeck: true},
+			{keys: "+ / -", what: "Another copy, or one fewer", needsDeck: true},
+			{keys: "u", what: "Undo the last change", hint: "undo", needsDeck: true},
+			{keys: "w", what: "Write the deck now", needsDeck: true},
 		}},
 		{"Tagging", []binding{
-			{"space", "Mark this card, and step to the next"},
-			{"v", "Mark everything the list is showing"},
-			{"V", "Clear the marks"},
-			{"T", "Tag the marked cards — a leading - removes"},
+			{keys: "space", what: "Mark this card, and step to the next", needsDeck: true},
+			{keys: "v", what: "Mark everything the list is showing", needsDeck: true},
+			{keys: "V", what: "Clear the marks", needsDeck: true},
+			{keys: "T", what: "Tag the marked cards — a leading - removes", hint: "tag", needsDeck: true},
 		}},
 		{"Elsewhere", leaderBindings()},
 	}
+}
+
+// ── The hint line ───────────────────────────────────────────────
+
+// hintLine is the one line of key hints at the bottom of the screen. One
+// line, in one place: the list's own help line is off and the panel doesn't
+// carry its own, so nothing is said twice.
+func (m model) hintLine(width int) string {
+	keyStyle := lipgloss.NewStyle().Foreground(gruvYellow)
+	whatStyle := lipgloss.NewStyle().Foreground(gruvGray)
+
+	render := func(b binding) string {
+		return keyStyle.Render(b.keys) + " " + whatStyle.Render(b.hint)
+	}
+	cost := func(b binding) int { return runeLen(b.keys) + 1 + runeLen(b.hint) + 2 }
+
+	// The keys that lead to every other key go on last but are budgeted for
+	// first: a narrow terminal should lose "rules" and "stats" before it
+	// loses the two hints that would have told you about them.
+	var lead, tail []binding
+	for _, g := range keysFor(m.state) {
+		// On the main screen the bar and the lists want different halves of
+		// the table; everywhere else there's only one thing to be doing.
+		if m.state == stateResults && (g.title == "The search bar") != m.searchFocused() {
+			continue
+		}
+		for _, b := range g.bindings {
+			if b.hint == "" || (b.needsDeck && !m.deckOpen()) {
+				continue
+			}
+			if b.keys == leaderKey || b.keys == "?" {
+				tail = append(tail, b)
+				continue
+			}
+			lead = append(lead, b)
+		}
+	}
+
+	budget := width - 1
+	for _, b := range tail {
+		budget -= cost(b)
+	}
+
+	var parts []string
+	for _, b := range lead {
+		if budget-cost(b) < 0 {
+			break
+		}
+		budget -= cost(b)
+		parts = append(parts, render(b))
+	}
+	for _, b := range tail {
+		parts = append(parts, render(b))
+	}
+
+	return lipgloss.NewStyle().MaxWidth(width).
+		Render(" " + strings.Join(parts, whatStyle.Render("  ")))
 }
 
 // leaderBindings turns the leader menu into reference rows, so the two can't
@@ -224,9 +306,11 @@ func keysFor(s state) []keyGroup {
 func leaderBindings() []binding {
 	out := make([]binding, 0, len(leaderCmds)+1)
 	for _, c := range leaderCmds {
-		out = append(out, binding{leaderKey + c.key, c.what})
+		out = append(out, binding{keys: leaderKey + c.key, what: c.what})
 	}
-	return append(out, binding{"?", "These keys"})
+	return append(out,
+		binding{keys: leaderKey, what: "The menu above", hint: "more"},
+		binding{keys: "?", what: "These keys", hint: "keys"})
 }
 
 // ── The reference screen ────────────────────────────────────────

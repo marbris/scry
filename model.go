@@ -104,6 +104,12 @@ type model struct {
 	moxUserLoading bool
 	moxUserErr     error
 
+	// The queries you've run, oldest first, with where up/down has walked
+	// to and what was in the bar before the walk started.
+	queryHistory []string
+	historyAt    int
+	historyDraft string
+
 	// undo holds the deck as it was before each edit, so u can walk back.
 	undo []undoStep
 
@@ -201,20 +207,21 @@ func initialModel() model {
 	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(gruvGray)
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(gruvOrange)
 
-	newCardList := func(help bool) list.Model {
+	newCardList := func(statusBar bool) list.Model {
 		l := list.New([]list.Item{}, compactDelegate{}, 40, 30)
 		// The header above the list carries query/sort/count now.
 		l.SetShowTitle(false)
 		l.Styles.FilterPrompt = lipgloss.NewStyle().Foreground(gruvYellow)
 		l.Styles.FilterCursor = lipgloss.NewStyle().Foreground(gruvOrange)
-		l.SetShowStatusBar(help)
+		l.SetShowStatusBar(statusBar)
 		l.SetFilteringEnabled(true)
-		l.SetShowHelp(help)
+		// One hint line for the whole screen, at the bottom — see hintLine.
+		l.SetShowHelp(false)
 		// Literal rather than fuzzy: see filter.go.
 		l.Filter = literalFilter
 		return l
 	}
-	// Only the results list carries the help line; two copies of it in one
+	// Only the results list carries the item count; two copies of it in one
 	// screen is noise, and the deck column is the narrower of the two.
 	l := newCardList(true)
 	dl := newCardList(false)
@@ -234,18 +241,20 @@ func initialModel() model {
 	rl.Filter = literalFilter
 
 	return model{
-		state:       stateResults,
-		searchInput: ti,
-		focus:       focusSearch,
-		results:     pane{list: l, statIndex: -1, arrivedName: "search order"},
-		deckPane:    pane{list: dl, statIndex: -1, arrivedName: "decklist"},
-		rulesList:   rl,
-		sortIndex:   9,
-		rulings:     make(map[string][]Ruling),
-		rulingErr:   make(map[string]error),
-		inflight:    make(map[string]bool),
-		histories:   make(map[string]*cardHistory),
-		originals:   make(map[string]map[string]string),
+		state:        stateResults,
+		searchInput:  ti,
+		focus:        focusSearch,
+		results:      pane{list: l, statIndex: -1, arrivedName: "search order"},
+		deckPane:     pane{list: dl, statIndex: -1, arrivedName: "decklist"},
+		rulesList:    rl,
+		sortIndex:    9,
+		historyAt:    historyIdle,
+		queryHistory: loadQueryHistory(),
+		rulings:      make(map[string][]Ruling),
+		rulingErr:    make(map[string]error),
+		inflight:     make(map[string]bool),
+		histories:    make(map[string]*cardHistory),
+		originals:    make(map[string]map[string]string),
 	}
 }
 

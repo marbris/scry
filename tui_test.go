@@ -350,10 +350,13 @@ func TestSearchBarFocus(t *testing.T) {
 		t.Errorf("typing did not reach the search bar: %q", typed.searchInput.Value())
 	}
 
-	// Arrows still move the list while typing.
-	moved := drive(typed, tea.KeyMsg{Type: tea.KeyDown})
-	if moved.active().list.Index() != 1 {
-		t.Error("arrow keys do not move the list while the search bar has focus")
+	// The list can still be paged through without leaving the bar — the
+	// arrows walk the query history now, so pgup/pgdn took that job. Three
+	// test cards fit on one page, so this checks where the key went rather
+	// than how far it moved.
+	paged := drive(typed, tea.KeyMsg{Type: tea.KeyPgDown})
+	if paged.searchInput.Value() != typed.searchInput.Value() {
+		t.Errorf("pgdn was typed into the search bar: %q", paged.searchInput.Value())
 	}
 
 	// esc hands focus back to the list.
@@ -400,7 +403,9 @@ func TestRulingsAreDebounced(t *testing.T) {
 		t.Fatal("hovering a card did not schedule a rulings fetch")
 	}
 
-	// Move on before the tick fires.
+	// Move on before the tick fires. Focus is on the list here, where down
+	// is still down.
+	m = m.setFocus(focusResults)
 	moved := drive(m, tea.KeyMsg{Type: tea.KeyDown})
 	if moved.hoverKey != "b" {
 		t.Fatalf("hover key = %q, want b", moved.hoverKey)

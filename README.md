@@ -22,6 +22,7 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 - **Printed text history** — press `t` to see how a card's wording changed across its printings, from Alpha to today (via MTGJSON, since Scryfall only serves current oracle text)
 - **Comprehensive rules built in** — press `r` to swap the card panel for the rules its text invokes, and browse the full rulebook and glossary (merged in from `mtg-rules`)
 - **Statistics you can filter by** — `s` breaks the results down by colour, rarity, mana value and type; `J/K` walks those categories, narrows the list to whichever one you're on, and re-cuts every histogram for what's left
+- **Query history** — `↑` in the search bar walks back through what you've searched for, kept between sessions
 - **Two kinds of sort** — `tab` sets the order the query asks Scryfall for, which decides which 175 cards come back; `o` reorders whatever is already on screen, results or deck, by name, mana value, type, colour or EDHREC rank
 - **Moxfield decks** — paste a public deck URL (or `scry deck <id>`) to browse someone's list, with every card behaving like a search result
 - **Decks of your own** — import a deck and keep it as a plain text file, one card per line, editable here or in your editor
@@ -344,6 +345,12 @@ Tags
 
 Tags are per deck, so an untagged deck simply doesn't show the section.
 
+### Query history
+
+The search bar remembers what you've searched for, between sessions. `↑` walks back through it and `↓` walks forward; coming back past the newest restores whatever you were half-way through typing, so glancing at an old search doesn't cost you the one you were composing. Running a search you've run before moves it to the end rather than adding a second copy, so walking back never steps through the same query twice.
+
+Queries live in `~/.local/share/scry/queries.json`, the last 200 of them.
+
 ### Sorting what's on screen
 
 There are two orderings, and they do different jobs.
@@ -486,8 +493,9 @@ In the search bar a comma is a comma — card names have them — so the leader 
 | Key | Action |
 |---|---|
 | `enter` | Run the search — or load the deck, if the text is a Moxfield URL |
+| `↑/↓` | Walk back and forward through the queries you've run |
 | `tab` / `shift+tab` | Cycle the order the *query* asks Scryfall for |
-| `↑/↓` | Move through the results while typing |
+| `pgup` / `pgdn` | Move through the results without leaving the bar |
 | `esc` | Back to the results (quits if there are none) |
 
 ### Rules Browser

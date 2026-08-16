@@ -243,8 +243,7 @@ func (m model) viewDeckHistory() string {
 		body = renderDiff(m.historyDiff, diffW-4)
 	}
 
-	hint := lipgloss.NewStyle().Foreground(gruvGray).
-		Render("enter: restore this version  J/K: scroll  /: search  esc: back")
+	hint := m.hintLine(m.width)
 	body = scrollView(body, m.diffScroll, m.height-3) + "\n" + hint
 
 	diffStyle := lipgloss.NewStyle().

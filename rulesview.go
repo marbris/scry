@@ -194,8 +194,7 @@ func (m model) viewRulesBrowse() string {
 		preview = lipgloss.NewStyle().Foreground(gruvGray).Render("No rule selected")
 	}
 
-	hint := lipgloss.NewStyle().Foreground(gruvGray).
-		Render("/: search  g: glossary  J/K: scroll  esc: back")
+	hint := m.hintLine(m.width)
 	preview = scrollView(preview, m.browseScroll, m.height-3) + "\n" + hint
 
 	previewStyle := lipgloss.NewStyle().

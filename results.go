@@ -136,6 +136,7 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.err = nil
 		m.searching = true
+		m.leaveHistory()
 
 		// A pasted Moxfield link loads that deck instead of being run as a
 		// (hopeless) Scryfall query.
@@ -143,6 +144,11 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.deckLoading = true
 			return m, loadDeckCmd(id)
 		}
+
+		m.queryHistory = rememberQuery(m.queryHistory, query)
+		// A failed write costs the history, never the search.
+		_ = saveQueryHistory(m.queryHistory)
+
 		return m, searchScryfall(query, sortOptions[m.sortIndex], maxResults)
 
 	case "esc":
@@ -159,14 +165,23 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sortIndex = (m.sortIndex - 1 + len(sortOptions)) % len(sortOptions)
 		return m, nil
 
-	// Browse the results without leaving the search bar.
-	case "up", "down", "pgup", "pgdown":
+	// Up and down walk the queries you've run, the way a shell prompt
+	// does. Browsing the results without leaving the search bar moved to
+	// pgup/pgdown, which is the less used of the two by a distance.
+	case "up":
+		return m.recallQuery(-1), nil
+	case "down":
+		return m.recallQuery(1), nil
+
+	case "pgup", "pgdown":
 		var cmd tea.Cmd
 		m.results.list, cmd = m.results.list.Update(msg)
 		next, hoverCmd := m.syncHover()
 		return next, tea.Batch(cmd, hoverCmd)
 	}
 
+	// Typing means you've stopped walking and started editing.
+	m.leaveHistory()
 	var cmd tea.Cmd
 	m.searchInput, cmd = m.searchInput.Update(msg)
 	return m, cmd
@@ -450,7 +465,8 @@ func (m model) deckColumn() bool {
 func (m model) resultsLayout() resultsLayout {
 	l := resultsLayout{headerH: headerLines}
 
-	l.bodyH = m.height - l.headerH
+	// One row at the bottom belongs to the hint line.
+	l.bodyH = m.height - l.headerH - 1
 	if l.bodyH < 6 {
 		l.bodyH = 6
 	}
@@ -580,11 +596,6 @@ func (m model) resultsHeader() string {
 
 	default:
 		b.WriteString(labelStyle.Render("Sort") + valueStyle.Render(sortOptions[m.sortIndex]))
-		if m.searchFocused() {
-			b.WriteString(dimStyle.Render("  tab: cycle  enter: search"))
-		} else {
-			b.WriteString(dimStyle.Render("  i: edit search  ?: help"))
-		}
 	}
 	b.WriteString("\n")
 
@@ -696,12 +707,7 @@ func (m model) viewResults() string {
 	// given, which would reflow everything beside it.
 	listView := lipgloss.NewStyle().MaxWidth(l.listW).Render(main.list.View())
 
-	hint := m.panelHint()
-	if m.tagging {
-		hint = m.tagInput.View()
-	}
-	panel := scrollView(m.panelContent(l.panelW-4), m.panelScroll(), l.panelH-1) +
-		"\n" + hint
+	panel := scrollView(m.panelContent(l.panelW-4), m.panelScroll(), l.panelH)
 
 	var body string
 	switch {
@@ -731,11 +737,18 @@ func (m model) viewResults() string {
 		)
 	}
 
-	frame := lipgloss.JoinVertical(lipgloss.Left, m.resultsHeader(), body)
+	// The bottom row is the hint line, or the tag prompt while one is open.
+	bottom := []string{m.hintLine(m.width)}
+	if m.tagging {
+		bottom = []string{" " + m.tagInput.View()}
+	}
+	frame := lipgloss.JoinVertical(lipgloss.Left,
+		m.resultsHeader(), body, strings.Join(bottom, "\n"))
+
 	if m.leader {
-		// The menu needs the whole width — squeezed into the panel column
-		// it loses half its entries — and the frame is a fixed height, so
-		// it takes the bottom lines rather than adding any.
+		// The menu needs the whole width — squeezed into a column it loses
+		// half its entries — and the frame is a fixed height, so it takes
+		// the bottom lines rather than adding any.
 		frame = replaceLastLines(frame, m.leaderBarLines(m.width))
 	}
 	return frame
@@ -883,29 +896,6 @@ func (m model) panelBox(content string, w, h int, left, top bool) string {
 		BorderRight(false).
 		BorderBottom(false).
 		Render(content)
-}
-
-// panelHint spells out how to reach the panels you're not looking at.
-func (m model) panelHint() string {
-	parts := []string{"J/K: scroll"}
-	switch m.panel {
-	case panelStats:
-		parts = []string{"J/K: category", "^d/^u: scroll", "s: card"}
-		if m.active().statFilter != nil {
-			parts = append(parts, "esc: clear")
-		}
-	case panelRules:
-		parts = append(parts, "r: card", "s: stats", "enter: browse")
-	case panelHistory:
-		parts = append(parts, "t: card", "r: rules", "s: stats")
-	default:
-		parts = append(parts, "r: rules", "s: stats", "t: text history")
-	}
-	if m.deck != nil && m.deck.local() {
-		parts = append(parts, "a/x: add/remove", "w: write")
-	}
-	parts = append(parts, "o: sort", ",: more", "?: keys")
-	return lipgloss.NewStyle().Foreground(gruvGray).Render(strings.Join(parts, "  "))
 }
 
 // leavesNotice reports whether a key is one that says something afterwards.

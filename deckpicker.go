@@ -298,7 +298,6 @@ func (m model) viewDeckPicker() string {
 			lipgloss.NewStyle().Foreground(gruvGray).Render("  enter: create  esc: cancel"))
 	}
 
-	hint := lipgloss.NewStyle().Foreground(gruvGray).
-		Render("  enter: open  n: new deck  /: filter  esc: back")
+	hint := m.hintLine(m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, m.deckPicker.View(), errLine, hint)
 }

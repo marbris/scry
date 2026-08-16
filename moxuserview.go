@@ -267,7 +267,6 @@ func (m model) viewMoxUser() string {
 	}
 
 	m.moxUserList.SetSize(m.width, m.height-3)
-	hint := dim.Render("  enter: import   b: browse without importing   " +
-		"u: someone else   /: filter   esc: back")
+	hint := m.hintLine(m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, m.moxUserList.View(), errLine, hint)
 }
