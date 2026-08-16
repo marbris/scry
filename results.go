@@ -327,6 +327,20 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.statMove(-1)
 			}
 			return m.scrollPanel(-1), nil
+
+		case "j", "down":
+			// With the statistics up they're what you're reading, and the
+			// panel is where everything is happening — moving the cursor
+			// through cards you can't see the details of does nothing. So
+			// the plain keys drive the categories too, and s puts the card
+			// panel back when you want the list again.
+			if m.panel == panelStats {
+				return m.statMove(1)
+			}
+		case "k", "up":
+			if m.panel == panelStats {
+				return m.statMove(-1)
+			}
 		case "ctrl+d", "ctrl+u":
 			// Scrolling the panel proper, which in the statistics panel
 			// means moving the view without moving the selected category.
@@ -695,14 +709,15 @@ func (m model) viewResults() string {
 	// Only the list taking keys is drawn in full colour. Whichever isn't
 	// goes dim, which is a far clearer signal than the colour of the rule
 	// between the columns.
-	// The results are flagged with what the deck already holds; a deck row
-	// carries its own commander flag, so it needs nothing passed in.
-	inDeck := m.deckMembership()
+	// Each list flags the cards the other one is also showing: a search
+	// result you already run, and a deck card your search just turned up.
+	// A deck row carries its own commander flag, which takes the slot when
+	// both would apply.
 	m.results.list.SetDelegate(compactDelegate{
-		blurred: m.focus == focusDeck, marks: m.marks, inDeck: inDeck,
+		blurred: m.focus == focusDeck, marks: m.marks, inOther: m.deckMembership(),
 	})
 	m.deckPane.list.SetDelegate(compactDelegate{
-		blurred: m.focus != focusDeck, marks: m.marks,
+		blurred: m.focus != focusDeck, marks: m.marks, inOther: m.resultMembership(),
 	})
 
 	// The list's own help line can render wider than the width it was

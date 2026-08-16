@@ -179,13 +179,26 @@ func deckItems(cards []deckCard) []list.Item {
 	return items
 }
 
-// deckMembership is what the open deck holds, by lowercased name. Used to
-// flag search results the deck already runs; a deck row knows for itself
-// whether it's a commander, from the item.
+// deckMembership is what the open deck holds, by lowercased name, for
+// flagging the search results it already runs.
 func (m model) deckMembership() map[string]bool {
-	inDeck := make(map[string]bool, len(m.deckCards))
+	out := make(map[string]bool, len(m.deckCards))
 	for _, dc := range m.deckCards {
-		inDeck[strings.ToLower(dc.card.Name)] = true
+		out[strings.ToLower(dc.card.Name)] = true
 	}
-	return inDeck
+	return out
+}
+
+// resultMembership is what the search turned up, for flagging the deck cards
+// it matched. Built from the whole result set rather than what a filter
+// leaves on screen: the question is whether the search found the card, not
+// whether it's currently scrolled into view.
+func (m model) resultMembership() map[string]bool {
+	out := make(map[string]bool, len(m.results.baseItems))
+	for _, it := range m.results.baseItems {
+		if ci, ok := it.(cardItem); ok {
+			out[strings.ToLower(ci.card.Name)] = true
+		}
+	}
+	return out
 }

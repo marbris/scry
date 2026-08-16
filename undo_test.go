@@ -226,7 +226,7 @@ func TestGutterKeepsRowsAlignedWhateverTheFlags(t *testing.T) {
 	}{
 		"plain":     {compactDelegate{}, cardItem{card: card}},
 		"marked":    {compactDelegate{marks: key}, cardItem{card: card}},
-		"in deck":   {compactDelegate{inDeck: key}, cardItem{card: card}},
+		"in other":  {compactDelegate{inOther: key}, cardItem{card: card}},
 		"commander": {compactDelegate{}, cardItem{card: card, commander: true}},
 		"both":      {compactDelegate{marks: key}, cardItem{card: card, commander: true}},
 	} {

@@ -137,12 +137,13 @@ type RulingsResponse struct {
 //
 //   - blurred is set on whichever list doesn't have focus.
 //   - marks are the cards picked out for tagging.
-//   - inDeck says which cards the open deck holds, so a search result you
-//     already run is obvious without looking across at the other column.
+//   - inOther says which cards the list beside this one is showing, so a
+//     search result you already run — or a deck card your search just
+//     turned up — is obvious without reading across.
 type compactDelegate struct {
 	blurred bool
 	marks   map[string]bool
-	inDeck  map[string]bool
+	inOther map[string]bool
 }
 
 // gutterWidth is the two columns in front of every row: one for the tagging
@@ -163,7 +164,7 @@ func (d compactDelegate) gutter(it cardItem) string {
 	switch {
 	case it.commander:
 		role = lipgloss.NewStyle().Foreground(gruvYellow).Bold(true).Render("★")
-	case d.inDeck[key]:
+	case d.inOther[key]:
 		role = lipgloss.NewStyle().Foreground(gruvAqua).Render("▪")
 	}
 	return mark + role

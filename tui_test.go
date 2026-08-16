@@ -1565,8 +1565,8 @@ func TestBarsScaleToTheUnfilteredSet(t *testing.T) {
 
 	// And two small categories stay in proportion to each other rather
 	// than both filling the bar: CMC 5 has two cards, CMC 3 has one.
-	cmc3 := selectedBar(t, walkTo(t, base, "CMC", "3"))
-	cmc5 := selectedBar(t, walkTo(t, base, "CMC", "5"))
+	cmc3 := selectedBar(t, walkTo(t, base, "Mana Value", "3"))
+	cmc5 := selectedBar(t, walkTo(t, base, "Mana Value", "5"))
 	if cmc5 <= cmc3 {
 		t.Errorf("CMC 5 (2 cards) drew %d blocks and CMC 3 (1 card) drew %d", cmc5, cmc3)
 	}

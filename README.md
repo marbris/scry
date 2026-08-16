@@ -63,7 +63,7 @@ A public Moxfield deck opened by URL — the deck reads in decklist order, and i
 
 ![Statistics for a deck](screenshots/statistics.png)
 
-`J/K` walks those categories and narrows the cards to whichever one it's on — here the deck's removal, with the breakdown re-cut for just those sixteen cards. Categories the filter has emptied hold their places at zero, and the bars stay scaled to the whole deck.
+`j/k` (or `J/K`) walks those categories and narrows the cards to whichever one it's on — here the deck's removal, with the breakdown re-cut for just those sixteen cards. Categories the filter has emptied hold their places at zero, and the bars stay scaled to the whole deck.
 
 ![Filtering by a statistics category](screenshots/filter_stats.png)
 
@@ -345,6 +345,8 @@ Tags
 
 Tags are per deck, so an untagged deck simply doesn't show the section.
 
+Lands are left out of the mana curve and the colour spread, and the headings say so. A Commander deck is a third lands; nearly all of them cost nothing and count as colourless, so leaving them in puts a column at zero taller than the rest of the curve together and a "Colorless" bar that reads as though the deck were full of colourless spells. How many lands there are is in the type breakdown, which says it better.
+
 ### Query history
 
 The search bar remembers what you've searched for, between sessions. `↑` walks back through it and `↓` walks forward; coming back past the newest restores whatever you were half-way through typing, so glancing at an old search doesn't cost you the one you were composing. Running a search you've run before moves it to the end rather than adding a second copy, so walking back never steps through the same query twice.
@@ -460,6 +462,7 @@ In the search bar a comma is a comma — card names have them — so the leader 
 | `i` | Edit the search query |
 | `o` / `O` | Reorder the list — name, mana value, type, colour, EDHREC rank |
 | `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
+| `j/k` or `↑/↓` | Move through the list — or, with the statistics up, walk the categories |
 | `ctrl+d` / `ctrl+u` | Scroll the panel half a screen |
 | `r` | Rules for this card (press again for the card view) |
 | `s` | Statistics for the list (press again for the card view) |

@@ -37,6 +37,11 @@ func (r statRow) same(other *statRow) bool {
 
 // ── Building the rows ───────────────────────────────────────────
 
+// colorRows is the colour spread of the spells. Lands are left out for the
+// same reason they're left out of the curve: nearly all of them are
+// colourless by the card's own reckoning, so counting them says how many
+// lands the deck runs — under a "Colorless" heading, where it reads as if
+// the deck were full of colourless spells.
 func colorRows() []statRow {
 	spec := []struct {
 		label string
@@ -56,6 +61,9 @@ func colorRows() []statRow {
 		rows = append(rows, statRow{
 			group: "Color", label: s.label, color: s.color,
 			match: func(ci cardItem) bool {
+				if isLand(ci.card) {
+					return false
+				}
 				for _, c := range ci.card.displayColors() {
 					if c == code {
 						return true
@@ -68,11 +76,15 @@ func colorRows() []statRow {
 	rows = append(rows,
 		statRow{
 			group: "Color", label: "Colorless", color: gruvFgDim,
-			match: func(ci cardItem) bool { return len(ci.card.displayColors()) == 0 },
+			match: func(ci cardItem) bool {
+				return !isLand(ci.card) && len(ci.card.displayColors()) == 0
+			},
 		},
 		statRow{
 			group: "Color", label: "Multi", color: gruvYellow,
-			match: func(ci cardItem) bool { return len(ci.card.displayColors()) > 1 },
+			match: func(ci cardItem) bool {
+				return !isLand(ci.card) && len(ci.card.displayColors()) > 1
+			},
 		},
 	)
 	return rows
@@ -124,6 +136,10 @@ func rarityRows(entries []cardItem) []statRow {
 	return rows
 }
 
+// cmcRows is the mana curve. Lands are left out of it: they nearly all cost
+// nothing, so counting them buries the curve under a column at zero that
+// says only how many lands the deck runs — which the type breakdown below
+// already says, and better.
 func cmcRows() []statRow {
 	rows := make([]statRow, 0, 8)
 	for i := 0; i <= 7; i++ {
@@ -133,8 +149,11 @@ func cmcRows() []statRow {
 			label = "7+"
 		}
 		rows = append(rows, statRow{
-			group: "CMC", label: label, color: gruvAqua,
+			group: "Mana Value", label: label, color: gruvAqua,
 			match: func(ci cardItem) bool {
+				if isLand(ci.card) {
+					return false
+				}
 				cmc := int(ci.card.CMC)
 				if n == 7 {
 					return cmc >= 7
@@ -145,6 +164,10 @@ func cmcRows() []statRow {
 	}
 	return rows
 }
+
+// isLand reports whether a card's front face is a land, which is what
+// decides where it's counted.
+func isLand(c ScryfallCard) bool { return primaryType(c.TypeLine) == "Land" }
 
 func typeRows() []statRow {
 	types := []string{"Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land"}
@@ -205,8 +228,8 @@ func statGroups(rowSource, counted []cardItem) []statGroup {
 	groups := []statGroup{
 		{title: "Tags", rows: tagRows(rowSource)},
 		{title: "Type", rows: typeRows()},
-		{title: "Color", rows: colorRows()},
-		{title: "CMC (Mana Value)", rows: cmcRows()},
+		{title: "Color (excl. lands)", rows: colorRows()},
+		{title: "Mana Value (excl. lands)", rows: cmcRows()},
 		{title: "Rarity", rows: rarityRows(rowSource)},
 	}
 
