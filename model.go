@@ -298,6 +298,21 @@ func initialModel() model {
 	}
 }
 
+// startWithLastQuery leaves the search bar showing the last thing you
+// searched for, rather than empty or — as it used to be when a deck opened
+// — something that isn't a query at all. A query typed on the command line
+// wins over it, since that's what you just asked for.
+func (m model) startWithLastQuery() model {
+	if m.initialQuery != "" || m.searchInput.Value() != "" {
+		return m
+	}
+	if n := len(m.queryHistory); n > 0 {
+		m.searchInput.SetValue(m.queryHistory[n-1])
+		m.searchInput.CursorEnd()
+	}
+	return m
+}
+
 func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{textinput.Blink}
 	if !m.rules.loaded() {

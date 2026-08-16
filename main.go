@@ -217,7 +217,6 @@ func runDeck(m model, args []string) {
 		m.searching = true
 		m.deckLoading = true
 		m.initialDeckSlug = arg
-		m.searchInput.SetValue("deck " + arg)
 		runTUI(m)
 		return
 	}
@@ -233,11 +232,11 @@ func runDeck(m model, args []string) {
 	m.searching = true
 	m.deckLoading = true
 	m.initialDeck = id
-	m.searchInput.SetValue("https://moxfield.com/decks/" + id)
 	runTUI(m)
 }
 
 func runTUI(m model) {
+	m = m.startWithLastQuery()
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)

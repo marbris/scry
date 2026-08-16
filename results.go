@@ -89,13 +89,17 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The deck gets its own column, so the search results stay where
 		// they are. With nothing searched yet the deck is all there is to
 		// look at, which is what an empty results list means.
+		//
+		// The search bar is left alone either way. It goes to Scryfall, and
+		// "deck ghen" is not something Scryfall has ever heard of — putting
+		// it there made the bar unusable until you cleared it. The deck's
+		// name is on the header line and its column caption already.
 		if m.results.empty() {
 			m.cards = make([]ScryfallCard, 0, len(msg.cards))
 			for _, dc := range msg.cards {
 				m.cards = append(m.cards, dc.card)
 			}
 			m.totalCards = info.total
-			m.searchInput.SetValue(info.ref())
 		}
 
 		m = m.setFocus(focusDeck)

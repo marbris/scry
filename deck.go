@@ -29,15 +29,6 @@ type deckInfo struct {
 
 func (d deckInfo) local() bool { return d.slug != "" }
 
-// ref is what the search bar shows while the deck is open: the URL it came
-// from, or the command that would reopen it.
-func (d deckInfo) ref() string {
-	if d.local() {
-		return "deck " + d.slug
-	}
-	return d.url
-}
-
 type deckCard struct {
 	card      ScryfallCard
 	qty       int

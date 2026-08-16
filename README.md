@@ -349,7 +349,7 @@ Tags are per deck, so an untagged deck simply doesn't show the section.
 
 The search bar remembers what you've searched for, between sessions. `↑` walks back through it and `↓` walks forward; coming back past the newest restores whatever you were half-way through typing, so glancing at an old search doesn't cost you the one you were composing. Running a search you've run before moves it to the end rather than adding a second copy, so walking back never steps through the same query twice.
 
-Queries live in `~/.local/share/scry/queries.json`, the last 200 of them.
+Queries live in `~/.local/share/scry/queries.json`, the last 200 of them. The search bar starts on the last one you ran, and opening a deck leaves it alone — the bar goes to Scryfall, and a deck isn't something Scryfall has heard of. Which deck is open is on the header line and the deck column's caption.
 
 ### Sorting what's on screen
 

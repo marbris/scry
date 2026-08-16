@@ -197,3 +197,76 @@ func TestHistoryWithNothingInIt(t *testing.T) {
 func writeString(path, body string) error {
 	return os.WriteFile(path, []byte(body), 0644)
 }
+
+func TestOpeningADeckLeavesTheSearchBarAlone(t *testing.T) {
+	// The search bar goes to Scryfall. It used to be filled with the deck
+	// reference — "deck ghen" — which isn't a query, would find nothing if
+	// you pressed enter on it, and had to be cleared before you could
+	// search for anything.
+	gitRepo(t)
+	seedCache(t, map[string]ScryfallCard{})
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = m.setFocus(focusSearch)
+	m.searchInput.SetValue("t:dragon c:r")
+
+	m = drive(m, deckLoadedMsg{
+		info:  deckInfo{name: "Ghen", slug: "ghen", total: 10},
+		cards: deckFixture(),
+	})
+
+	if got := m.searchInput.Value(); got != "t:dragon c:r" {
+		t.Errorf("opening a deck changed the search bar to %q", got)
+	}
+	// And the deck is still identified, on the line that's for saying so.
+	if !strings.Contains(stripANSI(m.resultsHeader()), "Ghen") {
+		t.Error("the header doesn't name the open deck")
+	}
+}
+
+func TestADeckIsNeverRememberedAsAQuery(t *testing.T) {
+	gitRepo(t)
+	t.Setenv("HOME", t.TempDir())
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
+	m = drive(m, deckLoadedMsg{
+		info:  deckInfo{name: "Ghen", slug: "ghen", total: 10},
+		cards: deckFixture(),
+	})
+
+	if len(m.queryHistory) != 0 {
+		t.Errorf("opening a deck put %v in the query history", m.queryHistory)
+	}
+	if got := loadQueryHistory(); len(got) != 0 {
+		t.Errorf("opening a deck wrote %v to the history file", got)
+	}
+}
+
+func TestTheBarStartsOnYourLastSearch(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if err := saveQueryHistory([]string{"t:angel", "t:dragon c:r"}); err != nil {
+		t.Fatal(err)
+	}
+
+	m := initialModel().startWithLastQuery()
+	if got := m.searchInput.Value(); got != "t:dragon c:r" {
+		t.Errorf("the bar starts on %q, want the last search", got)
+	}
+
+	// A query given on the command line is what you just asked for, so it
+	// wins over the last one.
+	m2 := initialModel()
+	m2.initialQuery = "t:goblin"
+	m2.searchInput.SetValue("t:goblin")
+	if got := m2.startWithLastQuery().searchInput.Value(); got != "t:goblin" {
+		t.Errorf("a command-line query was overwritten with %q", got)
+	}
+
+	// Nothing searched ever means nothing to show.
+	t.Setenv("HOME", t.TempDir())
+	if got := initialModel().startWithLastQuery().searchInput.Value(); got != "" {
+		t.Errorf("a fresh install starts with %q in the bar", got)
+	}
+}

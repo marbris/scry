@@ -213,16 +213,14 @@ func TestDeckRefDoesNotSwallowDeckNames(t *testing.T) {
 	}
 }
 
-func TestDeckInfoRef(t *testing.T) {
-	// The search bar shows how to get back to whatever is open.
-	local := deckInfo{slug: "ghen", url: "https://moxfield.com/decks/AbC123"}
-	if !local.local() || local.ref() != "deck ghen" {
-		t.Errorf("local deck ref = %q", local.ref())
+func TestDeckInfoLocal(t *testing.T) {
+	// A deck read from a file can be edited; one being browsed off Moxfield
+	// is somebody else's.
+	if !(deckInfo{slug: "ghen"}).local() {
+		t.Error("a deck with a slug should be local")
 	}
-
-	remote := deckInfo{url: "https://moxfield.com/decks/AbC123"}
-	if remote.local() || remote.ref() != "https://moxfield.com/decks/AbC123" {
-		t.Errorf("remote deck ref = %q", remote.ref())
+	if (deckInfo{url: "https://moxfield.com/decks/AbC123"}).local() {
+		t.Error("a deck with only a URL should not be local")
 	}
 }
 
@@ -305,9 +303,11 @@ func TestLocalDeckInTheApp(t *testing.T) {
 		cards: deckFixture(),
 	})
 
-	// The search bar shows how to reopen the deck, not the URL it came from.
-	if got := m.searchInput.Value(); got != "deck ghen" {
-		t.Errorf("search bar = %q, want %q", got, "deck ghen")
+	// The search bar goes to Scryfall, so opening a deck leaves it alone.
+	// It used to be filled with "deck ghen", which isn't a query and which
+	// you had to clear before you could search for anything.
+	if got := m.searchInput.Value(); got != "" {
+		t.Errorf("opening a deck wrote %q into the search bar", got)
 	}
 
 	// w writes the open deck; with nothing changed there is nothing to write.
