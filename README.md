@@ -266,7 +266,9 @@ Edit them in the app or in your editor — both work, and neither surprises the 
 
 #### Browsing someone's decks
 
-`,m` lists a Moxfield user's decks — type their name or paste a link to their profile — with the format, size, colour identity and when each last changed. `enter` imports one, `b` browses it without importing, and decks you already have are marked. Only public decks are listed; Moxfield doesn't show anyone else's private or unlisted ones.
+`,m` lists a Moxfield user's decks — type their name or paste a link to their profile — with the format, size, colour identity and when each last changed. `enter` imports one, `b` browses it without importing, and decks you already have are marked. The finished decks come first, then the works in progress, each newest first; a deck that isn't legal in its format yet is marked `not legal`.
+
+Only public decks are listed; Moxfield doesn't show anyone else's private or unlisted ones.
 
 #### Editing
 

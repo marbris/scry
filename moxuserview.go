@@ -63,6 +63,11 @@ func (d moxDeckDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	if age := dk.age(); age != "" {
 		parts = append(parts, age)
 	}
+	if !dk.Legal {
+		// Usually just means mid-build, which is most of what you'd open
+		// this list to work on — worth noting, not worth shouting about.
+		parts = append(parts, "not legal")
+	}
 	second := "  " + dimStyle.Render(truncate(strings.Join(parts, "  ·  "), width))
 
 	fmt.Fprint(w, first+"\n"+second)

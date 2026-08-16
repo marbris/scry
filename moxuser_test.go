@@ -283,3 +283,68 @@ func TestNestedScreensKeepTheirOwnWayBack(t *testing.T) {
 		t.Errorf("q from the picker went to %v after nesting", m.state)
 	}
 }
+
+func TestSearchAsksForDecksThatArentLegal(t *testing.T) {
+	// Moxfield's search returns only format-legal decks unless told
+	// otherwise, and for anyone who builds in the open that's a small
+	// fraction: an account with 42 public decks answered with 11, and the
+	// 31 it left out were the ones mid-build — 157 cards, or 3, or none
+	// yet. Those are the decks you'd open the list to work on.
+	if !strings.Contains(moxSearchURL, "showIllegal=true") {
+		t.Error("the deck search doesn't ask for decks that aren't legal yet")
+	}
+	// And it asks for them a hundred at a time rather than a screenful,
+	// since it pages through the rest.
+	if moxUserPageSize < 100 {
+		t.Errorf("page size is %d", moxUserPageSize)
+	}
+	if moxUserMaxPages < 2 {
+		t.Errorf("only %d page(s) are ever fetched", moxUserMaxPages)
+	}
+}
+
+func TestDecksThatArentLegalAreMarked(t *testing.T) {
+	gitRepo(t)
+	seedCache(t, map[string]ScryfallCard{})
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 120, Height: 30})
+	m = leaderPress(m, "m")
+	m = drive(m, moxUserDecksMsg{user: "MarBri", decks: []moxUserDeck{
+		{Name: "Finished", Format: "commander", PublicID: "a", Cards: 100, Legal: true},
+		{Name: "Half built", Format: "commander", PublicID: "b", Cards: 12},
+	}})
+
+	view := stripANSI(m.viewMoxUser())
+	if !strings.Contains(view, "not legal") {
+		t.Errorf("a deck that isn't legal yet isn't marked:\n%s", view)
+	}
+	// Only the one, though — most of a builder's decks are mid-build and
+	// saying so on every row would be noise.
+	if n := strings.Count(view, "not legal"); n != 1 {
+		t.Errorf("%q appears %d times, want 1:\n%s", "not legal", n, view)
+	}
+}
+
+func TestUserDecksAreOrderedLegalThenNewest(t *testing.T) {
+	// Most of a builder's decks are half-built. Burying the finished ones
+	// under thirty works-in-progress makes the list harder to use than it
+	// needs to be.
+	decks := []moxUserDeck{
+		{Name: "old wip", Updated: "2023-01-01T00:00:00Z"},
+		{Name: "new done", Updated: "2025-12-01T00:00:00Z", Legal: true},
+		{Name: "new wip", Updated: "2025-12-27T00:00:00Z"},
+		{Name: "old done", Updated: "2024-01-01T00:00:00Z", Legal: true},
+		{Name: "undated wip"},
+	}
+	sortUserDecks(decks)
+
+	var got []string
+	for _, d := range decks {
+		got = append(got, d.Name)
+	}
+	want := "new done|old done|new wip|old wip|undated wip"
+	if strings.Join(got, "|") != want {
+		t.Errorf("\n got %s\nwant %s", strings.Join(got, "|"), want)
+	}
+}
