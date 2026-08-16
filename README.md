@@ -47,7 +47,7 @@ Search results with the card panel alongside — oracle text highlighted, ruling
 
 ![Rules for the selected card](screenshots/rules.png)
 
-`enter` opens the full rules browser on the rules that card matched, with the rule text and its cross-references on the right.
+`r` then `R` opens the full rules browser on the rules that card matched, with the rule text and its cross-references on the right.
 
 ![Rules browser](screenshots/browse_rules.png)
 
@@ -63,7 +63,7 @@ A public Moxfield deck opened by URL — the deck reads in decklist order, and i
 
 ![Statistics for a deck](screenshots/statistics.png)
 
-`j/k` (or `J/K`) walks those categories and narrows the cards to whichever one it's on — here the deck's removal, with the breakdown re-cut for just those sixteen cards. Categories the filter has emptied hold their places at zero, and the bars stay scaled to the whole deck.
+`J/K` walks those categories and narrows the cards to whichever one it's on — here the deck's removal, with the breakdown re-cut for just those sixteen cards. Categories the filter has emptied hold their places at zero, and the bars stay scaled to the whole deck.
 
 ![Filtering by a statistics category](screenshots/filter_stats.png)
 
@@ -462,12 +462,12 @@ In the search bar a comma is a comma — card names have them — so the leader 
 | `i` | Edit the search query |
 | `o` / `O` | Reorder the list — name, mana value, type, colour, EDHREC rank |
 | `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
-| `j/k` or `↑/↓` | Move through the list — or, with the statistics up, walk the categories |
 | `ctrl+d` / `ctrl+u` | Scroll the panel half a screen |
-| `r` | Rules for this card (press again for the card view) |
+| `r` | Rules for this card — from the card view; again to go back |
+| `t` | Printed text history — from the card view; again to go back |
 | `s` | Statistics for the list (press again for the card view) |
-| `t` | Printed text history (press again for the card view) |
-| `enter` | Browse the rules this card's text matched |
+| `enter` | Back to the card from whichever panel is up |
+| `R` | With the rules panel up, open them in the rules browser |
 | `esc` | Peel one layer; quit when there's nothing left |
 | `q` | Quit |
 | `?` | Keys for this screen |

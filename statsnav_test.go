@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/charmbracelet/bubbles/list"
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -76,38 +76,33 @@ func TestStatGroupsSayTheyExcludeLands(t *testing.T) {
 	}
 }
 
-func TestPlainKeysWalkTheStatisticsWhileItIsUp(t *testing.T) {
-	// The statistics are what you're reading while they're up, and moving
-	// the cursor through cards whose details are hidden behind them does
-	// nothing — so j/k drive the categories too, not just J/K.
-	m := editableDeck(t)
-	m = pressKey(m, tea.KeyTab)
+func TestPlainKeysMoveTheListWhateverThePanelShows(t *testing.T) {
+	// j/k move through cards, always. The statistics have their own keys —
+	// J/K — so that walking the list and walking the categories never
+	// compete for the same press.
+	m := deckAndSearch(t, 190, 40)
 	m = press(m, "s")
-
-	if m.deckPane.statIndex != -1 {
-		t.Fatalf("statIndex = %d before anything was pressed", m.deckPane.statIndex)
-	}
-	m = press(m, "j")
-	if m.deckPane.statIndex != 0 || m.deckPane.statFilter == nil {
-		t.Fatalf("j did not enter the categories: index %d", m.deckPane.statIndex)
-	}
-	m = press(m, "j")
-	if m.deckPane.statIndex != 1 {
-		t.Errorf("a second j left the index at %d", m.deckPane.statIndex)
-	}
-	m = press(m, "k")
-	if m.deckPane.statIndex != 0 {
-		t.Errorf("k left the index at %d", m.deckPane.statIndex)
+	if m.panel != panelStats {
+		t.Fatalf("panel = %v", m.panel)
 	}
 
-	// The arrows do the same thing.
-	m = drive(m, tea.KeyMsg{Type: tea.KeyDown})
-	if m.deckPane.statIndex != 1 {
-		t.Errorf("down left the index at %d", m.deckPane.statIndex)
+	before := m.results.list.Index()
+	m = press(m, "j")
+	if m.results.list.Index() == before {
+		t.Error("j did not move the list with the statistics up")
 	}
-	m = drive(m, tea.KeyMsg{Type: tea.KeyUp})
-	if m.deckPane.statIndex != 0 {
-		t.Errorf("up left the index at %d", m.deckPane.statIndex)
+	if m.results.statIndex != -1 {
+		t.Errorf("j entered the categories: index %d", m.results.statIndex)
+	}
+
+	// J/K are what the categories answer to.
+	m = press(m, "J")
+	if m.results.statIndex != 0 || m.results.statFilter == nil {
+		t.Fatalf("J did not enter the categories: index %d", m.results.statIndex)
+	}
+	m = press(m, "K")
+	if m.results.statIndex != 0 {
+		t.Errorf("K past the top left the index at %d", m.results.statIndex)
 	}
 }
 
@@ -161,5 +156,77 @@ func TestCommanderFlagWinsTheSlot(t *testing.T) {
 	both := cardItem{card: ScryfallCard{Name: "Ghen"}, commander: true}
 	if got := stripANSI(d.gutter(both)); !strings.Contains(got, "★") {
 		t.Errorf("gutter = %q, want the commander flag", got)
+	}
+}
+
+func TestTheCardPanelIsTheHub(t *testing.T) {
+	// r and t open from the card view and come back to it. From the
+	// statistics they do nothing: swapping a panel you asked for for one
+	// you didn't is worse than ignoring the key.
+	m := deckAndSearch(t, 190, 40)
+	if m.panel != panelCard {
+		t.Fatalf("panel = %v at rest", m.panel)
+	}
+
+	for _, tt := range []struct {
+		key  string
+		want panelMode
+	}{
+		{"r", panelRules},
+		{"r", panelCard},
+		{"s", panelStats},
+		{"r", panelStats}, // ignored, not swapped
+		{"t", panelStats}, // ignored
+		{"s", panelCard},
+	} {
+		m = press(m, tt.key)
+		if m.panel != tt.want {
+			t.Errorf("%q from there left the panel at %v, want %v", tt.key, m.panel, tt.want)
+		}
+	}
+}
+
+func TestEnterGoesBackToTheCard(t *testing.T) {
+	// It used to open the rules browser, which isn't what enter on a card
+	// suggests and made the panel hard to leave.
+	m := deckAndSearch(t, 190, 40)
+
+	for _, key := range []string{"r", "s"} {
+		m = press(m, key)
+		if m.panel == panelCard {
+			t.Fatalf("%q did not open a panel", key)
+		}
+		m = pressKey(m, tea.KeyEnter)
+		if m.panel != panelCard {
+			t.Errorf("enter from %q left the panel at %v", key, m.panel)
+		}
+		if m.state != stateResults {
+			t.Fatalf("enter left the app in state %v", m.state)
+		}
+	}
+}
+
+func TestTheRulesBrowserOpensFromTheRulesPanel(t *testing.T) {
+	m := deckAndSearch(t, 190, 40)
+	m.rules = loadTestRules(t)
+
+	// R does nothing until the rules are what's on the panel.
+	m = press(m, "R")
+	if m.state != stateResults {
+		t.Errorf("R from the card view opened %v", m.state)
+	}
+
+	m = press(m, "r")
+	m = press(m, "R")
+	if m.state != stateRules {
+		t.Fatalf("R from the rules panel left the app in state %v", m.state)
+	}
+	// Scoped to the card, not the whole rulebook — that's on ,r. The
+	// fixture card has flying and hexproof on it.
+	if len(m.rulesList.Items()) == 0 {
+		t.Error("the browser opened with nothing in it")
+	}
+	if len(m.rulesList.Items()) > 200 {
+		t.Errorf("the browser opened on the whole rulebook: %d entries", len(m.rulesList.Items()))
 	}
 }

@@ -288,10 +288,34 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.previewScroll = 0
 			return m, nil
 		case "r":
-			m.panel = m.panel.toggle(panelRules)
+			// The card panel is the hub. r and t open from it and come
+			// back to it; from the statistics they do nothing, rather than
+			// swapping one panel you asked for for another you didn't.
+			switch m.panel {
+			case panelCard:
+				m.panel = panelRules
+			case panelRules:
+				m.panel = panelCard
+			}
+			return m, nil
+		case "R":
+			// The rules the card matched, in the browser, where they can be
+			// read in full and followed. The whole rulebook is on ,r.
+			if m.panel != panelRules {
+				return m, nil
+			}
+			if item, ok := m.active().selected(); ok {
+				return m.openRulesBrowser(m.cardRuleItems(item.card), item.card.Name)
+			}
 			return m, nil
 		case "t":
-			return m.toggleHistory()
+			switch m.panel {
+			case panelCard:
+				return m.toggleHistory()
+			case panelHistory:
+				m.panel = panelCard
+			}
+			return m, nil
 		case "w":
 			// w writes the open deck. Importing a Moxfield deck as one of
 			// your own is a different thing and lives on the leader, so
@@ -328,19 +352,6 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m.scrollPanel(-1), nil
 
-		case "j", "down":
-			// With the statistics up they're what you're reading, and the
-			// panel is where everything is happening — moving the cursor
-			// through cards you can't see the details of does nothing. So
-			// the plain keys drive the categories too, and s puts the card
-			// panel back when you want the list again.
-			if m.panel == panelStats {
-				return m.statMove(1)
-			}
-		case "k", "up":
-			if m.panel == panelStats {
-				return m.statMove(-1)
-			}
 		case "ctrl+d", "ctrl+u":
 			// Scrolling the panel proper, which in the statistics panel
 			// means moving the view without moving the selected category.
@@ -353,9 +364,11 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m.scrollPanel(step), nil
 		case "enter":
-			// Open the rules browser scoped to this card's keywords.
-			if item, ok := m.active().selected(); ok {
-				return m.openRulesBrowser(m.cardRuleItems(item.card), item.card.Name)
+			// Back to the card, from whichever panel is up — the same place
+			// pressing that panel's own key again gets you.
+			if m.panel != panelCard {
+				m.panel = panelCard
+				m.previewScroll = 0
 			}
 			return m, nil
 		}

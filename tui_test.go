@@ -252,10 +252,12 @@ func TestResultsFrameFitsTerminal(t *testing.T) {
 			frameCheck(t, "results+"+keys, mk.View(), w, h)
 		}
 
-		// Rules browser, scoped to the selected card.
-		mb := drive(m, tea.KeyMsg{Type: tea.KeyEnter})
+		// The rules browser, scoped to the selected card: r brings up its
+		// rules in the panel, R opens them in the browser.
+		mb := drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+		mb = drive(mb, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
 		if mb.state != stateRules {
-			t.Fatalf("%dx%d: enter did not open the rules browser", w, h)
+			t.Fatalf("%dx%d: R did not open the rules browser", w, h)
 		}
 		frameCheck(t, "browser", mb.View(), w, h)
 
