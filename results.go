@@ -289,6 +289,8 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.changeQty(-1)
 		case "c":
 			return m.toggleCommander()
+		case "u":
+			return m.undoLast()
 		case "J", "shift+down":
 			// The statistics panel is a list rather than a wall of text,
 			// so J/K walks its categories and filters to them.
@@ -672,8 +674,15 @@ func (m model) viewResults() string {
 	// Only the list taking keys is drawn in full colour. Whichever isn't
 	// goes dim, which is a far clearer signal than the colour of the rule
 	// between the columns.
-	m.results.list.SetDelegate(compactDelegate{blurred: m.focus == focusDeck, marks: m.marks})
-	m.deckPane.list.SetDelegate(compactDelegate{blurred: m.focus != focusDeck, marks: m.marks})
+	// The results are flagged with what the deck already holds; the deck is
+	// flagged with what's in the command zone. Neither needs the other's.
+	inDeck, commanders := m.deckMembership()
+	m.results.list.SetDelegate(compactDelegate{
+		blurred: m.focus == focusDeck, marks: m.marks, inDeck: inDeck,
+	})
+	m.deckPane.list.SetDelegate(compactDelegate{
+		blurred: m.focus != focusDeck, marks: m.marks, commanders: commanders,
+	})
 
 	// The list's own help line can render wider than the width it was
 	// given, which would reflow everything beside it.
@@ -718,20 +727,23 @@ func (m model) viewResults() string {
 	if m.leader {
 		// The menu needs the whole width — squeezed into the panel column
 		// it loses half its entries — and the frame is a fixed height, so
-		// it takes the bottom line rather than adding one.
-		frame = replaceLastLine(frame, m.leaderBar(m.width))
+		// it takes the bottom lines rather than adding any.
+		frame = replaceLastLines(frame, m.leaderBarLines(m.width))
 	}
 	return frame
 }
 
-// replaceLastLine swaps the final line of a rendered block, keeping the
+// replaceLastLines swaps the final lines of a rendered block, keeping the
 // block the same height.
-func replaceLastLine(block, line string) string {
+func replaceLastLines(block string, with []string) string {
 	lines := strings.Split(block, "\n")
-	if len(lines) == 0 {
-		return line
+	for i, l := range with {
+		at := len(lines) - len(with) + i
+		if at < 0 {
+			continue
+		}
+		lines[at] = l
 	}
-	lines[len(lines)-1] = line
 	return strings.Join(lines, "\n")
 }
 
@@ -893,7 +905,7 @@ func (m model) panelHint() string {
 // something it no longer describes.
 func leavesNotice(key string) bool {
 	switch key {
-	case "w", "a", "x", "c", "v", "V", "T", "+", "=", "-", "_":
+	case "w", "a", "x", "c", "u", "v", "V", "T", "+", "=", "-", "_":
 		return true
 	}
 	return false

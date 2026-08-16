@@ -76,6 +76,7 @@ func (m model) addToDeck() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	m.pushUndo("+1 " + card.Name)
 	m.deckCards = append(m.deckCards, deckCard{card: card, qty: 1})
 	m.notice = "+1 " + card.Name
 	return m.deckChanged(card.Name)
@@ -116,6 +117,7 @@ func (m model) removeFromDeck() (tea.Model, tea.Cmd) {
 		}
 	}
 
+	m.pushUndo("-" + card.Name)
 	m.deckCards = append(m.deckCards[:i:i], m.deckCards[i+1:]...)
 	m.notice = "-" + card.Name
 	return m.deckChanged(next)
@@ -147,6 +149,7 @@ func (m model) changeQty(delta int) (tea.Model, tea.Cmd) {
 		return m.removeFromDeck()
 	}
 
+	m.pushUndo(fmt.Sprintf("%dx %s", m.deckCards[i].qty, card.Name))
 	m.deckCards = append([]deckCard(nil), m.deckCards...)
 	m.deckCards[i].qty = qty
 	m.notice = fmt.Sprintf("%dx %s", qty, card.Name)
@@ -172,11 +175,13 @@ func (m model) toggleCommander() (tea.Model, tea.Cmd) {
 
 	i := m.deckIndexOf(card.Name)
 	if i < 0 {
+		m.pushUndo("+1 " + card.Name + " · commander")
 		m.deckCards = append(m.deckCards, deckCard{card: card, qty: 1, commander: true})
 		m.notice = "+1 " + card.Name + " · commander"
 		return m.deckChanged(card.Name)
 	}
 
+	m.pushUndo(card.Name + " · commander")
 	m.deckCards = append([]deckCard(nil), m.deckCards...)
 	m.deckCards[i].commander = !m.deckCards[i].commander
 	if m.deckCards[i].commander {
@@ -194,11 +199,58 @@ func (m *model) setTags(index int, tags []string) {
 	m.deckCards[index].tags = tags
 }
 
+// ── Undo ────────────────────────────────────────────────────────
+
+// undoDepth is how far back u goes. Deep enough to walk out of a mistake,
+// shallow enough that a session's worth of tagging doesn't accumulate.
+const undoDepth = 50
+
+// undoStep is the deck as it was before one edit, and what that edit was.
+type undoStep struct {
+	cards []deckCard
+	what  string
+}
+
+// pushUndo records the deck as it stands, before an edit changes it.
+func (m *model) pushUndo(what string) {
+	m.undo = append(m.undo, undoStep{
+		cards: append([]deckCard(nil), m.deckCards...),
+		what:  what,
+	})
+	if len(m.undo) > undoDepth {
+		m.undo = m.undo[len(m.undo)-undoDepth:]
+	}
+}
+
+// undoLast puts the deck back the way it was before the last edit. It goes
+// through the same path as any other change, so the undo is written and
+// committed like one — nothing is lost and the history says what happened.
+func (m model) undoLast() (tea.Model, tea.Cmd) {
+	if ok, why := m.editable(); !ok {
+		m.notice = why
+		return m, nil
+	}
+	if len(m.undo) == 0 {
+		m.notice = "nothing to undo"
+		return m, nil
+	}
+
+	step := m.undo[len(m.undo)-1]
+	m.undo = m.undo[:len(m.undo)-1]
+
+	// Undoing is not itself undoable — otherwise u alternates between two
+	// states instead of walking back.
+	m.deckCards = step.cards
+	next, cmd := m.deckChanged("")
+	out := next.(model)
+	out.notice = "undo · " + step.what
+	return out, cmd
+}
+
 // ── After an edit ───────────────────────────────────────────────
 
-// deckChanged rebuilds the deck list from m.deckCards and starts the clock
-// on saving it. keepOn is the card to leave the cursor on, so editing in the
-// deck doesn't send you back to the top of it every time.
+// keepOn is the card to leave the cursor on, so editing in the deck doesn't
+// send you back to the top of it every time.
 func (m model) deckChanged(keepOn string) (tea.Model, tea.Cmd) {
 	total, unique := 0, 0
 	for _, dc := range m.deckCards {

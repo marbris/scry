@@ -141,6 +141,7 @@ func newCommitList(width, height int) list.Model {
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 	l.Styles.Title = lipgloss.NewStyle().Foreground(gruvBg).Background(gruvAqua).Padding(0, 1)
+	l.Filter = literalFilter
 	return l
 }
 

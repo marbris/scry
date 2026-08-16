@@ -50,8 +50,13 @@ func TestLeaderBarFitsNarrowTerminals(t *testing.T) {
 		m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(leaderKey)})
 
 		bar := stripANSI(m.leaderBar(w))
-		if visibleLen(m.leaderBar(w)) > w {
-			t.Errorf("at %d columns the leader bar is %d wide", w, visibleLen(m.leaderBar(w)))
+		for i, line := range m.leaderBarLines(w) {
+			if n := visibleLen(line); n > w {
+				t.Errorf("at %d columns leader bar line %d is %d wide", w, i, n)
+			}
+		}
+		if got := len(m.leaderBarLines(w)); got > 3 {
+			t.Errorf("at %d columns the leader menu takes %d lines", w, got)
 		}
 		// Every command is still named, however narrow — by its full label
 		// where there's room, by its short one where there isn't.
@@ -144,20 +149,26 @@ func TestKeyReferenceIsForTheScreenYouCameFrom(t *testing.T) {
 	if m.state != stateKeys {
 		t.Fatalf("? left the app in state %v", m.state)
 	}
-	view := stripANSI(m.viewKeyReference())
-	for _, want := range []string{"Add the selected card", "Mark this card", "The panel"} {
-		if !strings.Contains(view, want) {
-			t.Errorf("the key reference is missing %q:\n%s", want, view)
-		}
+	// The main screen's reference is longer than a terminal, so what's on
+	// screen is the top of it and the rest is a scroll away. Which groups
+	// fall below the fold depends on the height, so this checks the whole
+	// of it across a scroll rather than asserting a particular line is
+	// visible at a particular size.
+	seen := stripANSI(m.viewKeyReference())
+	if !strings.Contains(seen, "Move") {
+		t.Errorf("the reference doesn't start at the top:\n%s", seen)
 	}
-
-	// The main screen's reference is longer than a screen, so the rest is
-	// a scroll away rather than missing.
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 40; i++ {
 		m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		seen += stripANSI(m.viewKeyReference())
 	}
-	if scrolled := stripANSI(m.viewKeyReference()); !strings.Contains(scrolled, "Decks") {
-		t.Errorf("scrolling doesn't reach the leader commands:\n%s", scrolled)
+	for _, want := range []string{
+		"Add the selected card", "Mark this card", "Undo the last change",
+		"The panel", "Decks",
+	} {
+		if !strings.Contains(seen, want) {
+			t.Errorf("the key reference never shows %q, even scrolled", want)
+		}
 	}
 
 	m = drive(m, tea.KeyMsg{Type: tea.KeyEsc})

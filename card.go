@@ -133,21 +133,43 @@ type RulingsResponse struct {
 
 // ── Single-line delegate ────────────────────────────────────────
 
-// compactDelegate draws one card per line. blurred is set on whichever list
-// doesn't have focus; marks are the cards picked out for tagging.
+// compactDelegate draws one card per line.
+//
+//   - blurred is set on whichever list doesn't have focus.
+//   - marks are the cards picked out for tagging.
+//   - inDeck says which cards the open deck holds, so a search result you
+//     already run is obvious without looking across at the other column.
+//   - commanders is set on the deck's own list, where the useful thing to
+//     flag is which cards are in the command zone.
 type compactDelegate struct {
-	blurred bool
-	marks   map[string]bool
+	blurred    bool
+	marks      map[string]bool
+	inDeck     map[string]bool
+	commanders map[string]bool
 }
 
-// markGutter is the column in front of every row showing whether the card is
-// marked. It's always there, marked or not, so rows don't shift sideways as
-// you mark them.
-func (d compactDelegate) markGutter(c ScryfallCard) string {
-	if d.marks[strings.ToLower(c.Name)] {
-		return lipgloss.NewStyle().Foreground(gruvGreen).Bold(true).Render("●")
+// gutterWidth is the two columns in front of every row: one for the tagging
+// mark, one for the card's standing in the deck. Both are always drawn, so
+// rows never shift sideways underneath you.
+const gutterWidth = 2
+
+// gutter is those two columns for one card.
+func (d compactDelegate) gutter(c ScryfallCard) string {
+	key := strings.ToLower(c.Name)
+
+	mark := " "
+	if d.marks[key] {
+		mark = lipgloss.NewStyle().Foreground(gruvGreen).Bold(true).Render("●")
 	}
-	return " "
+
+	role := " "
+	switch {
+	case d.commanders[key]:
+		role = lipgloss.NewStyle().Foreground(gruvYellow).Bold(true).Render("★")
+	case d.inDeck[key]:
+		role = lipgloss.NewStyle().Foreground(gruvAqua).Render("▪")
+	}
+	return mark + role
 }
 
 func (d compactDelegate) Height() int                             { return 1 }
@@ -162,9 +184,8 @@ func listColumns(total int) (nameW, manaW, typeW int) {
 	// {3}{W}{U} is three characters wide. The handful that run longer are
 	// truncated rather than made everything else sit behind a gap.
 	manaW = 6
-	// 1 for the mark gutter, 2 for the cursor, and 2 between each pair of
-	// columns.
-	rest := total - 1 - 2 - manaW - 4
+	// The gutter, 2 for the cursor, and 2 between each pair of columns.
+	rest := total - gutterWidth - 2 - manaW - 4
 	if rest < 18 {
 		rest = 18
 	}
@@ -216,7 +237,7 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		if selected {
 			cursor = "▹ "
 		}
-		fmt.Fprint(w, d.markGutter(c)+dim.Render(cursor+
+		fmt.Fprint(w, d.gutter(c)+dim.Render(cursor+
 			padTo(truncate(name, nameW), nameW)+"  "+
 			mana+strings.Repeat(" ", pad)+"  "+
 			truncate(c.TypeLine, typeW)))
@@ -264,7 +285,7 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		line = "  " + line
 	}
 
-	fmt.Fprint(w, d.markGutter(c)+line)
+	fmt.Fprint(w, d.gutter(c)+line)
 }
 
 // ── List item adapter ───────────────────────────────────────────

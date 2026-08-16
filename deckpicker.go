@@ -160,6 +160,7 @@ func newDeckPickerList(width, height int) list.Model {
 	l.Styles.Title = lipgloss.NewStyle().Foreground(gruvBg).Background(gruvAqua).Padding(0, 1)
 	l.Styles.FilterPrompt = lipgloss.NewStyle().Foreground(gruvYellow)
 	l.Styles.FilterCursor = lipgloss.NewStyle().Foreground(gruvOrange)
+	l.Filter = literalFilter
 	return l
 }
 
@@ -187,6 +188,8 @@ func (m model) updateDeckPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "?":
 			return m.openKeyReference()
+		case "m":
+			return m.openMoxUserPrompt()
 		case "n":
 			m.naming = true
 			m.deckNameInput = newDeckNameInput()

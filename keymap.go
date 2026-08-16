@@ -44,6 +44,7 @@ var leaderCmds = []leaderCmd{
 	{"n", "New deck", "New", func(m model) (tea.Model, tea.Cmd) { return m.openNewDeckPrompt() }},
 	{"g", "Deck history", "History", func(m model) (tea.Model, tea.Cmd) { return m.openDeckHistory() }},
 	{"i", "Import this deck as mine", "Import", func(m model) (tea.Model, tea.Cmd) { return m.saveCurrentDeck(), nil }},
+	{"m", "Someone's decks on Moxfield", "Moxfield", func(m model) (tea.Model, tea.Cmd) { return m.openMoxUserPrompt() }},
 	{"r", "Rules browser", "Rules", func(m model) (tea.Model, tea.Cmd) { return m.openRulesBrowser(nil, "") }},
 	{"s", "Query syntax", "Syntax", func(m model) (tea.Model, tea.Cmd) { return m.openSyntaxHelp() }},
 	{"k", "Keys", "Keys", func(m model) (tea.Model, tea.Cmd) { return m.openKeyReference() }},
@@ -62,33 +63,62 @@ func (m model) handleLeader(key string) (tea.Model, tea.Cmd) {
 }
 
 // leaderBar is the hint shown while the leader is waiting for its second
-// key, so the menu never has to be memorised.
+// key, so the menu never has to be memorised. It wraps onto as many lines as
+// it needs rather than being cut off — a menu clipped halfway hides exactly
+// the entries you opened it to read.
 func (m model) leaderBar(width int) string {
+	return strings.Join(m.leaderBarLines(width), "\n")
+}
+
+func (m model) leaderBarLines(width int) []string {
 	keyStyle := lipgloss.NewStyle().Foreground(gruvBg).Background(gruvYellow).Bold(true)
 	whatStyle := lipgloss.NewStyle().Foreground(gruvFg)
 	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
 
-	build := func(long bool, gap string) (string, int) {
-		var parts []string
-		plain := 0
-		for _, c := range leaderCmds {
-			label := c.short
-			if long {
-				label = c.what
-			}
-			parts = append(parts, keyStyle.Render(" "+c.key+" ")+whatStyle.Render(" "+label))
-			plain += 3 + 1 + runeLen(label) + runeLen(gap)
-		}
-		return strings.Join(parts, dimStyle.Render(gap)), plain
+	const gap = "  "
+
+	// Full labels if the whole menu fits on one line, short ones otherwise.
+	long := true
+	if leaderBarWidth(true, gap) > width {
+		long = false
 	}
 
-	// Full labels if they fit, short ones if they don't. A menu clipped
-	// halfway through is worse than a terse one.
-	line, w := build(true, "   ")
-	if w > width {
-		line, _ = build(false, "  ")
+	var lines []string
+	var cur string
+	curW := 0
+	for _, c := range leaderCmds {
+		label := c.short
+		if long {
+			label = c.what
+		}
+		w := 3 + 1 + runeLen(label) + runeLen(gap)
+		if curW > 0 && curW+w > width {
+			lines = append(lines, cur)
+			cur, curW = "", 0
+		}
+		cur += keyStyle.Render(" "+c.key+" ") + whatStyle.Render(" "+label) + dimStyle.Render(gap)
+		curW += w
 	}
-	return lipgloss.NewStyle().MaxWidth(width).Render(line)
+	if cur != "" {
+		lines = append(lines, cur)
+	}
+
+	for i := range lines {
+		lines[i] = lipgloss.NewStyle().MaxWidth(width).Render(lines[i])
+	}
+	return lines
+}
+
+func leaderBarWidth(long bool, gap string) int {
+	total := 0
+	for _, c := range leaderCmds {
+		label := c.short
+		if long {
+			label = c.what
+		}
+		total += 3 + 1 + runeLen(label) + runeLen(gap)
+	}
+	return total
 }
 
 // ── The key reference ───────────────────────────────────────────
@@ -123,12 +153,23 @@ func keysFor(s state) []keyGroup {
 			{"esc, q", "Back"},
 		}}}
 
+	case stateMoxUser:
+		return []keyGroup{{"Decks on Moxfield", []binding{
+			{"↑/↓, j/k", "Move through their decks"},
+			{"enter, i", "Import it as one of yours"},
+			{"b", "Browse it without importing"},
+			{"u", "Someone else's decks"},
+			{"/", "Filter by name or format"},
+			{"esc, q", "Back"},
+		}}}
+
 	case stateDecks:
 		return []keyGroup{{"Decks", []binding{
 			{"↑/↓, j/k", "Move through your decks"},
 			{"/", "Filter by name or format"},
 			{"enter", "Open it"},
 			{"n", "Start a new deck"},
+			{"m", "Someone's decks on Moxfield"},
 			{"esc, q", "Back"},
 		}}}
 
@@ -164,6 +205,7 @@ func keysFor(s state) []keyGroup {
 			{"x", "Remove it"},
 			{"c", "Mark it a commander, or unmark it"},
 			{"+ / -", "Another copy, or one fewer"},
+			{"u", "Undo the last change"},
 			{"w", "Write the deck now"},
 		}},
 		{"Tagging", []binding{

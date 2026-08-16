@@ -24,6 +24,7 @@ const (
 	stateDeckHistory
 	stateDecks
 	stateKeys
+	stateMoxUser
 )
 
 // panelMode is what the panel beside the result list is showing.
@@ -93,6 +94,18 @@ type model struct {
 	marks    map[string]bool
 	tagging  bool
 	tagInput textinput.Model
+
+	// Someone's decks on Moxfield: whose, what they have, and whether we're
+	// mid-question or mid-request.
+	moxUser        string
+	moxUserList    list.Model
+	moxUserInput   textinput.Model
+	moxUserAsking  bool
+	moxUserLoading bool
+	moxUserErr     error
+
+	// undo holds the deck as it was before each edit, so u can walk back.
+	undo []undoStep
 
 	// leader is set between pressing the leader key and the key that says
 	// what to do; keysScroll is the key reference's scroll position.
@@ -197,6 +210,8 @@ func initialModel() model {
 		l.SetShowStatusBar(help)
 		l.SetFilteringEnabled(true)
 		l.SetShowHelp(help)
+		// Literal rather than fuzzy: see filter.go.
+		l.Filter = literalFilter
 		return l
 	}
 	// Only the results list carries the help line; two copies of it in one
@@ -216,6 +231,7 @@ func initialModel() model {
 	rl.SetShowStatusBar(true)
 	rl.SetFilteringEnabled(true)
 	rl.SetShowHelp(true)
+	rl.Filter = literalFilter
 
 	return model{
 		state:       stateResults,
@@ -330,6 +346,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateDeckPicker(msg)
 	case stateKeys:
 		return m.updateKeyReference(msg)
+	case stateMoxUser:
+		return m.updateMoxUser(msg)
 	}
 	return m, nil
 }
@@ -359,6 +377,8 @@ func (m model) View() string {
 		content = m.viewDeckPicker()
 	case stateKeys:
 		content = m.viewKeyReference()
+	case stateMoxUser:
+		content = m.viewMoxUser()
 	}
 
 	return base.Render(content)

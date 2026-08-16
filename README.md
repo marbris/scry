@@ -11,7 +11,7 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 ## Features
 
 - **Full Scryfall syntax** — search with the same query language you use on scryfall.com
-- **Fuzzy filtering** — narrow down results by name or oracle text
+- **Filtering** — narrow a list to the cards whose name or rules text actually contain what you typed
 - **One screen** — search bar, result list and card panel together; no separate search page to pass through
 - **Live preview** — card details shown alongside the list as you browse
 - **Responsive layout** — horizontal split on wide terminals, vertical on narrow (tiling WM friendly)
@@ -260,6 +260,10 @@ source: https://moxfield.com/decks/zJ0qPOnI2UqykOwmeIUixg
 
 Edit them in the app or in your editor — both work, and neither surprises the other. Cards are named rather than pinned to a printing, so the file stays readable; add `(c21) 263` after a name if you want a particular one. `SCRY_DECKS_DIR` moves the directory somewhere you'd rather keep it.
 
+#### Browsing someone's decks
+
+`,m` lists a Moxfield user's decks — type their name or paste a link to their profile — with the format, size, colour identity and when each last changed. `enter` imports one, `b` browses it without importing, and decks you already have are marked. Only public decks are listed; Moxfield doesn't show anyone else's private or unlisted ones.
+
 #### Editing
 
 With one of your decks open, `a` adds the selected card and `x` takes it out — from either list, so a card you've just found in a search can go straight in, and one you spot in the search that you no longer want can come straight out. `+` and `-` change how many copies; `-` on the last one removes it. Adding a card that's already there won't quietly double it, since nearly every deck this is built for is singleton — `+` is how you ask for a second copy.
@@ -271,7 +275,9 @@ c57a6a5  +Dragonlord Ojutai, requantify Plains
 0d7945a  Add Ghen
 ```
 
-`w` writes immediately if you'd rather not wait, and quitting always writes first — an edit made a second before you quit is still an edit.
+`u` undoes the last change, one step at a time — a bulk tagging counts as one step, so a single `u` puts all of it back. `w` writes immediately if you'd rather not wait, and quitting always writes first: an edit made a second before you quit is still an edit.
+
+Two columns in front of every row say where a card stands. In the search results, `▪` marks the ones already in the open deck; in the deck, `★` marks a commander. `●` is a tagging mark. All three slots are always drawn, so rows never shift sideways underneath you.
 
 `c` marks the selected card as a commander, and adds it first if it isn't in the deck yet — which is how a new deck starts: `scry deck new`, search for your commander, press `c`. Pressing `c` again unmarks it. scry doesn't know the rules and doesn't try to: how many commanders a deck has is between you and your playgroup, so several and none are both fine. It only records what you said, under a `[commander]` heading in the file.
 
@@ -314,7 +320,7 @@ v                mark all three of them
 T  flying  ⏎     tag them
 ```
 
-`space` marks one card at a time and steps to the next, so a run of cards is one key held down. `V` clears the marks, and so does `esc`, before it touches anything else. A marked card stays marked while you filter, sort or edit around it — marks are held by card, not by row.
+Filtering is literal rather than fuzzy: `flying` matches the cards whose name or rules text contain that word, not every card whose letters happen to appear in that order. Terms are ANDed, and `"first strike"` in quotes is one term. `space` marks one card at a time and steps to the next, so a run of cards is one key held down. `V` clears the marks, and so does `esc`, before it touches anything else. A marked card stays marked while you filter, sort or edit around it — marks are held by card, not by row.
 
 In the prompt, a leading `-` removes instead of adding, and commas separate several at once: `flying, evasion, -needs-review`. With nothing marked, `T` tags just the card under the cursor — never everything the filter is showing, which is what `v` is for.
 
@@ -416,6 +422,7 @@ The scheme, in three rules:
 | `,n` | New deck |
 | `,g` | Deck history — browse versions and restore one |
 | `,i` | Import the Moxfield deck you're browsing as one of your own |
+| `,m` | Someone's decks on Moxfield — list them and import one |
 | `,r` | Rules browser |
 | `,s` | Scryfall query syntax |
 | `,k` | Keys (same as `?`) |
@@ -428,7 +435,7 @@ In the search bar a comma is a comma — card names have them — so the leader 
 |---|---|
 | `↑/↓` or `j/k` | Move through the list |
 | `tab` / `shift+tab` | Between the search results and the deck |
-| `/` | Fuzzy filter (name + oracle text) |
+| `/` | Filter by name + oracle text (literal, not fuzzy) |
 | `i` | Edit the search query |
 | `J/K` or `shift+↑/↓` | Scroll the panel; in statistics, walk the categories |
 | `ctrl+d` / `ctrl+u` | Scroll the panel half a screen |
@@ -448,6 +455,7 @@ In the search bar a comma is a comma — card names have them — so the leader 
 | `x` | Remove it (from either list) |
 | `c` | Mark it a commander, or unmark it |
 | `+` / `-` | Another copy, or one fewer |
+| `u` | Undo the last change |
 | `w` | Write the deck now |
 
 ### Tagging
@@ -485,6 +493,17 @@ In the search bar a comma is a comma — card names have them — so the leader 
 | `/` | Filter by name or format |
 | `enter` | Open it |
 | `n` | Start a new deck |
+| `esc` or `q` | Back |
+
+### Decks on Moxfield
+
+| Key | Action |
+|---|---|
+| `↑/↓` or `j/k` | Move through their decks |
+| `enter` or `i` | Import it as one of yours |
+| `b` | Browse it without importing |
+| `u` | Someone else's decks |
+| `/` | Filter by name or format |
 | `esc` or `q` | Back |
 
 ### Deck History

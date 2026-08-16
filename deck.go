@@ -185,3 +185,20 @@ func deckItems(cards []deckCard) []list.Item {
 	}
 	return items
 }
+
+// deckMembership is what the open deck holds, by lowercased name: every card
+// in it, and separately the ones in the command zone. Used to flag rows in
+// both lists — a search result you already run, and a deck card that's a
+// commander.
+func (m model) deckMembership() (inDeck, commanders map[string]bool) {
+	inDeck = make(map[string]bool, len(m.deckCards))
+	commanders = map[string]bool{}
+	for _, dc := range m.deckCards {
+		key := strings.ToLower(dc.card.Name)
+		inDeck[key] = true
+		if dc.commander {
+			commanders[key] = true
+		}
+	}
+	return inDeck, commanders
+}

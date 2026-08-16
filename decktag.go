@@ -196,6 +196,10 @@ func (m model) applyTags(input string) (tea.Model, tea.Cmd) {
 		inTargets[t] = true
 	}
 
+	// One snapshot for the batch, so u undoes the whole tagging rather than
+	// one card of it.
+	m.pushUndo(tagUndoLabel(add, remove, len(targets)))
+
 	changed, missing := 0, 0
 	for i := range m.deckCards {
 		if !inTargets[markKey(m.deckCards[i].card)] {
@@ -218,6 +222,8 @@ func (m model) applyTags(input string) (tea.Model, tea.Cmd) {
 
 	m.notice = tagNotice(changed, missing, add, remove)
 	if changed == 0 {
+		// Nothing happened, so there is nothing to undo.
+		m.undo = m.undo[:len(m.undo)-1]
 		return m, nil
 	}
 
@@ -262,6 +268,17 @@ func (m model) deckIndexOfKey(key string) int {
 		}
 	}
 	return -1
+}
+
+func tagUndoLabel(add, remove []string, n int) string {
+	var what []string
+	for _, t := range add {
+		what = append(what, "+"+t)
+	}
+	for _, t := range remove {
+		what = append(what, "-"+t)
+	}
+	return fmt.Sprintf("%s on %d %s", strings.Join(what, " "), n, plural("card", n))
 }
 
 func tagNotice(changed, missing int, add, remove []string) string {
