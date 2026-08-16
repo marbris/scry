@@ -122,8 +122,7 @@ func (m model) openDeckHistory() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.prevState = m.state
-	m.state = stateDeckHistory
+	m = m.enterState(stateDeckHistory)
 	m.historyList = newCommitList(m.width, m.height)
 	m.historyDiff = ""
 	m.historyErr = nil
@@ -177,8 +176,7 @@ func (m model) updateDeckHistory(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			return m.openKeyReference()
 		case "esc", "q":
-			m.state = m.prevState
-			return m, nil
+			return m.leaveState(), nil
 		case "J", "shift+down":
 			m.diffScroll++
 			return m, nil
@@ -194,7 +192,7 @@ func (m model) updateDeckHistory(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !ok || m.deck == nil {
 				return m, nil
 			}
-			m.state = m.prevState
+			m = m.showResults()
 			m.notice = "restored to " + sel.commit.short
 			return m, restoreDeckCmd(m.deck.slug, sel.commit.hash)
 		}

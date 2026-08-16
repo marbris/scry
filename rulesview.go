@@ -132,8 +132,7 @@ func (m model) updateRulesBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			return m.openKeyReference()
 		case "esc", "q":
-			m.state = m.prevState
-			return m, nil
+			return m.leaveState(), nil
 		case "g":
 			m.showGlossary = !m.showGlossary
 			if m.showGlossary {

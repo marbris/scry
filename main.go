@@ -488,7 +488,7 @@ func runRules(m model, args []string) {
 
 	m.rules = data
 	m.state = stateRules
-	m.prevState = stateResults
+	m.backStack = []state{stateResults}
 
 	items := buildRuleItems(data)
 	if len(args) > 0 {

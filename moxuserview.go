@@ -72,8 +72,7 @@ func (d moxDeckDelegate) Render(w io.Writer, m list.Model, index int, item list.
 
 // openMoxUserPrompt asks whose decks to list.
 func (m model) openMoxUserPrompt() (tea.Model, tea.Cmd) {
-	m.prevState = m.state
-	m.state = stateMoxUser
+	m = m.enterState(stateMoxUser)
 	m.moxUserErr = nil
 	m.moxUserAsking = true
 	m.moxUserInput = newMoxUserInput()
@@ -135,17 +134,6 @@ func (m model) updateMoxUser(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.moxUserList.Title = fmt.Sprintf("%s · %d decks", msg.user, len(items))
 		return m, nil
 
-	case deckImportedMsg:
-		m.moxUserLoading = false
-		if msg.err != nil {
-			m.moxUserErr = msg.err
-			return m, nil
-		}
-		// Straight into the deck that was just imported.
-		m.state = m.prevState
-		m.deckLoading = true
-		return m, openLocalDeckCmd(msg.slug)
-
 	case tea.KeyMsg:
 		if m.moxUserAsking {
 			return m.updateMoxUserPrompt(msg)
@@ -157,8 +145,7 @@ func (m model) updateMoxUser(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "?":
 			return m.openKeyReference()
 		case "esc", "q":
-			m.state = m.prevState
-			return m, nil
+			return m.leaveState(), nil
 		case "u":
 			// Ask again, for someone else.
 			m.moxUserAsking = true
@@ -178,7 +165,7 @@ func (m model) updateMoxUser(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !ok {
 				return m, nil
 			}
-			m.state = m.prevState
+			m = m.showResults()
 			m.deckLoading = true
 			m.searching = true
 			return m, loadDeckCmd(sel.deck.PublicID)
@@ -195,9 +182,8 @@ func (m model) updateMoxUserPrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		// With nothing listed there's nothing to go back to.
 		if len(m.moxUserList.Items()) == 0 {
-			m.state = m.prevState
 			m.moxUserAsking = false
-			return m, nil
+			return m.leaveState(), nil
 		}
 		m.moxUserAsking = false
 		return m, nil

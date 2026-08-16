@@ -200,3 +200,86 @@ var errNoSuchUser = &userError{`no public decks for "nobody"`}
 type userError struct{ s string }
 
 func (e *userError) Error() string { return e.s }
+
+func TestImportingFromTheMoxfieldBrowserOpensTheDeck(t *testing.T) {
+	// Reported: from the deck picker, m, pick a deck, enter — and you came
+	// back to the picker with nothing opened, nothing selected, and q doing
+	// nothing. Two causes, both about where a screen goes when it closes.
+	gitRepo(t)
+	seedCache(t, map[string]ScryfallCard{"sol ring": {Name: "Sol Ring", TypeLine: "Artifact"}})
+
+	d, err := parseDeckFile(strings.NewReader("name: Hinata\n[mainboard]\n1 Sol Ring\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := saveDeckVersioned("hinata", d); err != nil {
+		t.Fatal(err)
+	}
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	// The path that broke: into the picker first, then Moxfield from it.
+	m = leaderPress(m, "d")
+	m = press(m, "m")
+	m = drive(m, moxUserDecksMsg{user: "MarBri", decks: []moxUserDeck{
+		{Name: "Hinata", PublicID: "abc", Cards: 100},
+	}})
+	m = drive(m, deckImportedMsg{slug: "hinata"})
+
+	if m.state != stateResults {
+		t.Fatalf("state = %v, want the deck on screen — not the picker it came from", m.state)
+	}
+	if m.deck == nil || m.deck.slug != "hinata" {
+		t.Fatalf("the imported deck was not opened: %+v", m.deck)
+	}
+	// Arriving at a deck is a destination, not a screen to step back out of.
+	if len(m.backStack) != 0 {
+		t.Errorf("the way back is still %v", m.backStack)
+	}
+}
+
+func TestNestedScreensKeepTheirOwnWayBack(t *testing.T) {
+	// One shared "previous state" meant opening the key reference from the
+	// deck picker — or Moxfield from it — overwrote the picker's own way
+	// back, and esc and q from the picker afterwards did nothing at all.
+	gitRepo(t)
+	seedCache(t, map[string]ScryfallCard{})
+
+	m := initialModel()
+	m = drive(m, tea.WindowSizeMsg{Width: 120, Height: 30})
+	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
+
+	m = leaderPress(m, "d")
+	if m.state != stateDecks {
+		t.Fatalf("state = %v", m.state)
+	}
+
+	// Two levels down and back up again.
+	m = press(m, "?")
+	if m.state != stateKeys {
+		t.Fatalf("? left the app in state %v", m.state)
+	}
+	m = drive(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.state != stateDecks {
+		t.Fatalf("esc from the reference went to %v, want back to the picker", m.state)
+	}
+
+	// And the picker still knows its own way out.
+	m = press(m, "q")
+	if m.state != stateResults {
+		t.Errorf("q from the picker went to %v, want the results it was opened from", m.state)
+	}
+
+	// The same through Moxfield, which is where it was noticed.
+	m = leaderPress(m, "d")
+	m = press(m, "m")
+	m = drive(m, tea.KeyMsg{Type: tea.KeyEsc}) // out of the prompt
+	if m.state != stateDecks {
+		t.Fatalf("esc from Moxfield went to %v, want the picker", m.state)
+	}
+	m = press(m, "q")
+	if m.state != stateResults {
+		t.Errorf("q from the picker went to %v after nesting", m.state)
+	}
+}

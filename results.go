@@ -388,8 +388,7 @@ func (m model) syncHover() (model, tea.Cmd) {
 // every rule; otherwise it shows just the ones passed in.
 func (m model) openRulesBrowser(items []list.Item, scope string) (tea.Model, tea.Cmd) {
 	if !m.rules.loaded() {
-		m.prevState = m.state
-		m.state = stateRules
+		m = m.enterState(stateRules)
 		return m, nil
 	}
 
@@ -406,8 +405,7 @@ func (m model) openRulesBrowser(items []list.Item, scope string) (tea.Model, tea
 	m.rulesList.SetItems(items)
 	m.rulesList.ResetSelected()
 	m.browseScroll = 0
-	m.prevState = m.state
-	m.state = stateRules
+	m = m.enterState(stateRules)
 	m.applyLayout()
 	return m, nil
 }

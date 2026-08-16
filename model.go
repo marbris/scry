@@ -46,8 +46,12 @@ func (p panelMode) toggle(mode panelMode) panelMode {
 }
 
 type model struct {
-	state       state
-	prevState   state // where stateRules was entered from
+	state state
+	// backStack is where each screen was opened from. A single "previous
+	// state" isn't enough: opening the key reference from the deck picker,
+	// or Moxfield from it, would overwrite the picker's own way back and
+	// leave esc and q doing nothing.
+	backStack   []state
 	searchInput textinput.Model
 	// focus routes keys to the search bar, the results, or the deck;
 	// returnFocus is the list to go back to when leaving the search bar.
@@ -159,6 +163,42 @@ type model struct {
 	rulesList    list.Model
 	showGlossary bool
 	browseScroll int
+}
+
+// enterState opens a screen, remembering where it was opened from.
+func (m model) enterState(s state) model {
+	m.backStack = append(append([]state(nil), m.backStack...), m.state)
+	m.state = s
+	return m
+}
+
+// leaveState closes the current screen and goes back to whatever opened it.
+func (m model) leaveState() model {
+	if n := len(m.backStack); n > 0 {
+		m.state = m.backStack[n-1]
+		m.backStack = m.backStack[:n-1]
+		return m
+	}
+	m.state = stateResults
+	return m
+}
+
+// showResults goes to the main screen and forgets the way back. Used when a
+// deck opens: that's arriving somewhere, not stepping into a screen you'd
+// then step out of.
+func (m model) showResults() model {
+	m.state = stateResults
+	m.backStack = nil
+	return m
+}
+
+// cameFrom is the screen below this one, which is what the key reference
+// describes — it lists the keys of the screen you opened it from.
+func (m model) cameFrom() state {
+	if n := len(m.backStack); n > 0 {
+		return m.backStack[n-1]
+	}
+	return stateResults
 }
 
 func cardKey(c ScryfallCard) string {
@@ -330,6 +370,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case setOriginalsMsg:
 		return m.handleSetOriginals(msg)
+
+	// A deck finishing loading means the main screen, whatever screen asked
+	// for it. Handled here rather than in updateResults, which only ever
+	// sees it when that screen already happens to be up — the reason
+	// importing from the Moxfield browser silently did nothing.
+	case deckLoadedMsg:
+		m = m.showResults()
+		return m.updateResults(msg)
+
+	// So is a finished import: it ends with the deck on screen, from
+	// whichever screen asked for it.
+	case deckImportedMsg:
+		m.moxUserLoading = false
+		if msg.err != nil {
+			m.moxUserErr = msg.err
+			return m, nil
+		}
+		m = m.showResults()
+		m.deckLoading = true
+		m.searching = true
+		return m, openLocalDeckCmd(msg.slug)
 
 	case rulingsMsg:
 		delete(m.inflight, msg.key)

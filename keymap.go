@@ -316,15 +316,13 @@ func leaderBindings() []binding {
 // ── The reference screen ────────────────────────────────────────
 
 func (m model) openKeyReference() (tea.Model, tea.Cmd) {
-	m.prevState = m.state
-	m.state = stateKeys
+	m = m.enterState(stateKeys)
 	m.keysScroll = 0
 	return m, nil
 }
 
 func (m model) openSyntaxHelp() (tea.Model, tea.Cmd) {
-	m.prevState = m.state
-	m.state = stateHelp
+	m = m.enterState(stateHelp)
 	m.helpScroll = 0
 	return m, nil
 }
@@ -336,8 +334,7 @@ func (m model) updateKeyReference(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch key.String() {
 	case "esc", "q", "?":
-		m.state = m.prevState
-		return m, nil
+		return m.leaveState(), nil
 	case "down", "j":
 		m.keysScroll++
 	case "up", "k":
@@ -350,7 +347,7 @@ func (m model) updateKeyReference(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) viewKeyReference() string {
 	// The reference is for the screen it was opened from, not for itself.
-	groups := keysFor(m.prevState)
+	groups := keysFor(m.cameFrom())
 
 	titleStyle := lipgloss.NewStyle().Foreground(gruvBg).Background(gruvAqua).Bold(true).Padding(0, 1)
 	groupStyle := lipgloss.NewStyle().Foreground(gruvOrange).Bold(true)

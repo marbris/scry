@@ -127,8 +127,7 @@ func listDecksCmd() tea.Cmd {
 // ── Opening ─────────────────────────────────────────────────────
 
 func (m model) openDeckPicker() (tea.Model, tea.Cmd) {
-	m.prevState = m.state
-	m.state = stateDecks
+	m = m.enterState(stateDecks)
 	m.deckPickerErr = nil
 	m.naming = false
 
@@ -195,8 +194,7 @@ func (m model) updateDeckPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.deckNameInput = newDeckNameInput()
 			return m, textinput.Blink
 		case "esc", "q":
-			m.state = m.prevState
-			return m, nil
+			return m.leaveState(), nil
 		case "enter":
 			sel, ok := m.deckPicker.SelectedItem().(deckListItem)
 			if !ok {
@@ -206,7 +204,7 @@ func (m model) updateDeckPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.deckPickerErr = sel.deck.err
 				return m, nil
 			}
-			m.state = m.prevState
+			m = m.showResults()
 			m.deckLoading = true
 			m.searching = true
 			return m, openLocalDeckCmd(sel.deck.slug)
@@ -254,7 +252,7 @@ func (m model) updateDeckNaming(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// to find it in.
 		m.naming = false
 		m.deckPickerErr = nil
-		m.state = m.prevState
+		m = m.showResults()
 		m.deckLoading = true
 		return m, openLocalDeckCmd(slug)
 	}
