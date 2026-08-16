@@ -22,6 +22,7 @@ Card search comes from the [Scryfall API](https://scryfall.com/docs/api), the ru
 - **Printed text history** — press `t` to see how a card's wording changed across its printings, from Alpha to today (via MTGJSON, since Scryfall only serves current oracle text)
 - **Comprehensive rules built in** — press `r` to swap the card panel for the rules its text invokes, and browse the full rulebook and glossary (merged in from `mtg-rules`)
 - **Statistics you can filter by** — `s` breaks the results down by colour, rarity, mana value and type; `J/K` walks those categories, narrows the list to whichever one you're on, and re-cuts every histogram for what's left
+- **Picks up where you left off** — `scry` on its own reopens the deck you had open and re-runs the search you had run
 - **Query history** — `↑` in the search bar walks back through what you've searched for, kept between sessions
 - **Two kinds of sort** — `tab` sets the order the query asks Scryfall for, which decides which 175 cards come back; `o` reorders whatever is already on screen, results or deck, by name, mana value, type, colour or EDHREC rank
 - **Moxfield decks** — paste a public deck URL (or `scry deck <id>`) to browse someone's list, with every card behaving like a search result
@@ -152,7 +153,9 @@ mv scry-linux-amd64 ~/.local/bin/scry
 scry
 ```
 
-Opens on the results screen with the search bar focused. Type a Scryfall query, hit enter, browse results. `i` or `esc` puts you back in the search bar.
+Comes back to where you left off: the deck you had open and the search you had run. Type a Scryfall query, hit enter, browse results. `i` or `esc` puts you back in the search bar.
+
+A query or a deck named on the command line is what you just asked for, so it wins over the session. A deck deleted since last time is skipped rather than opening an error, and a deck you were only browsing off Moxfield isn't restored — it isn't yours, and it might not be public tomorrow. The session lives in `~/.local/share/scry/session.json`.
 
 ### Direct query
 

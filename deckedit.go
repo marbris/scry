@@ -329,9 +329,11 @@ func (m *model) flushDeck() {
 	_, _, _ = saveDeckVersioned(m.deck.slug, deckFileFrom(*m.deck, m.deckCards))
 }
 
-// quitAfterSaving is tea.Quit with any unsaved edit written first.
+// quitAfterSaving is tea.Quit with any unsaved edit written first, and the
+// session recorded so `scry` comes back to it.
 func (m model) quitAfterSaving() (tea.Model, tea.Cmd) {
 	m.flushDeck()
+	_ = saveSession(m.currentSession())
 	return m, tea.Quit
 }
 

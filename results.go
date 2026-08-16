@@ -149,6 +149,7 @@ func (m model) updateSearchBar(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, loadDeckCmd(id)
 		}
 
+		m.lastQuery = query
 		m.queryHistory = rememberQuery(m.queryHistory, query)
 		// A failed write costs the history, never the search.
 		_ = saveQueryHistory(m.queryHistory)

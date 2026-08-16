@@ -155,6 +155,7 @@ func main() {
 
 		m.searchInput.SetValue(query)
 		m.initialQuery = query
+		m.lastQuery = query
 		m.searching = true
 	}
 
@@ -236,7 +237,7 @@ func runDeck(m model, args []string) {
 }
 
 func runTUI(m model) {
-	m = m.startWithLastQuery()
+	m = m.restore().startWithLastQuery()
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)

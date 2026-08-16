@@ -108,6 +108,10 @@ type model struct {
 	moxUserLoading bool
 	moxUserErr     error
 
+	// lastQuery is the search whose results are on screen, which is what a
+	// session comes back to — not whatever half-typed thing is in the bar.
+	lastQuery string
+
 	// The queries you've run, oldest first, with where up/down has walked
 	// to and what was in the bar before the walk started.
 	queryHistory []string
