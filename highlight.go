@@ -209,7 +209,7 @@ func symbolColor(inner string) lipgloss.Color {
 	}
 
 	colors := map[rune]lipgloss.Color{
-		'W': lipgloss.Color("#fbf1c7"),
+		'W': gruvWhite,
 		'U': gruvBlue,
 		'B': gruvPurple,
 		'R': gruvRed,

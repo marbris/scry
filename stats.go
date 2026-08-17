@@ -48,7 +48,7 @@ func colorRows() []statRow {
 		code  string
 		color lipgloss.Color
 	}{
-		{"White", "W", lipgloss.Color("#fbf1c7")},
+		{"White", "W", gruvWhite},
 		{"Blue", "U", gruvBlue},
 		{"Black", "B", gruvGray},
 		{"Red", "R", gruvRed},

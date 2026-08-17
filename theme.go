@@ -13,6 +13,7 @@ import (
 var (
 	gruvBg      = lipgloss.Color("#282828")
 	gruvFg      = lipgloss.Color("#ebdbb2")
+	gruvWhite   = lipgloss.Color("#fbf1c7")
 	gruvRed     = lipgloss.Color("#cc241d")
 	gruvGreen   = lipgloss.Color("#98971a")
 	gruvYellow  = lipgloss.Color("#d79921")

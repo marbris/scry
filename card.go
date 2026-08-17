@@ -315,7 +315,7 @@ func colorForCard(colors []string) lipgloss.Color {
 	if len(colors) == 1 {
 		switch colors[0] {
 		case "W":
-			return lipgloss.Color("#fbf1c7")
+			return gruvWhite
 		case "U":
 			return gruvBlue
 		case "B":
@@ -344,7 +344,7 @@ func renderManaWidth(manaCost string, limit int) (string, int) {
 	}
 
 	colorMap := map[string]lipgloss.Color{
-		"W": lipgloss.Color("#fbf1c7"),
+		"W": gruvWhite,
 		"U": gruvBlue,
 		"B": gruvPurple,
 		"R": gruvRed,
