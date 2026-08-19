@@ -267,11 +267,23 @@ rest. Relevance ranks by how early and how tightly the terms appear —
 rule. The rules bar quotes the same way the card filter does, so there is one
 query syntax in the program.
 
-**9. Information panel. — next.** Card, deck, rule and diff renderers; `K`/`J` to
-move and `ctrl+k`/`ctrl+j` to scroll; `s`/`<space>s` statistics with live
-cross-list filtering; `gv` for both kinds of version history.
+**9. Information panel. — done.** Card, deck, rule and diff renderers;
+`K`/`J` to move and `ctrl+k`/`ctrl+j` to scroll; `s`/`<space>s` statistics
+with live cross-list filtering; `gv` for both kinds of version history.
 
-**10. Legality engine.** Per-card legality plus deck size, singleton and
+Oracle highlighting is ported from the old screen onto theme roles. Rulings
+arrive on a delay after the cursor settles. Statistics narrow the list they
+count, so bars and rows can never disagree; every bar shares one scale.
+
+Card printed-text history reads the sets already cached and **offers** the
+rest — forty printings is forty multi-megabyte downloads. `y` is the
+go-ahead, claimed before the view sees it because a card list takes `y` for
+yank.
+
+`g` is now genuinely a prefix: every list had been claiming it for "go to the
+top" before the workspace saw it, so `gd` and `gv` could never be typed.
+
+**10. Legality engine. — next.** Per-card legality plus deck size, singleton and
 commander colour identity. Feeds the decks panel's flag column.
 
 **11. Persistence and entry points.** Workspace in `session.json`, splash,

@@ -62,7 +62,7 @@ this has to be memorised.
 | `j` `k` | previous / next row |
 | `g` `G` | first / last row |
 | `ctrl+d` `ctrl+u` | half a page |
-| `gg` `G` | first / last row |
+| `gg` `G` | first / last row — `g` alone is a prefix, never a key |
 | `ctrl+d` `ctrl+u` | half page |
 | `gd` | jump to the editing deck panel |
 | `gv` | **versions** of the highlighted row — see below |
@@ -94,7 +94,7 @@ and "next row" are the same key, and that key is `j`.
 | `t` `T` | tag (`ramp -draw` does both) · add and tag with the last tag |
 | `c` | set as commander |
 | `s` | statistics for this list |
-| `gv` | printed-text history of this card |
+| `gv` | printed-text history of this card — `y` fetches uncached sets |
 | `w` | write this list — see **Writing a list** |
 | `W` | write it, and open the result in a new panel |
 | `esc` | clear selection → clear filter → empty the panel → close it |
