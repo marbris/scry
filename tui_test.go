@@ -342,7 +342,7 @@ func TestRulingsAreDebounced(t *testing.T) {
 	m.cards = cards
 	m.state = stateResults
 	m.active().list.SetItems([]list.Item{
-		cardItem{card: cards[0]}, cardItem{card: cards[1]},
+		cardItem{Card: cards[0]}, cardItem{Card: cards[1]},
 	})
 	m.active().list.ResetSelected()
 
@@ -548,7 +548,7 @@ func TestHistoryAssemblesFromCachedSets(t *testing.T) {
 		OracleText: "Flying", TypeLine: "Creature — Bird",
 	}
 	m.cards = []ScryfallCard{card}
-	m.active().list.SetItems([]list.Item{cardItem{card: card}})
+	m.active().list.SetItems([]list.Item{cardItem{Card: card}})
 	m.histories["oid"] = &cardHistory{state: histPrintings}
 
 	// Both sets are already in memory, so this resolves without any fetch.
@@ -651,11 +651,11 @@ func TestPrimaryTypePicksOneSection(t *testing.T) {
 func deckFixture() []deckCard {
 	cards := testCards()
 	return []deckCard{
-		{card: cards[1], qty: 1, commander: true}, // Goldspan Dragon
-		{card: cards[0], qty: 1},                  // Dragonlord Ojutai — creature
-		{card: cards[2], qty: 1},                  // Test Walker — planeswalker
-		{card: ScryfallCard{ID: "m", Name: "Mountain", TypeLine: "Basic Land — Mountain"}, qty: 30},
-		{card: ScryfallCard{ID: "z", Name: "Ancient Tomb", TypeLine: "Land"}, qty: 1},
+		{Card: cards[1], Qty: 1, Commander: true}, // Goldspan Dragon
+		{Card: cards[0], Qty: 1},                  // Dragonlord Ojutai — creature
+		{Card: cards[2], Qty: 1},                  // Test Walker — planeswalker
+		{Card: ScryfallCard{ID: "m", Name: "Mountain", TypeLine: "Basic Land — Mountain"}, Qty: 30},
+		{Card: ScryfallCard{ID: "z", Name: "Ancient Tomb", TypeLine: "Land"}, Qty: 1},
 	}
 }
 
@@ -665,7 +665,7 @@ func TestDeckItemsOrderByType(t *testing.T) {
 	var layout []string
 	for _, it := range items {
 		if ci, ok := it.(cardItem); ok {
-			layout = append(layout, ci.card.Name)
+			layout = append(layout, ci.Card.Name)
 		}
 	}
 
@@ -689,7 +689,7 @@ func TestDeckStatsCountCopies(t *testing.T) {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Test Deck", total: 34, unique: 5},
+		info:  deckInfo{Name: "Test Deck", Total: 34, Unique: 5},
 		cards: deckFixture(),
 	})
 
@@ -711,7 +711,7 @@ func TestDeckHeaderShowsDeckNotSort(t *testing.T) {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Winota: Snowball Stax", author: "ComedIan", format: "commander", total: 100, unique: 98},
+		info:  deckInfo{Name: "Winota: Snowball Stax", Author: "ComedIan", Format: "commander", Total: 100, Unique: 98},
 		cards: deckFixture(),
 	})
 
@@ -755,7 +755,7 @@ func TestSearchKeepsTheDeckOpen(t *testing.T) {
 	// doesn't — the results fill their own list beside the deck.
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 200, Height: 40})
-	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Test Deck", total: 34}, cards: deckFixture()})
+	m = drive(m, deckLoadedMsg{info: deckInfo{Name: "Test Deck", Total: 34}, cards: deckFixture()})
 	if m.deck == nil {
 		t.Fatal("deck did not load")
 	}
@@ -798,7 +798,7 @@ func TestNarrowTerminalSwapsBetweenListsInstead(t *testing.T) {
 	// the panel, so tab swaps which one is in it.
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 140, Height: 40})
-	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Test Deck", total: 34}, cards: deckFixture()})
+	m = drive(m, deckLoadedMsg{info: deckInfo{Name: "Test Deck", Total: 34}, cards: deckFixture()})
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
 
 	if m.deckColumn() {
@@ -972,13 +972,13 @@ func TestBackFaceKeywordsMatchRules(t *testing.T) {
 
 func TestAuthorTagsInStatistics(t *testing.T) {
 	cards := deckFixture()
-	cards[0].tags = []string{"Ramp", "Own"}
-	cards[1].tags = []string{"Ramp"}
-	cards[3].tags = []string{"Land"} // the 30 Mountains
+	cards[0].Tags = []string{"Ramp", "Own"}
+	cards[1].Tags = []string{"Ramp"}
+	cards[3].Tags = []string{"Land"} // the 30 Mountains
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Tagged", total: 34}, cards: cards})
+	m = drive(m, deckLoadedMsg{info: deckInfo{Name: "Tagged", Total: 34}, cards: cards})
 
 	stats := stripANSI(m.renderStats(70))
 	if !strings.Contains(stats, "Tags") {
@@ -1040,7 +1040,7 @@ func TestSaveDeckFromTheApp(t *testing.T) {
 	}
 
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Winota: Snowball Stax", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7", total: 34},
+		info:  deckInfo{Name: "Winota: Snowball Stax", ID: "Y8dZ7", URL: "https://moxfield.com/decks/Y8dZ7", Total: 34},
 		cards: deckFixture(),
 	})
 	m = leaderPress(m, "i")
@@ -1085,13 +1085,13 @@ func taggedDeckModel(t *testing.T) model {
 	t.Helper()
 
 	cards := deckFixture()
-	cards[0].tags = []string{"Ramp", "Own"} // Goldspan Dragon, commander
-	cards[1].tags = []string{"Ramp"}        // Dragonlord Ojutai
-	cards[3].tags = []string{"Land"}        // 30x Mountain
+	cards[0].Tags = []string{"Ramp", "Own"} // Goldspan Dragon, commander
+	cards[1].Tags = []string{"Ramp"}        // Dragonlord Ojutai
+	cards[3].Tags = []string{"Land"}        // 30x Mountain
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Tagged", total: 34, unique: 5}, cards: cards})
+	m = drive(m, deckLoadedMsg{info: deckInfo{Name: "Tagged", Total: 34, Unique: 5}, cards: cards})
 	return drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 }
 
@@ -1105,7 +1105,7 @@ func TestStatCountsMatchWhatFilteringGives(t *testing.T) {
 		got := 0
 		for _, e := range entries {
 			if row.match(e) {
-				got += e.qty
+				got += e.Qty
 			}
 		}
 		if got != row.count {
@@ -1141,7 +1141,7 @@ func TestStatNavigationFiltersTheList(t *testing.T) {
 		onScreen := toEntries(m.active().list.Items())
 		total := 0
 		for _, e := range onScreen {
-			total += e.qty
+			total += e.Qty
 		}
 
 		// The panel now describes the cards the category left on screen,
@@ -1159,7 +1159,7 @@ func TestStatNavigationFiltersTheList(t *testing.T) {
 			expect := 0
 			for _, e := range onScreen {
 				if got.match(e) {
-					expect += e.qty
+					expect += e.Qty
 				}
 			}
 			if got.count != expect {
@@ -1449,13 +1449,13 @@ func TestBarsScaleToTheUnfilteredSet(t *testing.T) {
 func TestStatsScrollLeavesTheSelectionAlone(t *testing.T) {
 	// A short terminal, so the category list runs past the panel.
 	cards := deckFixture()
-	cards[0].tags = []string{"Ramp", "Own"}
-	cards[1].tags = []string{"Ramp"}
-	cards[3].tags = []string{"Land"}
+	cards[0].Tags = []string{"Ramp", "Own"}
+	cards[1].Tags = []string{"Ramp"}
+	cards[3].Tags = []string{"Land"}
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 16})
-	m = drive(m, deckLoadedMsg{info: deckInfo{name: "Tagged", total: 34}, cards: cards})
+	m = drive(m, deckLoadedMsg{info: deckInfo{Name: "Tagged", Total: 34}, cards: cards})
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	m = walkTo(t, m, "Type", "Creature")
 

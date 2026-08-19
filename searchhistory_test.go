@@ -212,7 +212,7 @@ func TestOpeningADeckLeavesTheSearchBarAlone(t *testing.T) {
 	m.searchInput.SetValue("t:dragon c:r")
 
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Ghen", slug: "ghen", total: 10},
+		info:  deckInfo{Name: "Ghen", Slug: "ghen", Total: 10},
 		cards: deckFixture(),
 	})
 
@@ -232,7 +232,7 @@ func TestADeckIsNeverRememberedAsAQuery(t *testing.T) {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Ghen", slug: "ghen", total: 10},
+		info:  deckInfo{Name: "Ghen", Slug: "ghen", Total: 10},
 		cards: deckFixture(),
 	})
 

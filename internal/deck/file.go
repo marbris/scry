@@ -1,6 +1,8 @@
-package main
+package deck
 
 import (
+	"scry/internal/paths"
+
 	"bufio"
 	"fmt"
 	"io"
@@ -38,13 +40,13 @@ import (
 // the card lines are regenerated in a canonical order so that two people —
 // or the TUI and your editor — always produce the same bytes.
 
-const deckFileExt = ".deck"
+const FileExt = ".deck"
 
 // Sections a deck file can carry. Anything else found in a file is kept and
 // written back after these, so a hand-added section survives a rewrite.
 var knownSections = []string{"commander", "mainboard", "sideboard", "maybeboard"}
 
-type deckFile struct {
+type File struct {
 	Name   string
 	Format string
 	Source string // the Moxfield URL it came from, if any
@@ -56,13 +58,13 @@ type deckFile struct {
 	// they were read, so hand-written fields aren't eaten on the next write.
 	Extra [][2]string
 
-	Entries []deckEntry
+	Entries []Entry
 }
 
-// deckEntry is one line of a deck file: a card, how many, which section it's
+// Entry is one line of a deck file: a card, how many, which section it's
 // in, and its tags. It names a card rather than resolving one — turning
-// these into deckCards is resolveEntries' job.
-type deckEntry struct {
+// these into deckCards is Resolve' job.
+type Entry struct {
 	Qty       int
 	Name      string
 	Set       string // pinned printing, both empty when unpinned
@@ -71,25 +73,25 @@ type deckEntry struct {
 	Section   string
 }
 
-func (e deckEntry) commander() bool { return e.Section == "commander" }
+func (e Entry) commander() bool { return e.Section == "commander" }
 
 // ── Parsing ─────────────────────────────────────────────────────
 
-// deckLineRe splits a card line into quantity, name, pinned printing and
+// entryLineRe splits a card line into quantity, name, pinned printing and
 // tags. The name is lazy and the trailing groups optional, so a card whose
 // name really does end in brackets — "Erase (Not the Urza's Legacy One)" —
 // keeps them: the printing group only matches a set-code-shaped token
 // followed by a collector number.
-var deckLineRe = regexp.MustCompile(
+var entryLineRe = regexp.MustCompile(
 	`^(?:(\d+)\s+)?(.+?)(?:\s+\(([A-Za-z0-9]{3,5})\)\s+([^\s\[\]]+))?(?:\s+\[([^\]]*)\])?$`)
 
-var deckSectionRe = regexp.MustCompile(`^\[([^\]]+)\]$`)
+var sectionRe = regexp.MustCompile(`^\[([^\]]+)\]$`)
 
-// parseDeckFile reads the format above. It is forgiving on the way in —
+// ParseFile reads the format above. It is forgiving on the way in —
 // a missing quantity means one, a card before any section header is in the
 // mainboard — and strict only about things it cannot guess at.
-func parseDeckFile(r io.Reader) (*deckFile, error) {
-	d := &deckFile{}
+func ParseFile(r io.Reader) (*File, error) {
+	d := &File{}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -114,7 +116,7 @@ func parseDeckFile(r io.Reader) (*deckFile, error) {
 		}
 		leading = false
 
-		if m := deckSectionRe.FindStringSubmatch(text); m != nil {
+		if m := sectionRe.FindStringSubmatch(text); m != nil {
 			section = strings.ToLower(strings.TrimSpace(m[1]))
 			if section == "" {
 				return nil, fmt.Errorf("line %d: empty section name", line)
@@ -147,7 +149,7 @@ func parseDeckFile(r io.Reader) (*deckFile, error) {
 			inHeader = false
 		}
 
-		e, err := parseDeckLine(text)
+		e, err := parseEntry(text)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: %w", line, err)
 		}
@@ -160,31 +162,31 @@ func parseDeckFile(r io.Reader) (*deckFile, error) {
 	return d, nil
 }
 
-func parseDeckLine(text string) (deckEntry, error) {
-	m := deckLineRe.FindStringSubmatch(text)
+func parseEntry(text string) (Entry, error) {
+	m := entryLineRe.FindStringSubmatch(text)
 	if m == nil {
-		return deckEntry{}, fmt.Errorf("cannot read %q as a card", text)
+		return Entry{}, fmt.Errorf("cannot read %q as a card", text)
 	}
 
-	e := deckEntry{Qty: 1, Name: strings.TrimSpace(m[2]), Set: strings.ToLower(m[3]), Collector: m[4]}
+	e := Entry{Qty: 1, Name: strings.TrimSpace(m[2]), Set: strings.ToLower(m[3]), Collector: m[4]}
 	if m[1] != "" {
 		n, err := strconv.Atoi(m[1])
 		if err != nil || n < 1 {
-			return deckEntry{}, fmt.Errorf("bad quantity %q", m[1])
+			return Entry{}, fmt.Errorf("bad quantity %q", m[1])
 		}
 		e.Qty = n
 	}
 	if e.Name == "" {
-		return deckEntry{}, fmt.Errorf("no card name in %q", text)
+		return Entry{}, fmt.Errorf("no card name in %q", text)
 	}
-	e.Tags = parseTags(m[5])
+	e.Tags = ParseTags(m[5])
 	return e, nil
 }
 
 // parseTags splits and normalises a bracketed tag list. Tags are lowercased
 // and de-duplicated so that tagging in bulk stays consistent however the tag
 // was typed, and sorted so the line is canonical.
-func parseTags(s string) []string {
+func ParseTags(s string) []string {
 	if strings.TrimSpace(s) == "" {
 		return nil
 	}
@@ -208,7 +210,7 @@ func parseTags(s string) []string {
 // sections in a fixed order, cards sorted by name inside each, tags sorted.
 // Two writes of the same deck produce identical bytes, so git only ever sees
 // the lines that actually changed.
-func (d *deckFile) String() string {
+func (d *File) String() string {
 	var b strings.Builder
 
 	for _, n := range d.Notes {
@@ -250,7 +252,7 @@ func (d *deckFile) String() string {
 	return strings.TrimRight(b.String(), "\n") + "\n"
 }
 
-func (e deckEntry) String() string {
+func (e Entry) String() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%d %s", e.Qty, e.Name)
 	if e.Set != "" && e.Collector != "" {
@@ -263,8 +265,8 @@ func (e deckEntry) String() string {
 }
 
 // section returns one section's entries, sorted by name.
-func (d *deckFile) section(name string) []deckEntry {
-	var out []deckEntry
+func (d *File) section(name string) []Entry {
+	var out []Entry
 	for _, e := range d.Entries {
 		if e.Section == name {
 			out = append(out, e)
@@ -276,7 +278,7 @@ func (d *deckFile) section(name string) []deckEntry {
 
 // sectionOrder lists the known sections first, then any others the file
 // carried, alphabetically.
-func (d *deckFile) sectionOrder() []string {
+func (d *File) sectionOrder() []string {
 	known := map[string]bool{}
 	for _, s := range knownSections {
 		known[s] = true
@@ -299,7 +301,7 @@ func (d *deckFile) sectionOrder() []string {
 
 // counts totals the sections that make up the deck proper; a maybeboard is
 // a shortlist, not part of it.
-func (d *deckFile) counts() (total, unique int) {
+func (d *File) Counts() (total, unique int) {
 	for _, e := range d.Entries {
 		if e.Section == "maybeboard" {
 			continue
@@ -312,53 +314,53 @@ func (d *deckFile) counts() (total, unique int) {
 
 // ── The decks directory ─────────────────────────────────────────
 
-// decksDir is where deck files live, and in phase 3 the git repo tracking
+// Dir is where deck files live, and in phase 3 the git repo tracking
 // them. SCRY_DECKS_DIR moves it somewhere you'd rather back up.
-func decksDir() string {
+func Dir() string {
 	dir := os.Getenv("SCRY_DECKS_DIR")
 	if dir == "" {
-		dir = filepath.Join(dataDir(), "decks")
+		dir = filepath.Join(paths.Data(), "decks")
 	}
 	os.MkdirAll(dir, 0755)
 	return dir
 }
 
-func deckFilePath(slug string) string {
-	return filepath.Join(decksDir(), slug+deckFileExt)
+func Path(slug string) string {
+	return filepath.Join(Dir(), slug+FileExt)
 }
 
-// listDecks returns the slugs of the decks on disk, alphabetically.
-func listDecks() ([]string, error) {
-	entries, err := os.ReadDir(decksDir())
+// List returns the slugs of the decks on disk, alphabetically.
+func List() ([]string, error) {
+	entries, err := os.ReadDir(Dir())
 	if err != nil {
 		return nil, err
 	}
 	var out []string
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), deckFileExt) {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), FileExt) {
 			continue
 		}
-		out = append(out, strings.TrimSuffix(e.Name(), deckFileExt))
+		out = append(out, strings.TrimSuffix(e.Name(), FileExt))
 	}
 	sort.Strings(out)
 	return out, nil
 }
 
-func deckExists(slug string) bool {
-	_, err := os.Stat(deckFilePath(slug))
+func Exists(slug string) bool {
+	_, err := os.Stat(Path(slug))
 	return err == nil
 }
 
-func readDeck(slug string) (*deckFile, error) {
-	f, err := os.Open(deckFilePath(slug))
+func Read(slug string) (*File, error) {
+	f, err := os.Open(Path(slug))
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	d, err := parseDeckFile(f)
+	d, err := ParseFile(f)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", slug+deckFileExt, err)
+		return nil, fmt.Errorf("%s: %w", slug+FileExt, err)
 	}
 	if d.Name == "" {
 		d.Name = slug
@@ -366,10 +368,10 @@ func readDeck(slug string) (*deckFile, error) {
 	return d, nil
 }
 
-// writeDeck saves a deck, via a temporary file so that a crash mid-write
+// Write saves a deck, via a temporary file so that a crash mid-write
 // can't leave a half-written deck behind — git will be reading these.
-func writeDeck(slug string, d *deckFile) error {
-	path := deckFilePath(slug)
+func Write(slug string, d *File) error {
+	path := Path(slug)
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+slug+".*")
 	if err != nil {
 		return err
@@ -389,31 +391,31 @@ func writeDeck(slug string, d *deckFile) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-func deleteDeck(slug string) error {
-	return os.Remove(deckFilePath(slug))
+func Delete(slug string) error {
+	return os.Remove(Path(slug))
 }
 
-// defaultFormat is what a deck is assumed to be when you don't say. This is
+// DefaultFormat is what a deck is assumed to be when you don't say. This is
 // a Commander tool first.
-const defaultFormat = "commander"
+const DefaultFormat = "commander"
 
-// newDeck creates an empty deck and returns the name it was filed under.
+// New creates an empty deck and returns the name it was filed under.
 // Empty is a legitimate state: you fill it by adding cards, and until then
 // there's nothing to write but a header.
-func newDeck(name, format string) (slug string, d *deckFile, err error) {
+func New(name, format string) (slug string, d *File, err error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", nil, fmt.Errorf("a deck needs a name")
 	}
-	slug = slugify(name)
+	slug = Slugify(name)
 	if slug == "" {
 		return "", nil, fmt.Errorf("%q doesn't make a usable file name", name)
 	}
-	if deckExists(slug) {
+	if Exists(slug) {
 		return "", nil, fmt.Errorf("you already have a deck called %q", slug)
 	}
 	if format == "" {
-		format = defaultFormat
+		format = DefaultFormat
 	}
-	return slug, &deckFile{Name: name, Format: format}, nil
+	return slug, &File{Name: name, Format: format}, nil
 }

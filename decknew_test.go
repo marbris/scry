@@ -83,7 +83,7 @@ func TestAnEmptyDeckOpens(t *testing.T) {
 	if len(cards) != 0 {
 		t.Errorf("got %d cards from an empty deck", len(cards))
 	}
-	if info.name != "Ghen" || !info.local() {
+	if info.Name != "Ghen" || !info.Local() {
 		t.Errorf("info = %+v", info)
 	}
 }
@@ -117,7 +117,7 @@ func TestNewDeckFromThePicker(t *testing.T) {
 		t.Fatal("the deck was not created")
 	}
 	// And you land in it, rather than back at a list to find it in.
-	if m.deck == nil || m.deck.slug != "ghen-reanimator" {
+	if m.deck == nil || m.deck.Slug != "ghen-reanimator" {
 		t.Errorf("did not open the new deck: %+v", m.deck)
 	}
 	if m.state != stateResults {
@@ -171,7 +171,7 @@ func TestCommanderToggle(t *testing.T) {
 
 	m = press(m, "c")
 	i := m.deckIndexOf("Sol Ring")
-	if !m.deckCards[i].commander {
+	if !m.deckCards[i].Commander {
 		t.Fatal("c did not mark the card as a commander")
 	}
 	if !strings.Contains(m.notice, "commander") {
@@ -180,7 +180,7 @@ func TestCommanderToggle(t *testing.T) {
 
 	// And off again.
 	m = press(m, "c")
-	if m.deckCards[m.deckIndexOf("Sol Ring")].commander {
+	if m.deckCards[m.deckIndexOf("Sol Ring")].Commander {
 		t.Error("c did not unmark it")
 	}
 	if !strings.Contains(m.notice, "no longer") {
@@ -194,11 +194,11 @@ func TestCommanderFromASearchAddsIt(t *testing.T) {
 	sel, _ := m.active().selected()
 
 	m = press(m, "c")
-	i := m.deckIndexOf(sel.card.Name)
+	i := m.deckIndexOf(sel.Card.Name)
 	if i < 0 {
 		t.Fatal("c did not add the card")
 	}
-	if !m.deckCards[i].commander {
+	if !m.deckCards[i].Commander {
 		t.Error("the card was added but not as a commander")
 	}
 }
@@ -216,7 +216,7 @@ func TestSeveralCommandersAndNone(t *testing.T) {
 
 	var commanders int
 	for _, dc := range m.deckCards {
-		if dc.commander {
+		if dc.Commander {
 			commanders++
 		}
 	}
@@ -246,7 +246,7 @@ func TestSeveralCommandersAndNone(t *testing.T) {
 		m = press(m, "c")
 	}
 	for _, dc := range m.deckCards {
-		if dc.commander {
+		if dc.Commander {
 			t.Error("a deck with no commanders should be allowed")
 		}
 	}
@@ -259,7 +259,7 @@ func TestCommandersSortToTheTop(t *testing.T) {
 	m = press(m, "c")
 
 	first, ok := m.deckPane.list.Items()[0].(cardItem)
-	if !ok || first.card.Name != "Plains" {
+	if !ok || first.Card.Name != "Plains" {
 		t.Errorf("the commander is not at the top of the deck list: %+v", first)
 	}
 }

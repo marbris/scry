@@ -80,7 +80,7 @@ func (m model) toggleHistory() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	h := m.histories[card.card.OracleID]
+	h := m.histories[card.Card.OracleID]
 
 	// Already showing a finished history: the key toggles back to the card.
 	if m.panel == panelHistory && h != nil && (h.state == histReady || h.state == histFailed) {
@@ -92,13 +92,13 @@ func (m model) toggleHistory() (tea.Model, tea.Cmd) {
 	m.historyScroll = 0
 
 	switch {
-	case card.card.OracleID == "":
+	case card.Card.OracleID == "":
 		return m, nil
 
 	case h == nil:
 		// First look at this card: find out where it was printed.
-		m.histories[card.card.OracleID] = &cardHistory{state: histPrintings}
-		return m, fetchPrintings(card.card.OracleID, card.card.PrintsSearchURI)
+		m.histories[card.Card.OracleID] = &cardHistory{state: histPrintings}
+		return m, fetchPrintings(card.Card.OracleID, card.Card.PrintsSearchURI)
 
 	case h.state == histNeedSets:
 		// The user has seen the download count and pressed the key again.
@@ -112,7 +112,7 @@ func (m model) toggleHistory() (tea.Model, tea.Cmd) {
 			}
 		}
 		if len(cmds) == 0 {
-			m.finishHistory(card.card.OracleID)
+			m.finishHistory(card.Card.OracleID)
 			return m, nil
 		}
 		return m, tea.Batch(cmds...)

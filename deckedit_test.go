@@ -28,8 +28,8 @@ func editableDeck(t *testing.T) model {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 190, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Ghen", slug: "ghen", format: "commander", total: 8, unique: 2},
-		cards: []deckCard{{card: ScryfallCard{Name: "Sol Ring", TypeLine: "Artifact"}, qty: 1, tags: []string{"ramp"}}, {card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains"}, qty: 7}},
+		info:  deckInfo{Name: "Ghen", Slug: "ghen", Format: "commander", Total: 8, Unique: 2},
+		cards: []deckCard{{Card: ScryfallCard{Name: "Sol Ring", TypeLine: "Artifact"}, Qty: 1, Tags: []string{"ramp"}}, {Card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains"}, Qty: 7}},
 	})
 	return drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
 }
@@ -59,15 +59,15 @@ func TestAddCardFromSearch(t *testing.T) {
 	if len(m.deckCards) != before+1 {
 		t.Fatalf("deck has %d cards, want %d", len(m.deckCards), before+1)
 	}
-	if m.deckIndexOf(sel.card.Name) < 0 {
-		t.Errorf("%q is not in the deck", sel.card.Name)
+	if m.deckIndexOf(sel.Card.Name) < 0 {
+		t.Errorf("%q is not in the deck", sel.Card.Name)
 	}
-	if !strings.Contains(m.notice, sel.card.Name) {
+	if !strings.Contains(m.notice, sel.Card.Name) {
 		t.Errorf("notice = %q, should name the card added", m.notice)
 	}
 	// The deck column and its counts follow immediately.
-	if m.deck.unique != before+1 {
-		t.Errorf("unique = %d, want %d", m.deck.unique, before+1)
+	if m.deck.Unique != before+1 {
+		t.Errorf("unique = %d, want %d", m.deck.Unique, before+1)
 	}
 	if len(m.deckPane.list.Items()) != before+1 {
 		t.Errorf("the deck column shows %d cards", len(m.deckPane.list.Items()))
@@ -87,7 +87,7 @@ func TestAddingTwiceNeedsAsking(t *testing.T) {
 
 	m = press(m, "a")
 	if len(m.deckCards) != count {
-		t.Errorf("a second a added another copy of %s", sel.card.Name)
+		t.Errorf("a second a added another copy of %s", sel.Card.Name)
 	}
 	if !strings.Contains(m.notice, "already in the deck") {
 		t.Errorf("notice = %q", m.notice)
@@ -95,8 +95,8 @@ func TestAddingTwiceNeedsAsking(t *testing.T) {
 
 	// + is how you ask.
 	m = press(m, "+")
-	i := m.deckIndexOf(sel.card.Name)
-	if i < 0 || m.deckCards[i].qty != 2 {
+	i := m.deckIndexOf(sel.Card.Name)
+	if i < 0 || m.deckCards[i].Qty != 2 {
 		t.Errorf("+ did not add a second copy: %+v", m.deckCards[i])
 	}
 }
@@ -107,12 +107,12 @@ func TestQuantityAndRemoval(t *testing.T) {
 	selectCard(&m.deckPane, "Plains")
 
 	m = press(m, "-")
-	if i := m.deckIndexOf("Plains"); m.deckCards[i].qty != 6 {
-		t.Errorf("- left %d Plains, want 6", m.deckCards[i].qty)
+	if i := m.deckIndexOf("Plains"); m.deckCards[i].Qty != 6 {
+		t.Errorf("- left %d Plains, want 6", m.deckCards[i].Qty)
 	}
 	m = press(m, "+")
-	if i := m.deckIndexOf("Plains"); m.deckCards[i].qty != 7 {
-		t.Errorf("+ left %d Plains, want 7", m.deckCards[i].qty)
+	if i := m.deckIndexOf("Plains"); m.deckCards[i].Qty != 7 {
+		t.Errorf("+ left %d Plains, want 7", m.deckCards[i].Qty)
 	}
 
 	// x takes the card out however many copies there are.
@@ -120,8 +120,8 @@ func TestQuantityAndRemoval(t *testing.T) {
 	if m.deckIndexOf("Plains") >= 0 {
 		t.Error("x did not remove Plains")
 	}
-	if m.deck.total != 1 {
-		t.Errorf("total = %d, want 1 after removing seven Plains", m.deck.total)
+	if m.deck.Total != 1 {
+		t.Errorf("total = %d, want 1 after removing seven Plains", m.deck.Total)
 	}
 }
 
@@ -143,11 +143,11 @@ func TestRemoveFromTheSearchSide(t *testing.T) {
 	m = press(m, "a")
 	sel, _ := m.active().selected()
 
-	if m.deckIndexOf(sel.card.Name) < 0 {
+	if m.deckIndexOf(sel.Card.Name) < 0 {
 		t.Fatal("the card was not added")
 	}
 	m = press(m, "x")
-	if m.deckIndexOf(sel.card.Name) >= 0 {
+	if m.deckIndexOf(sel.Card.Name) >= 0 {
 		t.Error("x from the results did not remove the card from the deck")
 	}
 }
@@ -159,7 +159,7 @@ func TestEditingKeepsTheCursorPut(t *testing.T) {
 
 	m = press(m, "+")
 	sel, ok := m.deckPane.selected()
-	if !ok || sel.card.Name != "Plains" {
+	if !ok || sel.Card.Name != "Plains" {
 		t.Errorf("the cursor moved off the card being edited: %+v", sel)
 	}
 }
@@ -257,13 +257,13 @@ func TestQuittingWritesAPendingEdit(t *testing.T) {
 	}
 	var found bool
 	for _, e := range on.Entries {
-		if e.Name == added.card.Name {
+		if e.Name == added.Card.Name {
 			found = true
 		}
 	}
 	if !found {
 		t.Errorf("quitting lost the edit — %q is not in the saved deck:\n%s",
-			added.card.Name, on.String())
+			added.Card.Name, on.String())
 	}
 }
 
@@ -300,7 +300,7 @@ func TestAMoxfieldDeckIsReadOnly(t *testing.T) {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 190, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Someone else's", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7"},
+		info:  deckInfo{Name: "Someone else's", ID: "Y8dZ7", URL: "https://moxfield.com/decks/Y8dZ7"},
 		cards: deckFixture(),
 	})
 	m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})

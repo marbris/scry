@@ -82,14 +82,14 @@ func TestDeckPickerOpensADeck(t *testing.T) {
 	if m.deck == nil {
 		t.Fatal("no deck was opened")
 	}
-	if m.deck.slug != "ghen" {
-		t.Errorf("opened %q, want the first deck in the list", m.deck.slug)
+	if m.deck.Slug != "ghen" {
+		t.Errorf("opened %q, want the first deck in the list", m.deck.Slug)
 	}
 	if m.deckPane.empty() {
 		t.Error("the deck opened with no cards in it")
 	}
 	// A deck opened from the picker is one of your own, so it has a history.
-	if !m.deck.local() {
+	if !m.deck.Local() {
 		t.Error("a deck from the picker should be local")
 	}
 }

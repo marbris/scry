@@ -15,8 +15,8 @@ func deckAndSearch(t *testing.T, w, h int) model {
 	m = drive(m, tea.WindowSizeMsg{Width: w, Height: h})
 	m = drive(m, deckLoadedMsg{
 		info: deckInfo{
-			name: "Ghen reanimator", slug: "ghen", format: "commander",
-			total: 100, unique: 86,
+			Name: "Ghen reanimator", Slug: "ghen", Format: "commander",
+			Total: 100, Unique: 86,
 		},
 		cards: deckFixture(),
 	})
@@ -149,8 +149,8 @@ func TestPanelFollowsFocus(t *testing.T) {
 	if !ok {
 		t.Fatal("nothing selected in the results")
 	}
-	if !strings.Contains(stripANSI(m.View()), first.card.Name) {
-		t.Errorf("the panel is not showing %q", first.card.Name)
+	if !strings.Contains(stripANSI(m.View()), first.Card.Name) {
+		t.Errorf("the panel is not showing %q", first.Card.Name)
 	}
 
 	// Tabbing to the deck moves the panel onto the deck's selected card.
@@ -160,8 +160,8 @@ func TestPanelFollowsFocus(t *testing.T) {
 		t.Fatal("nothing selected in the deck")
 	}
 	view := stripANSI(m.View())
-	if !strings.Contains(view, deckCard.card.TypeLine) {
-		t.Errorf("the panel did not follow focus to %q:\n%s", deckCard.card.Name, view)
+	if !strings.Contains(view, deckCard.Card.TypeLine) {
+		t.Errorf("the panel did not follow focus to %q:\n%s", deckCard.Card.Name, view)
 	}
 }
 

@@ -1,6 +1,8 @@
-package main
+package deck
 
 import (
+	"scry/internal/mtg"
+
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,80 +15,80 @@ func TestParseDeckLine(t *testing.T) {
 	tests := []struct {
 		name string
 		line string
-		want deckEntry
+		want Entry
 	}{
 		{
 			name: "bare name defaults to one",
 			line: "Sol Ring",
-			want: deckEntry{Qty: 1, Name: "Sol Ring"},
+			want: Entry{Qty: 1, Name: "Sol Ring"},
 		},
 		{
 			name: "quantity",
 			line: "7 Plains",
-			want: deckEntry{Qty: 7, Name: "Plains"},
+			want: Entry{Qty: 7, Name: "Plains"},
 		},
 		{
 			name: "tags",
 			line: "1 Sol Ring [ramp, artifact]",
-			want: deckEntry{Qty: 1, Name: "Sol Ring", Tags: []string{"artifact", "ramp"}},
+			want: Entry{Qty: 1, Name: "Sol Ring", Tags: []string{"artifact", "ramp"}},
 		},
 		{
 			name: "pinned printing",
 			line: "1 Sol Ring (c21) 263",
-			want: deckEntry{Qty: 1, Name: "Sol Ring", Set: "c21", Collector: "263"},
+			want: Entry{Qty: 1, Name: "Sol Ring", Set: "c21", Collector: "263"},
 		},
 		{
 			name: "pinned printing and tags",
 			line: "1 Sol Ring (c21) 263 [ramp]",
-			want: deckEntry{Qty: 1, Name: "Sol Ring", Set: "c21", Collector: "263", Tags: []string{"ramp"}},
+			want: Entry{Qty: 1, Name: "Sol Ring", Set: "c21", Collector: "263", Tags: []string{"ramp"}},
 		},
 		{
 			name: "collector number with a letter",
 			line: "1 Arcane Signet (eld) 331p",
-			want: deckEntry{Qty: 1, Name: "Arcane Signet", Set: "eld", Collector: "331p"},
+			want: Entry{Qty: 1, Name: "Arcane Signet", Set: "eld", Collector: "331p"},
 		},
 		{
 			// The reason the printing group is shaped the way it is: this
 			// card's name really does end in a parenthesis.
 			name: "name ending in parentheses is not a printing",
 			line: "1 Erase (Not the Urza's Legacy One)",
-			want: deckEntry{Qty: 1, Name: "Erase (Not the Urza's Legacy One)"},
+			want: Entry{Qty: 1, Name: "Erase (Not the Urza's Legacy One)"},
 		},
 		{
 			name: "double-faced name keeps its slashes",
 			line: "1 Fire // Ice [removal]",
-			want: deckEntry{Qty: 1, Name: "Fire // Ice", Tags: []string{"removal"}},
+			want: Entry{Qty: 1, Name: "Fire // Ice", Tags: []string{"removal"}},
 		},
 		{
 			name: "name with a comma",
 			line: "1 Ghen, Arcanum Weaver [wincon]",
-			want: deckEntry{Qty: 1, Name: "Ghen, Arcanum Weaver", Tags: []string{"wincon"}},
+			want: Entry{Qty: 1, Name: "Ghen, Arcanum Weaver", Tags: []string{"wincon"}},
 		},
 		{
 			name: "tags are lowercased, sorted and de-duplicated",
 			line: "1 Sol Ring [Ramp,  ramp , Artifact]",
-			want: deckEntry{Qty: 1, Name: "Sol Ring", Tags: []string{"artifact", "ramp"}},
+			want: Entry{Qty: 1, Name: "Sol Ring", Tags: []string{"artifact", "ramp"}},
 		},
 		{
 			name: "empty tag list is no tags",
 			line: "1 Sol Ring []",
-			want: deckEntry{Qty: 1, Name: "Sol Ring"},
+			want: Entry{Qty: 1, Name: "Sol Ring"},
 		},
 		{
 			name: "set code is normalised to lower case",
 			line: "1 Sol Ring (C21) 263",
-			want: deckEntry{Qty: 1, Name: "Sol Ring", Set: "c21", Collector: "263"},
+			want: Entry{Qty: 1, Name: "Sol Ring", Set: "c21", Collector: "263"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseDeckLine(tt.line)
+			got, err := parseEntry(tt.line)
 			if err != nil {
-				t.Fatalf("parseDeckLine(%q): %v", tt.line, err)
+				t.Fatalf("parseEntry(%q): %v", tt.line, err)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parseDeckLine(%q)\n got %+v\nwant %+v", tt.line, got, tt.want)
+				t.Errorf("parseEntry(%q)\n got %+v\nwant %+v", tt.line, got, tt.want)
 			}
 		})
 	}
@@ -94,8 +96,8 @@ func TestParseDeckLine(t *testing.T) {
 
 func TestParseDeckLineRejects(t *testing.T) {
 	for _, line := range []string{"", "0 Sol Ring"} {
-		if _, err := parseDeckLine(line); err == nil {
-			t.Errorf("parseDeckLine(%q) should have failed", line)
+		if _, err := parseEntry(line); err == nil {
+			t.Errorf("parseEntry(%q) should have failed", line)
 		}
 	}
 }
@@ -121,9 +123,9 @@ colour: rw
 `
 
 func TestParseDeckFile(t *testing.T) {
-	d, err := parseDeckFile(strings.NewReader(sampleDeck))
+	d, err := ParseFile(strings.NewReader(sampleDeck))
 	if err != nil {
-		t.Fatalf("parseDeckFile: %v", err)
+		t.Fatalf("ParseFile: %v", err)
 	}
 
 	if d.Name != "Ghen, Arcanum Weaver" {
@@ -155,7 +157,7 @@ func TestParseDeckFile(t *testing.T) {
 	}
 
 	// The maybeboard is a shortlist, not part of the deck.
-	total, unique := d.counts()
+	total, unique := d.Counts()
 	if total != 10 || unique != 4 {
 		t.Errorf("counts() = (%d, %d), want (10, 4)", total, unique)
 	}
@@ -163,8 +165,8 @@ func TestParseDeckFile(t *testing.T) {
 
 // sortedEntries puts a deck's entries in a fixed order so two decks can be
 // compared by content regardless of the order they were read in.
-func sortedEntries(d *deckFile) []deckEntry {
-	out := append([]deckEntry(nil), d.Entries...)
+func sortedEntries(d *File) []Entry {
+	out := append([]Entry(nil), d.Entries...)
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Section != out[j].Section {
 			return out[i].Section < out[j].Section
@@ -175,13 +177,13 @@ func sortedEntries(d *deckFile) []deckEntry {
 }
 
 func TestDeckFileRoundTrip(t *testing.T) {
-	d, err := parseDeckFile(strings.NewReader(sampleDeck))
+	d, err := ParseFile(strings.NewReader(sampleDeck))
 	if err != nil {
-		t.Fatalf("parseDeckFile: %v", err)
+		t.Fatalf("ParseFile: %v", err)
 	}
 
 	out := d.String()
-	again, err := parseDeckFile(strings.NewReader(out))
+	again, err := ParseFile(strings.NewReader(out))
 	if err != nil {
 		t.Fatalf("reparsing our own output: %v", err)
 	}
@@ -218,11 +220,11 @@ func TestDeckFileCanonicalOrder(t *testing.T) {
 1 Arcane Signet [RAMP]
 1 Sol Ring [ramp]
 `
-	da, err := parseDeckFile(strings.NewReader(a))
+	da, err := ParseFile(strings.NewReader(a))
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := parseDeckFile(strings.NewReader(b))
+	db, err := ParseFile(strings.NewReader(b))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,9 +235,9 @@ func TestDeckFileCanonicalOrder(t *testing.T) {
 
 func TestParseDeckFileNoHeader(t *testing.T) {
 	// A bare decklist pasted in, with no header and no sections at all.
-	d, err := parseDeckFile(strings.NewReader("1 Sol Ring\n1 Smothering Tithe\n"))
+	d, err := ParseFile(strings.NewReader("1 Sol Ring\n1 Smothering Tithe\n"))
 	if err != nil {
-		t.Fatalf("parseDeckFile: %v", err)
+		t.Fatalf("ParseFile: %v", err)
 	}
 	if len(d.Entries) != 2 {
 		t.Fatalf("got %d entries, want 2", len(d.Entries))
@@ -248,7 +250,7 @@ func TestParseDeckFileNoHeader(t *testing.T) {
 }
 
 func TestParseDeckFileReportsLineNumbers(t *testing.T) {
-	_, err := parseDeckFile(strings.NewReader("[mainboard]\n1 Sol Ring\n0 Broken\n"))
+	_, err := ParseFile(strings.NewReader("[mainboard]\n1 Sol Ring\n0 Broken\n"))
 	if err == nil {
 		t.Fatal("expected an error for a zero quantity")
 	}
@@ -261,57 +263,57 @@ func TestDeckStoreRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("SCRY_DECKS_DIR", dir)
 
-	if decks, err := listDecks(); err != nil || len(decks) != 0 {
-		t.Fatalf("listDecks() on an empty dir = %v, %v", decks, err)
+	if decks, err := List(); err != nil || len(decks) != 0 {
+		t.Fatalf("List() on an empty dir = %v, %v", decks, err)
 	}
-	if deckExists("ghen") {
-		t.Error("deckExists() true before anything was written")
+	if Exists("ghen") {
+		t.Error("Exists() true before anything was written")
 	}
 
-	d, err := parseDeckFile(strings.NewReader(sampleDeck))
+	d, err := ParseFile(strings.NewReader(sampleDeck))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writeDeck("ghen", d); err != nil {
-		t.Fatalf("writeDeck: %v", err)
+	if err := Write("ghen", d); err != nil {
+		t.Fatalf("Write: %v", err)
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "ghen.deck")); err != nil {
 		t.Fatalf("deck file not where it should be: %v", err)
 	}
-	if !deckExists("ghen") {
-		t.Error("deckExists() false after a write")
+	if !Exists("ghen") {
+		t.Error("Exists() false after a write")
 	}
 
-	decks, err := listDecks()
+	decks, err := List()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(decks, []string{"ghen"}) {
-		t.Errorf("listDecks() = %v", decks)
+		t.Errorf("List() = %v", decks)
 	}
 
-	back, err := readDeck("ghen")
+	back, err := Read("ghen")
 	if err != nil {
-		t.Fatalf("readDeck: %v", err)
+		t.Fatalf("Read: %v", err)
 	}
 	if back.String() != d.String() {
 		t.Errorf("what came back off disk isn't what went on:\n%s\nvs\n%s", back.String(), d.String())
 	}
 
 	// Writing over a deck replaces it rather than appending.
-	if err := writeDeck("ghen", d); err != nil {
+	if err := Write("ghen", d); err != nil {
 		t.Fatal(err)
 	}
-	if decks, _ := listDecks(); len(decks) != 1 {
+	if decks, _ := List(); len(decks) != 1 {
 		t.Errorf("a second write left %d decks", len(decks))
 	}
 
-	if err := deleteDeck("ghen"); err != nil {
-		t.Fatalf("deleteDeck: %v", err)
+	if err := Delete("ghen"); err != nil {
+		t.Fatalf("Delete: %v", err)
 	}
-	if deckExists("ghen") {
-		t.Error("deck still there after deleteDeck")
+	if Exists("ghen") {
+		t.Error("deck still there after Delete")
 	}
 }
 
@@ -323,7 +325,7 @@ func TestReadDeckNamesItselfAfterItsFile(t *testing.T) {
 		[]byte("[mainboard]\n1 Sol Ring\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	d, err := readDeck("untitled")
+	d, err := Read("untitled")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,31 +336,31 @@ func TestReadDeckNamesItselfAfterItsFile(t *testing.T) {
 
 func TestEntryKey(t *testing.T) {
 	// Case must not split an entry in the cache.
-	if a, b := entryKey(deckEntry{Name: "Sol Ring"}), entryKey(deckEntry{Name: "sol ring"}); a != b {
+	if a, b := entryKey(Entry{Name: "Sol Ring"}), entryKey(Entry{Name: "sol ring"}); a != b {
 		t.Errorf("entryKey is case sensitive: %q vs %q", a, b)
 	}
 	// A pinned printing is a different card to the unpinned name.
-	pinned := entryKey(deckEntry{Name: "Sol Ring", Set: "c21", Collector: "263"})
-	if pinned == entryKey(deckEntry{Name: "Sol Ring"}) {
+	pinned := entryKey(Entry{Name: "Sol Ring", Set: "c21", Collector: "263"})
+	if pinned == entryKey(Entry{Name: "Sol Ring"}) {
 		t.Error("a pinned printing should key differently to a bare name")
 	}
 }
 
 func TestIndexCardsFindsEitherFace(t *testing.T) {
-	idx := indexCards([]ScryfallCard{
+	idx := indexCards([]mtg.Card{
 		{Name: "Fire // Ice", Set: "apc", CollectorNumber: "128"},
 		{Name: "Sol Ring", Set: "c21", CollectorNumber: "263"},
 	})
 
 	for _, want := range []string{"Fire // Ice", "Fire", "Ice"} {
-		if _, ok := idx.lookup(deckEntry{Name: want}); !ok {
+		if _, ok := idx.lookup(Entry{Name: want}); !ok {
 			t.Errorf("lookup(%q) missed", want)
 		}
 	}
-	if _, ok := idx.lookup(deckEntry{Name: "Sol Ring", Set: "c21", Collector: "263"}); !ok {
+	if _, ok := idx.lookup(Entry{Name: "Sol Ring", Set: "c21", Collector: "263"}); !ok {
 		t.Error("lookup by pinned printing missed")
 	}
-	if _, ok := idx.lookup(deckEntry{Name: "Sol Ring", Set: "lea", Collector: "1"}); ok {
+	if _, ok := idx.lookup(Entry{Name: "Sol Ring", Set: "lea", Collector: "1"}); ok {
 		t.Error("lookup matched a printing that wasn't there")
 	}
 }

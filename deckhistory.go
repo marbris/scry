@@ -21,9 +21,9 @@ const historyLimit = 200
 
 type commitItem struct{ commit deckCommit }
 
-func (c commitItem) Title() string       { return c.commit.subject }
-func (c commitItem) Description() string { return c.commit.when }
-func (c commitItem) FilterValue() string { return c.commit.subject + " " + c.commit.short }
+func (c commitItem) Title() string       { return c.commit.Subject }
+func (c commitItem) Description() string { return c.commit.When }
+func (c commitItem) FilterValue() string { return c.commit.Subject + " " + c.commit.Short }
 
 type commitDelegate struct{}
 
@@ -49,17 +49,17 @@ func (d commitDelegate) Render(w io.Writer, m list.Model, index int, item list.I
 
 	// hash, then as much of the subject as fits, then how long ago.
 	width := m.Width() - 4
-	when := it.commit.when
-	subjectW := width - len(it.commit.short) - runeLen(when) - 3
+	when := it.commit.When
+	subjectW := width - len(it.commit.Short) - runeLen(when) - 3
 	if subjectW < 8 {
 		subjectW = 8
 		when = ""
 	}
 
-	line := cursor + hashStyle.Render(it.commit.short) + " " +
-		subjectStyle.Render(truncate(it.commit.subject, subjectW))
+	line := cursor + hashStyle.Render(it.commit.Short) + " " +
+		subjectStyle.Render(truncate(it.commit.Subject, subjectW))
 	if when != "" {
-		pad := width - len(it.commit.short) - runeLen(truncate(it.commit.subject, subjectW)) - runeLen(when)
+		pad := width - len(it.commit.Short) - runeLen(truncate(it.commit.Subject, subjectW)) - runeLen(when)
 		if pad < 1 {
 			pad = 1
 		}
@@ -77,8 +77,8 @@ type deckHistoryMsg struct {
 }
 
 type deckDiffMsg struct {
-	hash string
-	diff string
+	Hash string
+	Diff string
 	err  error
 }
 
@@ -92,7 +92,7 @@ func loadDeckHistoryCmd(slug string) tea.Cmd {
 func loadDeckDiffCmd(slug, hash string) tea.Cmd {
 	return func() tea.Msg {
 		diff, err := deckDiff(slug, hash)
-		return deckDiffMsg{hash: hash, diff: diff, err: err}
+		return deckDiffMsg{Hash: hash, Diff: diff, err: err}
 	}
 }
 
@@ -113,7 +113,7 @@ func restoreDeckCmd(slug, hash string) tea.Cmd {
 // deck of your own has one: a deck being browsed off Moxfield isn't yours to
 // have a history of.
 func (m model) openDeckHistory() (tea.Model, tea.Cmd) {
-	if m.deck == nil || !m.deck.local() {
+	if m.deck == nil || !m.deck.Local() {
 		m.notice = "no history — open one of your own decks first"
 		return m, nil
 	}
@@ -127,7 +127,7 @@ func (m model) openDeckHistory() (tea.Model, tea.Cmd) {
 	m.historyDiff = ""
 	m.historyErr = nil
 	m.diffScroll = 0
-	return m, loadDeckHistoryCmd(m.deck.slug)
+	return m, loadDeckHistoryCmd(m.deck.Slug)
 }
 
 func newCommitList(width, height int) list.Model {
@@ -160,10 +160,10 @@ func (m model) updateDeckHistory(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case deckDiffMsg:
 		// A diff that arrives after the cursor has moved on is stale.
-		if sel, ok := m.historyList.SelectedItem().(commitItem); ok && sel.commit.hash != msg.hash {
+		if sel, ok := m.historyList.SelectedItem().(commitItem); ok && sel.commit.Hash != msg.Hash {
 			return m, nil
 		}
-		m.historyDiff = msg.diff
+		m.historyDiff = msg.Diff
 		m.historyErr = msg.err
 		m.diffScroll = 0
 		return m, nil
@@ -193,8 +193,8 @@ func (m model) updateDeckHistory(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m = m.showResults()
-			m.notice = "restored to " + sel.commit.short
-			return m, restoreDeckCmd(m.deck.slug, sel.commit.hash)
+			m.notice = "restored to " + sel.commit.Short
+			return m, restoreDeckCmd(m.deck.Slug, sel.commit.Hash)
 		}
 	}
 
@@ -213,7 +213,7 @@ func (m model) syncDiff() tea.Cmd {
 	if !ok || m.deck == nil {
 		return nil
 	}
-	return loadDeckDiffCmd(m.deck.slug, sel.commit.hash)
+	return loadDeckDiffCmd(m.deck.Slug, sel.commit.Hash)
 }
 
 // ── View ────────────────────────────────────────────────────────

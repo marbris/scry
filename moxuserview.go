@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/moxfield"
+
 	"fmt"
 	"io"
 	"strings"
@@ -60,7 +62,7 @@ func (d moxDeckDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	if len(dk.Colors) > 0 {
 		parts = append(parts, strings.Join(dk.Colors, ""))
 	}
-	if age := dk.age(); age != "" {
+	if age := dk.Age(); age != "" {
 		parts = append(parts, age)
 	}
 	if !dk.Legal {
@@ -260,4 +262,27 @@ func (m model) viewMoxUser() string {
 	m.moxUserList.SetSize(m.width, m.height-3)
 	hint := m.hintLine(m.width)
 	return lipgloss.JoinVertical(lipgloss.Left, m.moxUserList.View(), errLine, hint)
+}
+
+// The Bubbletea wrappers around package moxfield. The fetching lives there;
+// only the messages are the UI's business.
+
+type moxUserDecksMsg struct {
+	user  string
+	decks []moxUserDeck
+	err   error
+}
+
+func fetchMoxUserDecksCmd(user string) tea.Cmd {
+	return func() tea.Msg {
+		name, decks, err := moxfield.UserDecks(user)
+		return moxUserDecksMsg{user: name, decks: decks, err: err}
+	}
+}
+
+func loadDeckCmd(id string) tea.Cmd {
+	return func() tea.Msg {
+		info, cards, err := moxfield.Load(id)
+		return deckLoadedMsg{info: info, cards: cards, err: err}
+	}
 }

@@ -73,8 +73,8 @@ func (m model) markVisible() (tea.Model, tea.Cmd) {
 		if !ok {
 			continue
 		}
-		if !m.marks[markKey(ci.card)] {
-			m.marks[markKey(ci.card)] = true
+		if !m.marks[markKey(ci.Card)] {
+			m.marks[markKey(ci.Card)] = true
 			added++
 		}
 	}
@@ -202,11 +202,11 @@ func (m model) applyTags(input string) (tea.Model, tea.Cmd) {
 
 	changed, missing := 0, 0
 	for i := range m.deckCards {
-		if !inTargets[markKey(m.deckCards[i].card)] {
+		if !inTargets[markKey(m.deckCards[i].Card)] {
 			continue
 		}
-		before := strings.Join(m.deckCards[i].tags, ",")
-		tags := applyTagEdits(m.deckCards[i].tags, add, remove)
+		before := strings.Join(m.deckCards[i].Tags, ",")
+		tags := applyTagEdits(m.deckCards[i].Tags, add, remove)
 		if strings.Join(tags, ",") != before {
 			m.setTags(i, tags)
 			changed++
@@ -236,34 +236,9 @@ func (m model) applyTags(input string) (tea.Model, tea.Cmd) {
 	return m.deckChanged(on)
 }
 
-// applyTagEdits returns the tags with the additions and removals applied,
-// normalised the way the file stores them.
-func applyTagEdits(tags, add, remove []string) []string {
-	set := map[string]bool{}
-	for _, t := range tags {
-		set[t] = true
-	}
-	for _, t := range add {
-		set[t] = true
-	}
-	for _, t := range remove {
-		delete(set, t)
-	}
-	if len(set) == 0 {
-		return nil
-	}
-
-	out := make([]string, 0, len(set))
-	for t := range set {
-		out = append(out, t)
-	}
-	sort.Strings(out)
-	return out
-}
-
 func (m model) deckIndexOfKey(key string) int {
 	for i, dc := range m.deckCards {
-		if markKey(dc.card) == key {
+		if markKey(dc.Card) == key {
 			return i
 		}
 	}

@@ -276,7 +276,7 @@ func runDeckList() {
 			fmt.Printf("%s  %s\n", nameStyle.Render(slug+pad), dimStyle.Render(err.Error()))
 			continue
 		}
-		total, unique := d.counts()
+		total, unique := d.Counts()
 		fmt.Printf("%s  %s\n", nameStyle.Render(slug+pad), d.Name)
 
 		detail := fmt.Sprintf("%d cards, %d distinct", total, unique)
@@ -370,7 +370,7 @@ func runDeckImport(args []string) {
 		os.Exit(1)
 	}
 
-	total, unique := d.counts()
+	total, unique := d.Counts()
 	fmt.Printf("%s %q — %d cards, %d distinct\n", verb, d.Name, total, unique)
 	fmt.Printf("  %s\n", deckFilePath(slug))
 	if warning != "" {
@@ -407,8 +407,8 @@ func runDeckLog(args []string) {
 	hashStyle := lipgloss.NewStyle().Foreground(gruvYellow)
 	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
 	for _, c := range commits {
-		fmt.Printf("%s  %s\n", hashStyle.Render(c.short), c.subject)
-		fmt.Printf("%s  %s\n", strings.Repeat(" ", len(c.short)), dimStyle.Render(c.when))
+		fmt.Printf("%s  %s\n", hashStyle.Render(c.Short), c.Subject)
+		fmt.Printf("%s  %s\n", strings.Repeat(" ", len(c.Short)), dimStyle.Render(c.When))
 	}
 	fmt.Printf("\n%s\n", dimStyle.Render("scry deck restore "+slug+" <ref>  ·  git -C "+deckRepoPath()+" show <ref>"))
 }
@@ -436,7 +436,7 @@ func runDeckRestore(args []string) {
 		os.Exit(1)
 	}
 
-	total, unique := old.counts()
+	total, unique := old.Counts()
 	fmt.Printf("Restored %s to %s — %d cards, %d distinct\n", slug, ref, total, unique)
 	fmt.Println(lipgloss.NewStyle().Foreground(gruvGray).
 		Render("The version you restored over is still in the history."))

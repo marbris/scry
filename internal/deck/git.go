@@ -1,4 +1,4 @@
-package main
+package deck
 
 import (
 	"fmt"
@@ -19,16 +19,16 @@ import (
 // afterwards, so a machine without git, or a repository in some state we
 // didn't expect, costs you the history and not the deck.
 
-const gitNotInstalled = "git isn't installed — decks are saved, but not versioned"
+const GitNotInstalled = "git isn't installed — decks are saved, but not versioned"
 
 var (
 	gitLookupOnce sync.Once
 	gitPath       string
 )
 
-// gitAvailable reports whether we have a git to shell out to. Looked up
+// GitAvailable reports whether we have a git to shell out to. Looked up
 // once: it can't change while the program is running.
-func gitAvailable() bool {
+func GitAvailable() bool {
 	gitLookupOnce.Do(func() {
 		if p, err := exec.LookPath("git"); err == nil {
 			gitPath = p
@@ -39,11 +39,11 @@ func gitAvailable() bool {
 
 // git runs a git command in the decks directory.
 func git(args ...string) (string, error) {
-	if !gitAvailable() {
+	if !GitAvailable() {
 		return "", fmt.Errorf("git not found")
 	}
 	cmd := exec.Command(gitPath, args...)
-	cmd.Dir = decksDir()
+	cmd.Dir = Dir()
 
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimRight(string(out), "\n")
@@ -65,12 +65,12 @@ func firstLine(s string) string {
 
 // ── The repository ──────────────────────────────────────────────
 
-// ensureDeckRepo makes the decks directory a git repository the first time
+// ensureRepo makes the decks directory a git repository the first time
 // it's needed. If it already sits inside one — someone pointed
 // SCRY_DECKS_DIR at a checkout they keep themselves — that repository is
 // used as it is, rather than nesting a second one inside it.
-func ensureDeckRepo() error {
-	if !gitAvailable() {
+func ensureRepo() error {
+	if !GitAvailable() {
 		return fmt.Errorf("git not found")
 	}
 	if _, err := git("rev-parse", "--git-dir"); err == nil {
@@ -95,15 +95,15 @@ func ensureDeckRepo() error {
 	return nil
 }
 
-// commitDeck records one deck file. Only that file is staged, so a
+// record records one deck file. Only that file is staged, so a
 // repository holding other things — or another deck edited in your editor —
 // is never swept into a commit it didn't ask to be in.
-func commitDeck(slug, message string) error {
-	if err := ensureDeckRepo(); err != nil {
+func record(slug, message string) error {
+	if err := ensureRepo(); err != nil {
 		return err
 	}
 
-	rel := slug + deckFileExt
+	rel := slug + FileExt
 	if _, err := git("add", "--", rel); err != nil {
 		return err
 	}
@@ -118,18 +118,18 @@ func commitDeck(slug, message string) error {
 	return err
 }
 
-// deckHasUncommittedEdits reports whether a tracked deck file differs from
+// HasUncommittedEdits reports whether a tracked deck file differs from
 // what was last committed. An untracked deck has no edits to lose — its
 // first commit records the whole thing anyway.
-func deckHasUncommittedEdits(slug string) bool {
-	if !gitAvailable() || !deckExists(slug) {
+func HasUncommittedEdits(slug string) bool {
+	if !GitAvailable() || !Exists(slug) {
 		return false
 	}
-	if err := ensureDeckRepo(); err != nil {
+	if err := ensureRepo(); err != nil {
 		return false
 	}
 
-	rel := slug + deckFileExt
+	rel := slug + FileExt
 	if _, err := git("ls-files", "--error-unmatch", "--", rel); err != nil {
 		return false // not tracked yet
 	}
@@ -137,34 +137,34 @@ func deckHasUncommittedEdits(slug string) bool {
 	return err != nil
 }
 
-// deleteDeckCommitted removes a deck and records that too, so a deck you
+// DeleteCommitted removes a deck and records that too, so a deck you
 // delete by mistake is still in the history.
-func deleteDeckCommitted(slug string) error {
-	if err := deleteDeck(slug); err != nil {
+func DeleteCommitted(slug string) error {
+	if err := Delete(slug); err != nil {
 		return err
 	}
-	return commitDeck(slug, "Delete "+slug)
+	return record(slug, "Delete "+slug)
 }
 
 // ── History ─────────────────────────────────────────────────────
 
-type deckCommit struct {
-	hash    string
-	short   string
-	when    string // relative, as git prints it
-	subject string
+type Commit struct {
+	Hash    string
+	Short   string
+	When    string // relative, as git prints it
+	Subject string
 }
 
-// deckHistory lists the commits that touched one deck, newest first.
-func deckHistory(slug string, limit int) ([]deckCommit, error) {
-	if err := ensureDeckRepo(); err != nil {
+// History lists the commits that touched one deck, newest first.
+func History(slug string, limit int) ([]Commit, error) {
+	if err := ensureRepo(); err != nil {
 		return nil, err
 	}
 
 	// %x1f is a unit separator — safe in a way that any character a commit
 	// subject might contain is not.
 	out, err := git("log", fmt.Sprintf("-%d", limit),
-		"--format=%H%x1f%h%x1f%cr%x1f%s", "--", slug+deckFileExt)
+		"--format=%H%x1f%h%x1f%cr%x1f%s", "--", slug+FileExt)
 	if err != nil {
 		return nil, err
 	}
@@ -172,40 +172,40 @@ func deckHistory(slug string, limit int) ([]deckCommit, error) {
 		return nil, nil
 	}
 
-	var commits []deckCommit
+	var commits []Commit
 	for _, line := range strings.Split(out, "\n") {
 		f := strings.Split(line, "\x1f")
 		if len(f) != 4 {
 			continue
 		}
-		commits = append(commits, deckCommit{hash: f[0], short: f[1], when: f[2], subject: f[3]})
+		commits = append(commits, Commit{Hash: f[0], Short: f[1], When: f[2], Subject: f[3]})
 	}
 	return commits, nil
 }
 
-// deckDiff is what one commit did to one deck.
-func deckDiff(slug, hash string) (string, error) {
-	return git("show", "--format=%b", "--patch", hash, "--", slug+deckFileExt)
+// Diff is what one commit did to one deck.
+func Diff(slug, hash string) (string, error) {
+	return git("show", "--format=%b", "--patch", hash, "--", slug+FileExt)
 }
 
-// deckAt reads a deck as it stood at a commit.
-func deckAt(slug, hash string) (*deckFile, error) {
-	out, err := git("show", hash+":"+slug+deckFileExt)
+// At reads a deck as it stood at a commit.
+func At(slug, hash string) (*File, error) {
+	out, err := git("show", hash+":"+slug+FileExt)
 	if err != nil {
 		return nil, err
 	}
-	return parseDeckFile(strings.NewReader(out))
+	return ParseFile(strings.NewReader(out))
 }
 
-// restoreDeck brings an old version back as a new commit, rather than
+// Restore brings an old version back as a new commit, rather than
 // rewinding history — the version you restored from is still there, and so
 // is the one you restored over.
-func restoreDeck(slug, hash string) error {
-	old, err := deckAt(slug, hash)
+func Restore(slug, hash string) error {
+	old, err := At(slug, hash)
 	if err != nil {
 		return err
 	}
-	if err := writeDeck(slug, old); err != nil {
+	if err := Write(slug, old); err != nil {
 		return err
 	}
 
@@ -213,38 +213,38 @@ func restoreDeck(slug, hash string) error {
 	if len(short) > 7 {
 		short = short[:7]
 	}
-	return commitDeck(slug, "Restore "+slug+" to "+short)
+	return record(slug, "Restore "+slug+" to "+short)
 }
 
 // ── Saving ──────────────────────────────────────────────────────
 
-// saveDeckVersioned writes a deck and commits it, describing the change in
+// SaveVersioned writes a deck and commits it, describing the change in
 // the commit message. The write comes first and its error is the only one
 // that can fail the save: a deck that's on disk but unversioned is a much
 // better outcome than one that is neither.
 //
 // It returns the commit subject, so the caller can say what it recorded, and
 // a warning for anything that went wrong with git alone.
-func saveDeckVersioned(slug string, d *deckFile) (subject, warning string, err error) {
-	before, _ := readDeck(slug) // nil when the deck is new, which is fine
+func SaveVersioned(slug string, d *File) (subject, warning string, err error) {
+	before, _ := Read(slug) // nil when the deck is new, which is fine
 
 	// A deck file is meant to be edited in your own editor too, and those
 	// edits are only ever committed the next time scry writes. Record them
 	// first, or writing over them would lose them for good — the one thing
 	// keeping the history is supposed to prevent.
-	if deckHasUncommittedEdits(slug) {
-		_ = commitDeck(slug, "Edit "+slug+" outside scry")
+	if HasUncommittedEdits(slug) {
+		_ = record(slug, "Edit "+slug+" outside scry")
 	}
 
-	if err := writeDeck(slug, d); err != nil {
+	if err := Write(slug, d); err != nil {
 		return "", "", err
 	}
 
 	subject = commitSubject(before, d)
-	if !gitAvailable() {
-		return subject, gitNotInstalled, nil
+	if !GitAvailable() {
+		return subject, GitNotInstalled, nil
 	}
-	if err := commitDeck(slug, commitMessage(before, d)); err != nil {
+	if err := record(slug, commitMessage(before, d)); err != nil {
 		return subject, "saved, but not committed: " + err.Error(), nil
 	}
 	return subject, "", nil
@@ -252,31 +252,31 @@ func saveDeckVersioned(slug string, d *deckFile) (subject, warning string, err e
 
 // ── Describing a change ─────────────────────────────────────────
 
-type deckChange struct {
-	added    []string
-	removed  []string
-	requant  []string // quantity changed
-	retagged []string
+type Change struct {
+	Added    []string
+	Removed  []string
+	Requant  []string // quantity changed
+	Retagged []string
 }
 
-func (c deckChange) empty() bool {
-	return len(c.added)+len(c.removed)+len(c.requant)+len(c.retagged) == 0
+func (c Change) Empty() bool {
+	return len(c.Added)+len(c.Removed)+len(c.Requant)+len(c.Retagged) == 0
 }
 
-func (c deckChange) count() int {
-	return len(c.added) + len(c.removed) + len(c.requant) + len(c.retagged)
+func (c Change) Count() int {
+	return len(c.Added) + len(c.Removed) + len(c.Requant) + len(c.Retagged)
 }
 
-// diffDecks works out what happened between two versions of a deck, by card
+// DiffDecks works out what happened between two versions of a deck, by card
 // name — the identity a person thinks in.
-func diffDecks(before, after *deckFile) deckChange {
-	var c deckChange
+func DiffDecks(before, after *File) Change {
+	var c Change
 	if after == nil {
 		return c
 	}
 
-	index := func(d *deckFile) map[string]deckEntry {
-		out := map[string]deckEntry{}
+	index := func(d *File) map[string]Entry {
+		out := map[string]Entry{}
 		if d == nil {
 			return out
 		}
@@ -291,21 +291,21 @@ func diffDecks(before, after *deckFile) deckChange {
 		prev, existed := old[key]
 		switch {
 		case !existed:
-			c.added = append(c.added, e.Name)
+			c.Added = append(c.Added, e.Name)
 		case prev.Qty != e.Qty:
-			c.requant = append(c.requant, e.Name)
+			c.Requant = append(c.Requant, e.Name)
 		case !sameTags(prev.Tags, e.Tags):
-			c.retagged = append(c.retagged, e.Name)
+			c.Retagged = append(c.Retagged, e.Name)
 		}
 	}
 	for key, e := range old {
 		if _, still := now[key]; !still {
-			c.removed = append(c.removed, e.Name)
+			c.Removed = append(c.Removed, e.Name)
 		}
 	}
 
 	// Map iteration is random; a commit message must not be.
-	for _, s := range [][]string{c.added, c.removed, c.requant, c.retagged} {
+	for _, s := range [][]string{c.Added, c.Removed, c.Requant, c.Retagged} {
 		sort.Strings(s)
 	}
 	return c
@@ -326,7 +326,7 @@ func sameTags(a, b []string) bool {
 // commitSubject is the one-line summary of a change. Small changes name the
 // cards, because "+1 Sol Ring" is the whole story; larger ones count them,
 // because forty card names is not a subject line.
-func commitSubject(before, after *deckFile) string {
+func commitSubject(before, after *File) string {
 	if before == nil {
 		name := after.Name
 		if name == "" {
@@ -335,42 +335,42 @@ func commitSubject(before, after *deckFile) string {
 		return "Add " + name
 	}
 
-	c := diffDecks(before, after)
-	if c.empty() {
+	c := DiffDecks(before, after)
+	if c.Empty() {
 		return "Update " + after.Name
 	}
 
-	if c.count() <= 3 {
+	if c.Count() <= 3 {
 		var parts []string
-		for _, n := range c.added {
+		for _, n := range c.Added {
 			parts = append(parts, "+"+n)
 		}
-		for _, n := range c.removed {
+		for _, n := range c.Removed {
 			parts = append(parts, "-"+n)
 		}
-		for _, n := range c.requant {
+		for _, n := range c.Requant {
 			parts = append(parts, "requantify "+n)
 		}
-		for _, n := range c.retagged {
+		for _, n := range c.Retagged {
 			parts = append(parts, "retag "+n)
 		}
 		return strings.Join(parts, ", ")
 	}
 
 	var parts []string
-	if n := len(c.added); n > 0 {
+	if n := len(c.Added); n > 0 {
 		parts = append(parts, fmt.Sprintf("+%d", n))
 	}
-	if n := len(c.removed); n > 0 {
+	if n := len(c.Removed); n > 0 {
 		parts = append(parts, fmt.Sprintf("-%d", n))
 	}
-	if n := len(c.requant); n > 0 {
+	if n := len(c.Requant); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d requantified", n))
 	}
-	if n := len(c.retagged); n > 0 {
+	if n := len(c.Retagged); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d retagged", n))
 	}
-	return strings.Join(parts, ", ") + plural(" card", c.count())
+	return strings.Join(parts, ", ") + plural(" card", c.Count())
 }
 
 func plural(word string, n int) string {
@@ -383,14 +383,14 @@ func plural(word string, n int) string {
 // commitMessage is the subject plus, when the subject had to summarise, the
 // cards it summarised — so `git log` stays skimmable and `git log --format=%b`
 // still tells you exactly what moved.
-func commitMessage(before, after *deckFile) string {
+func commitMessage(before, after *File) string {
 	subject := commitSubject(before, after)
 	if before == nil {
 		return subject
 	}
 
-	c := diffDecks(before, after)
-	if c.count() <= 3 {
+	c := DiffDecks(before, after)
+	if c.Count() <= 3 {
 		return subject
 	}
 
@@ -405,17 +405,17 @@ func commitMessage(before, after *deckFile) string {
 			b.WriteString("  " + n + "\n")
 		}
 	}
-	section("Added:", c.added)
-	section("Removed:", c.removed)
-	section("Quantity changed:", c.requant)
-	section("Retagged:", c.retagged)
+	section("Added:", c.Added)
+	section("Removed:", c.Removed)
+	section("Quantity changed:", c.Requant)
+	section("Retagged:", c.Retagged)
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// deckRepoPath is where the deck repository lives, for the CLI to print.
-func deckRepoPath() string {
+// RepoPath is where the deck repository lives, for the CLI to print.
+func RepoPath() string {
 	if out, err := git("rev-parse", "--show-toplevel"); err == nil && out != "" {
 		return out
 	}
-	return filepath.Clean(decksDir())
+	return filepath.Clean(Dir())
 }

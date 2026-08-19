@@ -61,10 +61,10 @@ func colorRows() []statRow {
 		rows = append(rows, statRow{
 			group: "Color", label: s.label, color: s.color,
 			match: func(ci cardItem) bool {
-				if isLand(ci.card) {
+				if isLand(ci.Card) {
 					return false
 				}
-				for _, c := range ci.card.DisplayColors() {
+				for _, c := range ci.Card.DisplayColors() {
 					if c == code {
 						return true
 					}
@@ -77,13 +77,13 @@ func colorRows() []statRow {
 		statRow{
 			group: "Color", label: "Colorless", color: gruvFgDim,
 			match: func(ci cardItem) bool {
-				return !isLand(ci.card) && len(ci.card.DisplayColors()) == 0
+				return !isLand(ci.Card) && len(ci.Card.DisplayColors()) == 0
 			},
 		},
 		statRow{
 			group: "Color", label: "Multi", color: gruvYellow,
 			match: func(ci cardItem) bool {
-				return !isLand(ci.card) && len(ci.card.DisplayColors()) > 1
+				return !isLand(ci.Card) && len(ci.Card.DisplayColors()) > 1
 			},
 		},
 	)
@@ -104,7 +104,7 @@ func rarityRows(entries []cardItem) []statRow {
 	}
 	var extra []string
 	for _, e := range entries {
-		r := e.card.Rarity
+		r := e.Card.Rarity
 		if r == "" {
 			r = "unknown"
 		}
@@ -125,7 +125,7 @@ func rarityRows(entries []cardItem) []statRow {
 		rows = append(rows, statRow{
 			group: "Rarity", label: rarity, color: col,
 			match: func(ci cardItem) bool {
-				got := ci.card.Rarity
+				got := ci.Card.Rarity
 				if got == "" {
 					got = "unknown"
 				}
@@ -151,10 +151,10 @@ func cmcRows() []statRow {
 		rows = append(rows, statRow{
 			group: "Mana Value", label: label, color: gruvAqua,
 			match: func(ci cardItem) bool {
-				if isLand(ci.card) {
+				if isLand(ci.Card) {
 					return false
 				}
-				cmc := int(ci.card.CMC)
+				cmc := int(ci.Card.CMC)
 				if n == 7 {
 					return cmc >= 7
 				}
@@ -176,7 +176,7 @@ func typeRows() []statRow {
 		rows = append(rows, statRow{
 			group: "Type", label: cardType, color: gruvPurple,
 			match: func(ci cardItem) bool {
-				return strings.Contains(ci.card.TypeLine, cardType)
+				return strings.Contains(ci.Card.TypeLine, cardType)
 			},
 		})
 	}
@@ -189,7 +189,7 @@ func tagRows(entries []cardItem) []statRow {
 	seen := map[string]bool{}
 	var labels []string
 	for _, e := range entries {
-		for _, t := range e.tags {
+		for _, t := range e.Tags {
 			if !seen[t] {
 				seen[t] = true
 				labels = append(labels, t)
@@ -204,7 +204,7 @@ func tagRows(entries []cardItem) []statRow {
 		rows = append(rows, statRow{
 			group: "Tags", label: tag, color: gruvYellow,
 			match: func(ci cardItem) bool {
-				for _, t := range ci.tags {
+				for _, t := range ci.Tags {
 					if t == tag {
 						return true
 					}
@@ -238,7 +238,7 @@ func statGroups(rowSource, counted []cardItem) []statGroup {
 		for _, r := range g.rows {
 			for _, e := range rowSource {
 				if r.match(e) {
-					r.base += e.qty
+					r.base += e.Qty
 				}
 			}
 			// A category nothing in the deck has ever matched is left out
@@ -248,7 +248,7 @@ func statGroups(rowSource, counted []cardItem) []statGroup {
 			}
 			for _, e := range counted {
 				if r.match(e) {
-					r.count += e.qty
+					r.count += e.Qty
 				}
 			}
 			kept = append(kept, r)
@@ -320,7 +320,7 @@ func (m model) renderStats(maxW int) string {
 
 	total := 0
 	for _, e := range m.getVisibleEntries() {
-		total += e.qty
+		total += e.Qty
 	}
 
 	if maxW < 30 {
@@ -421,8 +421,8 @@ func toEntries(items []list.Item) []cardItem {
 		if !ok {
 			continue
 		}
-		if ci.qty < 1 {
-			ci.qty = 1
+		if ci.Qty < 1 {
+			ci.Qty = 1
 		}
 		entries = append(entries, ci)
 	}

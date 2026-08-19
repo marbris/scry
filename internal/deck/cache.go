@@ -1,6 +1,12 @@
-package main
+package deck
 
 import (
+	"scry/internal/scryfall"
+
+	"scry/internal/paths"
+
+	"scry/internal/mtg"
+
 	"encoding/json"
 	"fmt"
 	"os"
@@ -22,18 +28,18 @@ import (
 const cardCacheFile = "cards.json"
 
 type cardCache struct {
-	cards map[string]ScryfallCard
+	cards map[string]mtg.Card
 	dirty bool
 }
 
-func cardCachePath() string {
-	return filepath.Join(dataDir(), cardCacheFile)
+func CachePath() string {
+	return filepath.Join(paths.Data(), cardCacheFile)
 }
 
 // entryKey is what a deck line resolves by: a pinned printing if it has one,
 // otherwise just the name. Lowercased, so "sol ring" and "Sol Ring" share an
 // entry.
-func entryKey(e deckEntry) string {
+func entryKey(e Entry) string {
 	if e.Set != "" && e.Collector != "" {
 		return strings.ToLower(e.Set + "/" + e.Collector)
 	}
@@ -53,26 +59,26 @@ func searchableName(name string) string {
 }
 
 func loadCardCache() *cardCache {
-	c := &cardCache{cards: map[string]ScryfallCard{}}
+	c := &cardCache{cards: map[string]mtg.Card{}}
 
-	body, err := os.ReadFile(cardCachePath())
+	body, err := os.ReadFile(CachePath())
 	if err != nil {
 		return c
 	}
 	// A cache written by a different version, or half-written, is simply
 	// dropped — everything in it can be fetched again.
 	if err := json.Unmarshal(body, &c.cards); err != nil {
-		c.cards = map[string]ScryfallCard{}
+		c.cards = map[string]mtg.Card{}
 	}
 	return c
 }
 
-func (c *cardCache) get(e deckEntry) (ScryfallCard, bool) {
+func (c *cardCache) get(e Entry) (mtg.Card, bool) {
 	card, ok := c.cards[entryKey(e)]
 	return card, ok
 }
 
-func (c *cardCache) put(e deckEntry, card ScryfallCard) {
+func (c *cardCache) put(e Entry, card mtg.Card) {
 	c.cards[entryKey(e)] = card
 	c.dirty = true
 }
@@ -87,7 +93,7 @@ func (c *cardCache) save() error {
 		return err
 	}
 
-	path := cardCachePath()
+	path := CachePath()
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+cardCacheFile+".*")
 	if err != nil {
 		return err
@@ -113,23 +119,23 @@ func (c *cardCache) save() error {
 
 // ── Resolving ───────────────────────────────────────────────────
 
-// unresolvedError lists the deck lines Scryfall didn't recognise. The deck
+// UnresolvedError lists the deck lines Scryfall didn't recognise. The deck
 // still opens — the cards it did resolve are worth showing — so this is
 // reported alongside the result rather than instead of it.
-type unresolvedError struct{ names []string }
+type UnresolvedError struct{ Names []string }
 
-func (e unresolvedError) Error() string {
-	if len(e.names) == 1 {
-		return fmt.Sprintf("no card named %q", e.names[0])
+func (e UnresolvedError) Error() string {
+	if len(e.Names) == 1 {
+		return fmt.Sprintf("no card named %q", e.Names[0])
 	}
-	return fmt.Sprintf("%d cards not found: %s", len(e.names), strings.Join(e.names, ", "))
+	return fmt.Sprintf("%d cards not found: %s", len(e.Names), strings.Join(e.Names, ", "))
 }
 
-// resolveEntries turns deck lines into cards, taking what it can from the
+// Resolve turns deck lines into cards, taking what it can from the
 // cache and fetching the rest in one batch. Entries that resolve are
 // returned even when others don't; the misses come back as an
-// unresolvedError so the caller can show both.
-func resolveEntries(entries []deckEntry) ([]deckCard, error) {
+// UnresolvedError so the caller can show both.
+func Resolve(entries []Entry) ([]Card, error) {
 	cache := loadCardCache()
 
 	// Only the entries the cache can't answer go to Scryfall, and each
@@ -155,7 +161,7 @@ func resolveEntries(entries []deckEntry) ([]deckCard, error) {
 	// if something actually went unresolved because of it.
 	var fetchErr error
 	if len(idents) > 0 {
-		found, _, err := fetchIdentifiers(idents)
+		found, _, err := scryfall.Identifiers(idents)
 		if err != nil {
 			fetchErr = err
 		} else {
@@ -173,7 +179,7 @@ func resolveEntries(entries []deckEntry) ([]deckCard, error) {
 		}
 	}
 
-	cards := make([]deckCard, 0, len(entries))
+	cards := make([]Card, 0, len(entries))
 	var missing []string
 	for _, e := range entries {
 		card, ok := cache.get(e)
@@ -181,11 +187,11 @@ func resolveEntries(entries []deckEntry) ([]deckCard, error) {
 			missing = append(missing, e.Name)
 			continue
 		}
-		cards = append(cards, deckCard{
-			card:      card,
-			qty:       e.Qty,
-			commander: e.commander(),
-			tags:      e.Tags,
+		cards = append(cards, Card{
+			Card:      card,
+			Qty:       e.Qty,
+			Commander: e.commander(),
+			Tags:      e.Tags,
 		})
 	}
 
@@ -196,7 +202,7 @@ func resolveEntries(entries []deckEntry) ([]deckCard, error) {
 			return cards, fetchErr
 		}
 		sort.Strings(missing)
-		return cards, unresolvedError{names: missing}
+		return cards, UnresolvedError{Names: missing}
 	}
 	return cards, nil
 }
@@ -205,14 +211,14 @@ func resolveEntries(entries []deckEntry) ([]deckCard, error) {
 // Scryfall answers a batch in its own order, and a name lookup comes back
 // under the card's full name, so a request for "Fire" returns "Fire // Ice".
 type cardIndex struct {
-	byName     map[string]ScryfallCard
-	byPrinting map[string]ScryfallCard
+	byName     map[string]mtg.Card
+	byPrinting map[string]mtg.Card
 }
 
-func indexCards(cards []ScryfallCard) cardIndex {
+func indexCards(cards []mtg.Card) cardIndex {
 	idx := cardIndex{
-		byName:     make(map[string]ScryfallCard, len(cards)),
-		byPrinting: make(map[string]ScryfallCard, len(cards)),
+		byName:     make(map[string]mtg.Card, len(cards)),
+		byPrinting: make(map[string]mtg.Card, len(cards)),
 	}
 	for _, c := range cards {
 		name := strings.ToLower(c.Name)
@@ -234,7 +240,7 @@ func indexCards(cards []ScryfallCard) cardIndex {
 	return idx
 }
 
-func (idx cardIndex) lookup(e deckEntry) (ScryfallCard, bool) {
+func (idx cardIndex) lookup(e Entry) (mtg.Card, bool) {
 	if e.Set != "" && e.Collector != "" {
 		c, ok := idx.byPrinting[strings.ToLower(e.Set+"/"+e.Collector)]
 		return c, ok

@@ -4,7 +4,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/charmbracelet/x/term"
 )
@@ -93,20 +92,12 @@ func stdoutWidth() int {
 	return w
 }
 
-// slugify turns a deck's title into a name worth typing: "Winota:
-// Snowball Stax" becomes "winota-snowball-stax".
-func slugify(name string) string {
-	var b strings.Builder
-	lastDash := true // no leading dash
-	for _, r := range strings.ToLower(name) {
-		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r):
-			b.WriteRune(r)
-			lastDash = false
-		case !lastDash:
-			b.WriteRune('-')
-			lastDash = true
-		}
+// plural is the same six lines as in package deck and package moxfield.
+// Three copies beats a package for one grammar rule, or exporting it from
+// somewhere it doesn't belong.
+func plural(word string, n int) string {
+	if n == 1 {
+		return word
 	}
-	return strings.Trim(b.String(), "-")
+	return word + "s"
 }

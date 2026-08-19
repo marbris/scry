@@ -72,7 +72,7 @@ func sortItems(items []list.Item, s cardSort) []list.Item {
 		if !aok || !bok {
 			return false
 		}
-		return less(a.card, b.card)
+		return less(a.Card, b.Card)
 	})
 	return out
 }

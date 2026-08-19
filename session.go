@@ -52,10 +52,10 @@ func saveSession(s session) error {
 // coming back to.
 func (m model) currentSession() session {
 	s := session{Query: m.lastQuery}
-	if m.deck != nil && m.deck.local() {
+	if m.deck != nil && m.deck.Local() {
 		// A deck browsed off Moxfield isn't yours and might not be there
 		// tomorrow; only one of your own is worth reopening.
-		s.Deck = m.deck.slug
+		s.Deck = m.deck.Slug
 	}
 	return s
 }

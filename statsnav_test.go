@@ -15,12 +15,12 @@ func TestLandsAreOutOfTheCurveAndTheColours(t *testing.T) {
 	// deck were full of colourless spells. The type breakdown already says
 	// how many lands there are, and says it better.
 	items := []list.Item{
-		cardItem{card: ScryfallCard{Name: "Command Tower", TypeLine: "Land", CMC: 0}, qty: 1},
-		cardItem{card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains", CMC: 0}, qty: 30},
-		cardItem{card: ScryfallCard{Name: "Sol Ring", TypeLine: "Artifact", CMC: 1}, qty: 1},
-		cardItem{card: ScryfallCard{
+		cardItem{Card: ScryfallCard{Name: "Command Tower", TypeLine: "Land", CMC: 0}, Qty: 1},
+		cardItem{Card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains", CMC: 0}, Qty: 30},
+		cardItem{Card: ScryfallCard{Name: "Sol Ring", TypeLine: "Artifact", CMC: 1}, Qty: 1},
+		cardItem{Card: ScryfallCard{
 			Name: "Serra Angel", TypeLine: "Creature — Angel", CMC: 5, Colors: []string{"W"},
-		}, qty: 1},
+		}, Qty: 1},
 	}
 	entries := toEntries(items)
 
@@ -32,7 +32,7 @@ func TestLandsAreOutOfTheCurveAndTheColours(t *testing.T) {
 			var n int
 			for _, ci := range entries {
 				if r.match(ci) {
-					n += ci.qty
+					n += ci.Qty
 				}
 			}
 			return n
@@ -58,10 +58,10 @@ func TestLandsAreOutOfTheCurveAndTheColours(t *testing.T) {
 func TestStatGroupsSayTheyExcludeLands(t *testing.T) {
 	// The reader has to be told, or the numbers look wrong.
 	entries := toEntries([]list.Item{
-		cardItem{card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains"}, qty: 30},
-		cardItem{card: ScryfallCard{
+		cardItem{Card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains"}, Qty: 30},
+		cardItem{Card: ScryfallCard{
 			Name: "Serra Angel", TypeLine: "Creature — Angel", CMC: 5, Colors: []string{"W"},
-		}, qty: 1},
+		}, Qty: 1},
 	})
 
 	var titles []string
@@ -153,7 +153,7 @@ func TestCommanderFlagWinsTheSlot(t *testing.T) {
 	// A deck card can be a commander and be in the search results at once.
 	// There's one slot, and the commander is the more important of the two.
 	d := compactDelegate{inOther: map[string]bool{"ghen": true}}
-	both := cardItem{card: ScryfallCard{Name: "Ghen"}, commander: true}
+	both := cardItem{Card: ScryfallCard{Name: "Ghen"}, Commander: true}
 	if got := stripANSI(d.gutter(both)); !strings.Contains(got, "★") {
 		t.Errorf("gutter = %q, want the commander flag", got)
 	}

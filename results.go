@@ -51,7 +51,7 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.totalCards = msg.totalCards
 		items := make([]list.Item, len(msg.cards))
 		for i, c := range msg.cards {
-			items[i] = cardItem{card: c}
+			items[i] = cardItem{Card: c}
 		}
 		m.results.setItems(items)
 		m.previewScroll = 0
@@ -97,9 +97,9 @@ func (m model) updateResults(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.results.empty() {
 			m.cards = make([]ScryfallCard, 0, len(msg.cards))
 			for _, dc := range msg.cards {
-				m.cards = append(m.cards, dc.card)
+				m.cards = append(m.cards, dc.Card)
 			}
-			m.totalCards = info.total
+			m.totalCards = info.Total
 		}
 
 		m = m.setFocus(focusDeck)
@@ -200,14 +200,14 @@ func (m model) saveCurrentDeck() model {
 		m.notice = "nothing to save — open a deck first"
 		return m
 	}
-	if m.deck.local() {
-		m.notice = fmt.Sprintf("already saved · %s", m.deck.slug)
+	if m.deck.Local() {
+		m.notice = fmt.Sprintf("already saved · %s", m.deck.Slug)
 		return m
 	}
 
-	slug := slugify(m.deck.name)
+	slug := slugify(m.deck.Name)
 	if slug == "" {
-		slug = m.deck.id
+		slug = m.deck.ID
 	}
 
 	// Re-importing an existing deck is how you pull changes down from
@@ -306,7 +306,7 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if item, ok := m.active().selected(); ok {
-				return m.openRulesBrowser(m.cardRuleItems(item.card), item.card.Name)
+				return m.openRulesBrowser(m.cardRuleItems(item.Card), item.Card.Name)
 			}
 			return m, nil
 		case "t":
@@ -391,7 +391,7 @@ func (m model) syncHover() (model, tea.Cmd) {
 		return m, nil
 	}
 
-	key := cardKey(item.card)
+	key := cardKey(item.Card)
 	if key == m.hoverKey {
 		return m, nil
 	}
@@ -410,7 +410,7 @@ func (m model) syncHover() (model, tea.Cmd) {
 
 	m.hoverSeq++
 	seq := m.hoverSeq
-	uri := item.card.RulingsURI
+	uri := item.Card.RulingsURI
 	return m, tea.Tick(rulingsDelay, func(time.Time) tea.Msg {
 		return rulingsTickMsg{key: key, uri: uri, seq: seq}
 	})
@@ -605,11 +605,11 @@ func (m model) resultsHeader() string {
 		if !padded {
 			label = lipgloss.NewStyle().Foreground(gruvAqua).Bold(true).Render("  Deck ")
 		}
-		b.WriteString(label + valueStyle.Render(truncate(m.deck.name, 40)))
-		if by := m.deck.author; by != "" {
+		b.WriteString(label + valueStyle.Render(truncate(m.deck.Name, 40)))
+		if by := m.deck.Author; by != "" {
 			b.WriteString(dimStyle.Render("  by " + by))
 		}
-		if f := m.deck.format; f != "" {
+		if f := m.deck.Format; f != "" {
 			b.WriteString(dimStyle.Render("  · " + f))
 		}
 	}
@@ -665,9 +665,9 @@ func (m model) resultsSummary() string {
 
 	// A deck counts copies, so 99 cards can be 63 distinct ones.
 	if m.deckInMainList() {
-		out := valueStyle.Render(fmt.Sprintf("%d cards", m.deck.total))
-		if m.deck.unique != m.deck.total {
-			out += dimStyle.Render(fmt.Sprintf(" · %d unique", m.deck.unique))
+		out := valueStyle.Render(fmt.Sprintf("%d cards", m.deck.Total))
+		if m.deck.Unique != m.deck.Total {
+			out += dimStyle.Render(fmt.Sprintf(" · %d unique", m.deck.Unique))
 		}
 		if m.active().list.FilterState() != list.Unfiltered {
 			out += dimStyle.Render(fmt.Sprintf("  (%d filtered)", len(m.active().list.VisibleItems())))
@@ -820,8 +820,8 @@ func (m model) deckBox(content string, w, h int) string {
 
 	title, counts := "Deck", ""
 	if m.deck != nil {
-		counts = fmt.Sprintf(" %d · %d", m.deck.total, m.deck.unique)
-		title = truncate(m.deck.name, inner-runeLen(counts))
+		counts = fmt.Sprintf(" %d · %d", m.deck.Total, m.deck.Unique)
+		title = truncate(m.deck.Name, inner-runeLen(counts))
 	}
 
 	// The caption carries the focus too: filled in when the column is
@@ -856,11 +856,11 @@ func (m model) panelContent(inner int) string {
 	case panelStats:
 		return m.renderStats(inner)
 	case panelRules:
-		return m.renderCardRules(card.card, inner)
+		return m.renderCardRules(card.Card, inner)
 	case panelHistory:
-		return m.renderTextHistory(card.card, inner)
+		return m.renderTextHistory(card.Card, inner)
 	default:
-		return m.renderPreview(card.card, inner)
+		return m.renderPreview(card.Card, inner)
 	}
 }
 

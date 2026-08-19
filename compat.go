@@ -1,7 +1,9 @@
 package main
 
 import (
+	"scry/internal/deck"
 	"scry/internal/fetch"
+	"scry/internal/moxfield"
 	"scry/internal/mtg"
 	"scry/internal/paths"
 	"scry/internal/rules"
@@ -78,6 +80,68 @@ var (
 	doGet  = fetch.Get
 	doPost = fetch.Post
 	hostOf = fetch.Host
+)
+
+// ── Decks ───────────────────────────────────────────────────────
+
+type (
+	deckFile   = deck.File
+	deckEntry  = deck.Entry
+	deckInfo   = deck.Info
+	deckCard   = deck.Card
+	deckCommit = deck.Commit
+	deckChange = deck.Change
+
+	unresolvedError = deck.UnresolvedError
+)
+
+var (
+	readDeck                = deck.Read
+	writeDeck               = deck.Write
+	deleteDeck              = deck.Delete
+	deleteDeckCommitted     = deck.DeleteCommitted
+	listDecks               = deck.List
+	deckExists              = deck.Exists
+	newDeck                 = deck.New
+	decksDir                = deck.Dir
+	deckFilePath            = deck.Path
+	parseDeckFile           = deck.ParseFile
+	resolveEntries          = deck.Resolve
+	deckFileFrom            = deck.FileFrom
+	openLocalDeck           = deck.Open
+	slugify                 = deck.Slugify
+	gitAvailable            = deck.GitAvailable
+	deckHistory             = deck.History
+	deckDiff                = deck.Diff
+	deckAt                  = deck.At
+	restoreDeck             = deck.Restore
+	saveDeckVersioned       = deck.SaveVersioned
+	diffDecks               = deck.DiffDecks
+	deckHasUncommittedEdits = deck.HasUncommittedEdits
+	deckRepoPath            = deck.RepoPath
+	applyTagEdits           = deck.ApplyTagEdits
+)
+
+const (
+	defaultFormat   = deck.DefaultFormat
+	gitNotInstalled = deck.GitNotInstalled
+)
+
+// ── Moxfield ────────────────────────────────────────────────────
+
+type (
+	moxDeck     = moxfield.Deck
+	moxUserDeck = moxfield.UserDeck
+)
+
+var (
+	moxfieldURLID    = moxfield.URLID
+	deckRef          = moxfield.Ref
+	fetchMoxfield    = moxfield.Fetch
+	importMoxfield   = moxfield.Import
+	loadDeck         = moxfield.Load
+	moxfieldUserName = moxfield.UserName
+	moxDeckToFile    = moxfield.ToFile
 )
 
 // ── Files ───────────────────────────────────────────────────────

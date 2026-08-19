@@ -110,7 +110,7 @@ func TestLeaderInTheSearchBarOnlyWhenEmpty(t *testing.T) {
 
 	// With a query typed, a comma is a comma — card names have them.
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
-	for _, r := range `name:"Ghen` {
+	for _, r := range `Name:"Ghen` {
 		m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
 	}
 	m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(leaderKey)})
@@ -264,7 +264,7 @@ func TestHintLineFollowsFocusNotTheDeck(t *testing.T) {
 		m = drive(m, searchResultMsg{cards: testCards(), totalCards: 3})
 		if withDeck {
 			m = drive(m, deckLoadedMsg{
-				info:  deckInfo{name: "Ghen", slug: "ghen", total: 10},
+				info:  deckInfo{Name: "Ghen", Slug: "ghen", Total: 10},
 				cards: deckFixture(),
 			})
 		}

@@ -124,7 +124,7 @@ func TestImportedDeckIsWellFormed(t *testing.T) {
 		t.Errorf("read back %d entries, wrote %d", len(back.Entries), len(d.Entries))
 	}
 
-	total, unique := back.counts()
+	total, unique := back.Counts()
 	if total != 10 || unique != 4 {
 		t.Errorf("counts = (%d, %d), want (10, 4)", total, unique)
 	}
@@ -151,18 +151,18 @@ func TestDeckFileFromOpenDeck(t *testing.T) {
 	// What w does: turn the deck on screen back into a file, without
 	// going near the network.
 	info := deckInfo{
-		name:   "Winota: Snowball Stax",
-		format: "commander",
-		url:    "https://moxfield.com/decks/Y8dZ7",
+		Name:   "Winota: Snowball Stax",
+		Format: "commander",
+		URL:    "https://moxfield.com/decks/Y8dZ7",
 	}
 	cards := []deckCard{
-		{card: ScryfallCard{Name: "Winota, Joiner of Forces"}, qty: 1, commander: true, tags: []string{"wincon"}},
-		{card: ScryfallCard{Name: "Sol Ring"}, qty: 1, tags: []string{"ramp"}},
-		{card: ScryfallCard{Name: "Plains"}, qty: 7},
+		{Card: ScryfallCard{Name: "Winota, Joiner of Forces"}, Qty: 1, Commander: true, Tags: []string{"wincon"}},
+		{Card: ScryfallCard{Name: "Sol Ring"}, Qty: 1, Tags: []string{"ramp"}},
+		{Card: ScryfallCard{Name: "Plains"}, Qty: 7},
 	}
 
 	d := deckFileFrom(info, cards)
-	if d.Name != info.name || d.Format != info.format || d.Source != info.url {
+	if d.Name != info.Name || d.Format != info.Format || d.Source != info.URL {
 		t.Errorf("header lost: %+v", d)
 	}
 	if len(d.Entries) != 3 {
@@ -216,10 +216,10 @@ func TestDeckRefDoesNotSwallowDeckNames(t *testing.T) {
 func TestDeckInfoLocal(t *testing.T) {
 	// A deck read from a file can be edited; one being browsed off Moxfield
 	// is somebody else's.
-	if !(deckInfo{slug: "ghen"}).local() {
+	if !(deckInfo{Slug: "ghen"}).Local() {
 		t.Error("a deck with a slug should be local")
 	}
-	if (deckInfo{url: "https://moxfield.com/decks/AbC123"}).local() {
+	if (deckInfo{URL: "https://moxfield.com/decks/AbC123"}).Local() {
 		t.Error("a deck with only a URL should not be local")
 	}
 }
@@ -257,14 +257,14 @@ format: commander
 		t.Fatalf("openLocalDeck: %v", err)
 	}
 
-	if info.slug != "winota" || !info.local() {
+	if info.Slug != "winota" || !info.Local() {
 		t.Errorf("info = %+v, want a local deck", info)
 	}
-	if info.name != "Winota" || info.format != "commander" {
+	if info.Name != "Winota" || info.Format != "commander" {
 		t.Errorf("info header = %+v", info)
 	}
-	if info.total != 9 || info.unique != 3 {
-		t.Errorf("counts = (%d, %d), want (9, 3)", info.total, info.unique)
+	if info.Total != 9 || info.Unique != 3 {
+		t.Errorf("counts = (%d, %d), want (9, 3)", info.Total, info.Unique)
 	}
 
 	// The maybeboard is a shortlist, so it isn't resolved or shown, and its
@@ -273,14 +273,14 @@ format: commander
 		t.Fatalf("got %d cards, want 3 (the maybeboard should be left out)", len(cards))
 	}
 	for _, c := range cards {
-		if c.card.Name == "Some Card I Am Considering" {
+		if c.Card.Name == "Some Card I Am Considering" {
 			t.Error("the maybeboard was loaded into the deck")
 		}
 	}
 
 	var commanders int
 	for _, c := range cards {
-		if c.commander {
+		if c.Commander {
 			commanders++
 		}
 	}
@@ -297,8 +297,8 @@ func TestLocalDeckInTheApp(t *testing.T) {
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m = drive(m, deckLoadedMsg{
 		info: deckInfo{
-			name: "Ghen reanimator", format: "commander", slug: "ghen",
-			url: "https://moxfield.com/decks/AbC123", total: 100,
+			Name: "Ghen reanimator", Format: "commander", Slug: "ghen",
+			URL: "https://moxfield.com/decks/AbC123", Total: 100,
 		},
 		cards: deckFixture(),
 	})
@@ -336,9 +336,9 @@ func TestDeckLoadWithUnresolvedCardsStillOpens(t *testing.T) {
 	// Cards that wouldn't resolve are worth a notice, but the deck still
 	// has to open — the rest of it is fine.
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Ghen reanimator", slug: "ghen", total: 100},
+		info:  deckInfo{Name: "Ghen reanimator", Slug: "ghen", Total: 100},
 		cards: deckFixture(),
-		err:   unresolvedError{names: []string{"Nonesuch"}},
+		err:   unresolvedError{Names: []string{"Nonesuch"}},
 	})
 
 	if m.deck == nil {
@@ -354,7 +354,7 @@ func TestDeckLoadWithUnresolvedCardsStillOpens(t *testing.T) {
 	// With nothing resolved at all there's no deck to show, so it is an error.
 	m2 := initialModel()
 	m2 = drive(m2, tea.WindowSizeMsg{Width: 160, Height: 40})
-	m2 = drive(m2, deckLoadedMsg{err: unresolvedError{names: []string{"Nonesuch"}}})
+	m2 = drive(m2, deckLoadedMsg{err: unresolvedError{Names: []string{"Nonesuch"}}})
 	if m2.err == nil {
 		t.Error("a deck with no cards at all should be an error")
 	}

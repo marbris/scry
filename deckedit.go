@@ -35,7 +35,7 @@ func (m model) editable() (bool, string) {
 	switch {
 	case m.deck == nil:
 		return false, "no deck open — ,d to pick one, ,n for a new one"
-	case !m.deck.local():
+	case !m.deck.Local():
 		return false, "this deck is Moxfield's — ,i to make it yours first"
 	}
 	return true, ""
@@ -45,7 +45,7 @@ func (m model) editable() (bool, string) {
 func (m model) deckIndexOf(name string) int {
 	name = strings.ToLower(name)
 	for i, dc := range m.deckCards {
-		if strings.ToLower(dc.card.Name) == name {
+		if strings.ToLower(dc.Card.Name) == name {
 			return i
 		}
 	}
@@ -55,7 +55,7 @@ func (m model) deckIndexOf(name string) int {
 // selectedCard is the card under the cursor in whichever list has focus.
 func (m model) selectedCard() (ScryfallCard, bool) {
 	it, ok := m.active().selected()
-	return it.card, ok
+	return it.Card, ok
 }
 
 // addToDeck puts the selected card in the deck. A card already there isn't
@@ -77,7 +77,7 @@ func (m model) addToDeck() (tea.Model, tea.Cmd) {
 	}
 
 	m.pushUndo("+1 " + card.Name)
-	m.deckCards = append(m.deckCards, deckCard{card: card, qty: 1})
+	m.deckCards = append(m.deckCards, deckCard{Card: card, Qty: 1})
 	m.notice = "+1 " + card.Name
 	return m.deckChanged(card.Name)
 }
@@ -109,10 +109,10 @@ func (m model) removeFromDeck() (tea.Model, tea.Cmd) {
 			at := m.deckPane.list.Index()
 			if at+1 < len(items) {
 				if ci, ok := items[at+1].(cardItem); ok {
-					next = ci.card.Name
+					next = ci.Card.Name
 				}
 			} else if ci, ok := items[at-1].(cardItem); ok {
-				next = ci.card.Name
+				next = ci.Card.Name
 			}
 		}
 	}
@@ -144,14 +144,14 @@ func (m model) changeQty(delta int) (tea.Model, tea.Cmd) {
 		return m.addToDeck()
 	}
 
-	qty := m.deckCards[i].qty + delta
+	qty := m.deckCards[i].Qty + delta
 	if qty < 1 {
 		return m.removeFromDeck()
 	}
 
-	m.pushUndo(fmt.Sprintf("%dx %s", m.deckCards[i].qty, card.Name))
+	m.pushUndo(fmt.Sprintf("%dx %s", m.deckCards[i].Qty, card.Name))
 	m.deckCards = append([]deckCard(nil), m.deckCards...)
-	m.deckCards[i].qty = qty
+	m.deckCards[i].Qty = qty
 	m.notice = fmt.Sprintf("%dx %s", qty, card.Name)
 	return m.deckChanged(card.Name)
 }
@@ -176,15 +176,15 @@ func (m model) toggleCommander() (tea.Model, tea.Cmd) {
 	i := m.deckIndexOf(card.Name)
 	if i < 0 {
 		m.pushUndo("+1 " + card.Name + " · commander")
-		m.deckCards = append(m.deckCards, deckCard{card: card, qty: 1, commander: true})
+		m.deckCards = append(m.deckCards, deckCard{Card: card, Qty: 1, Commander: true})
 		m.notice = "+1 " + card.Name + " · commander"
 		return m.deckChanged(card.Name)
 	}
 
 	m.pushUndo(card.Name + " · commander")
 	m.deckCards = append([]deckCard(nil), m.deckCards...)
-	m.deckCards[i].commander = !m.deckCards[i].commander
-	if m.deckCards[i].commander {
+	m.deckCards[i].Commander = !m.deckCards[i].Commander
+	if m.deckCards[i].Commander {
 		m.notice = card.Name + " · commander"
 	} else {
 		m.notice = card.Name + " · no longer a commander"
@@ -196,7 +196,7 @@ func (m model) toggleCommander() (tea.Model, tea.Cmd) {
 // this, a card at a time.
 func (m *model) setTags(index int, tags []string) {
 	m.deckCards = append([]deckCard(nil), m.deckCards...)
-	m.deckCards[index].tags = tags
+	m.deckCards[index].Tags = tags
 }
 
 // ── Undo ────────────────────────────────────────────────────────
@@ -254,11 +254,11 @@ func (m model) undoLast() (tea.Model, tea.Cmd) {
 func (m model) deckChanged(keepOn string) (tea.Model, tea.Cmd) {
 	total, unique := 0, 0
 	for _, dc := range m.deckCards {
-		total += dc.qty
+		total += dc.Qty
 		unique++
 	}
 	info := *m.deck
-	info.total, info.unique = total, unique
+	info.Total, info.Unique = total, unique
 	m.deck = &info
 
 	// Remember the typed filter: rebuilding the list drops it, and losing
@@ -285,7 +285,7 @@ func (m model) deckChanged(keepOn string) (tea.Model, tea.Cmd) {
 // selectCard puts the cursor on a named card, if it's still in the list.
 func selectCard(p *pane, name string) {
 	for i, it := range p.list.VisibleItems() {
-		if ci, ok := it.(cardItem); ok && ci.card.Name == name {
+		if ci, ok := it.(cardItem); ok && ci.Card.Name == name {
 			p.list.Select(i)
 			return
 		}
@@ -297,7 +297,7 @@ func selectCard(p *pane, name string) {
 // saveDeckNow writes the deck and commits it. Used both by the debounce and
 // by anything that can't wait for it — quitting, most importantly.
 func (m model) saveDeckNow() (model, tea.Cmd) {
-	if m.deck == nil || !m.deck.local() {
+	if m.deck == nil || !m.deck.Local() {
 		ok, why := m.editable()
 		if !ok {
 			m.notice = why
@@ -305,12 +305,12 @@ func (m model) saveDeckNow() (model, tea.Cmd) {
 		return m, nil
 	}
 	if !m.deckDirty {
-		m.notice = "nothing to write — " + m.deck.slug + " is up to date"
+		m.notice = "nothing to write — " + m.deck.Slug + " is up to date"
 		return m, nil
 	}
 	m.deckDirty = false
 
-	slug := m.deck.slug
+	slug := m.deck.Slug
 	file := deckFileFrom(*m.deck, m.deckCards)
 	return m, func() tea.Msg {
 		subject, warning, err := saveDeckVersioned(slug, file)
@@ -322,11 +322,11 @@ func (m model) saveDeckNow() (model, tea.Cmd) {
 // run a command after tea.Quit, so this one happens inline: an edit made two
 // seconds before quitting is still an edit.
 func (m *model) flushDeck() {
-	if !m.deckDirty || m.deck == nil || !m.deck.local() {
+	if !m.deckDirty || m.deck == nil || !m.deck.Local() {
 		return
 	}
 	m.deckDirty = false
-	_, _, _ = saveDeckVersioned(m.deck.slug, deckFileFrom(*m.deck, m.deckCards))
+	_, _, _ = saveDeckVersioned(m.deck.Slug, deckFileFrom(*m.deck, m.deckCards))
 }
 
 // quitAfterSaving is tea.Quit with any unsaved edit written first, and the

@@ -16,15 +16,15 @@ func taggableDeck(t *testing.T) model {
 	gitRepo(t)
 
 	cards := []deckCard{
-		{card: ScryfallCard{Name: "Dragonlord Ojutai", TypeLine: "Creature — Dragon", OracleText: "Flying\nHexproof"}, qty: 1},
-		{card: ScryfallCard{Name: "Goldspan Dragon", TypeLine: "Creature — Dragon", OracleText: "Flying, haste"}, qty: 1},
-		{card: ScryfallCard{Name: "Serra Angel", TypeLine: "Creature — Angel", OracleText: "Flying, vigilance"}, qty: 1},
-		{card: ScryfallCard{Name: "Sol Ring", TypeLine: "Artifact", OracleText: "{T}: Add {C}{C}."}, qty: 1, tags: []string{"ramp"}},
-		{card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains"}, qty: 7},
+		{Card: ScryfallCard{Name: "Dragonlord Ojutai", TypeLine: "Creature — Dragon", OracleText: "Flying\nHexproof"}, Qty: 1},
+		{Card: ScryfallCard{Name: "Goldspan Dragon", TypeLine: "Creature — Dragon", OracleText: "Flying, haste"}, Qty: 1},
+		{Card: ScryfallCard{Name: "Serra Angel", TypeLine: "Creature — Angel", OracleText: "Flying, vigilance"}, Qty: 1},
+		{Card: ScryfallCard{Name: "Sol Ring", TypeLine: "Artifact", OracleText: "{T}: Add {C}{C}."}, Qty: 1, Tags: []string{"ramp"}},
+		{Card: ScryfallCard{Name: "Plains", TypeLine: "Basic Land — Plains"}, Qty: 7},
 	}
 
 	seedCache(t, map[string]ScryfallCard{})
-	d := deckFileFrom(deckInfo{name: "Fliers", format: "commander"}, cards)
+	d := deckFileFrom(deckInfo{Name: "Fliers", Format: "commander"}, cards)
 	if _, _, err := saveDeckVersioned("fliers", d); err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func taggableDeck(t *testing.T) model {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 190, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Fliers", slug: "fliers", format: "commander", total: 11, unique: 5},
+		info:  deckInfo{Name: "Fliers", Slug: "fliers", Format: "commander", Total: 11, Unique: 5},
 		cards: cards,
 	})
 	return m
@@ -55,7 +55,7 @@ func typeFilter(m model, text string) model {
 
 func tagsOf(m model, name string) []string {
 	if i := m.deckIndexOf(name); i >= 0 {
-		return m.deckCards[i].tags
+		return m.deckCards[i].Tags
 	}
 	return nil
 }
@@ -65,12 +65,12 @@ func TestMarkingWithSpace(t *testing.T) {
 	first, _ := m.active().selected()
 
 	m = press(m, " ")
-	if !m.marked(first.card) {
-		t.Errorf("space did not mark %q", first.card.Name)
+	if !m.marked(first.Card) {
+		t.Errorf("space did not mark %q", first.Card.Name)
 	}
 	// The cursor steps on, so marking a run is one key held down.
 	second, _ := m.active().selected()
-	if second.card.Name == first.card.Name {
+	if second.Card.Name == first.Card.Name {
 		t.Error("space did not move to the next card")
 	}
 
@@ -78,7 +78,7 @@ func TestMarkingWithSpace(t *testing.T) {
 	m = press(m, " ")
 	m.deckPane.list.Select(0)
 	m = press(m, " ")
-	if m.marked(first.card) {
+	if m.marked(first.Card) {
 		t.Error("space did not unmark on a second press")
 	}
 }
@@ -201,7 +201,7 @@ func TestMarksSurviveFilteringAndEditing(t *testing.T) {
 	// (s…o…l across "Goldspan Dragon Flying") — this one is unambiguous.
 	m = typeFilter(m, "plains")
 	for _, it := range m.active().list.VisibleItems() {
-		if ci, ok := it.(cardItem); ok && ci.card.Name == "Serra Angel" {
+		if ci, ok := it.(cardItem); ok && ci.Card.Name == "Serra Angel" {
 			t.Fatal("the filter did not hide the marked card")
 		}
 	}
@@ -266,8 +266,8 @@ func TestBulkTagIsOneCommit(t *testing.T) {
 		t.Fatalf("tagging five cards made %d commits, want 1", len(after)-len(before))
 	}
 	// The subject counts them rather than listing five names.
-	if !strings.Contains(after[0].subject, "retagged") {
-		t.Errorf("commit subject = %q", after[0].subject)
+	if !strings.Contains(after[0].Subject, "retagged") {
+		t.Errorf("commit subject = %q", after[0].Subject)
 	}
 
 	on, err := readDeck("fliers")
@@ -316,7 +316,7 @@ func TestTaggingNeedsAnEditableDeck(t *testing.T) {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 190, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Someone else's", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7"},
+		info:  deckInfo{Name: "Someone else's", ID: "Y8dZ7", URL: "https://moxfield.com/decks/Y8dZ7"},
 		cards: deckFixture(),
 	})
 
@@ -373,12 +373,12 @@ func TestMarkGutterKeepsRowsAligned(t *testing.T) {
 	// The gutter is drawn whether or not the card is marked, so rows don't
 	// shift sideways underneath you as you mark them.
 	card := ScryfallCard{Name: "Serra Angel", TypeLine: "Creature — Angel", ManaCost: "{3}{W}{W}"}
-	l := list.New([]list.Item{cardItem{card: card}}, compactDelegate{}, 60, 4)
+	l := list.New([]list.Item{cardItem{Card: card}}, compactDelegate{}, 60, 4)
 
 	var plain, marked strings.Builder
-	compactDelegate{}.Render(&plain, l, 0, cardItem{card: card})
+	compactDelegate{}.Render(&plain, l, 0, cardItem{Card: card})
 	compactDelegate{marks: map[string]bool{"serra angel": true}}.
-		Render(&marked, l, 0, cardItem{card: card})
+		Render(&marked, l, 0, cardItem{Card: card})
 
 	if a, b := visibleLen(plain.String()), visibleLen(marked.String()); a != b {
 		t.Errorf("marking changed the row width: %d vs %d\n%q\n%q",

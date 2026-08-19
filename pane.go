@@ -119,7 +119,7 @@ func (m model) cycleSort(delta int) (tea.Model, tea.Cmd) {
 	// what you were looking at.
 	on := ""
 	if it, ok := p.selected(); ok {
-		on = it.card.Name
+		on = it.Card.Name
 	}
 	p.refresh()
 	if on != "" {

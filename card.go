@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/mtg"
+
 	"fmt"
 	"io"
 	"strings"
@@ -36,7 +38,7 @@ const gutterWidth = 2
 
 // gutter is those two columns for one card.
 func (d compactDelegate) gutter(it cardItem) string {
-	key := strings.ToLower(it.card.Name)
+	key := strings.ToLower(it.Card.Name)
 
 	mark := " "
 	if d.marks[key] {
@@ -45,7 +47,7 @@ func (d compactDelegate) gutter(it cardItem) string {
 
 	role := " "
 	switch {
-	case it.commander:
+	case it.Commander:
 		role = lipgloss.NewStyle().Foreground(gruvYellow).Bold(true).Render("★")
 	case d.inOther[key]:
 		role = lipgloss.NewStyle().Foreground(gruvAqua).Render("▪")
@@ -88,7 +90,7 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	}
 
 	selected := index == m.Index()
-	c := ci.card
+	c := ci.Card
 
 	// With two lists on screen only one of them is taking keys. The inactive
 	// one drops to a single dim colour and loses its cursor highlight, so
@@ -96,8 +98,8 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	// of noticing the colour of a rule between columns.
 	if d.blurred {
 		name := c.Name
-		if ci.qty > 1 {
-			name = fmt.Sprintf("%dx %s", ci.qty, name)
+		if ci.Qty > 1 {
+			name = fmt.Sprintf("%dx %s", ci.Qty, name)
 		}
 		nameW, manaW, typeW := listColumns(m.Width())
 		dim := lipgloss.NewStyle().Foreground(gruvGray)
@@ -130,8 +132,8 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 	// A deck's repeat cards carry their count in the name column, so the
 	// columns stay where search results put them.
 	name := c.Name
-	if ci.qty > 1 {
-		name = fmt.Sprintf("%dx %s", ci.qty, name)
+	if ci.Qty > 1 {
+		name = fmt.Sprintf("%dx %s", ci.Qty, name)
 	}
 	name = truncate(name, nameW)
 	typeLine := truncate(c.TypeLine, typeW)
@@ -171,22 +173,29 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 
 // ── List item adapter ───────────────────────────────────────────
 
+// cardItem is a card as a row in a list.
+//
+// Field for field this is deck.Card, and the two ought to be one type. They
+// can't quite be yet: embedding deck.Card would put its own Card field a
+// level down, and every reader of a row would have to say so. The list item
+// is being redesigned when the panel workspace lands, which is the moment to
+// merge them.
 type cardItem struct {
-	// commander is set on a deck's own cards, so the row can be flagged.
+	// Commander is set on a deck's own cards, so the row can be flagged.
 	// It has no bearing on sorting — a commander sorts by mana value like
 	// anything else.
-	commander bool
-	card      ScryfallCard
-	// qty is how many copies a deck runs; zero for search results.
-	qty int
-	// tags are the deck author's own, and only ever set for deck cards.
-	tags []string
+	Commander bool
+	Card      mtg.Card
+	// Qty is how many copies a deck runs; zero for search results.
+	Qty int
+	// Tags are the deck author's own, and only ever set for deck cards.
+	Tags []string
 }
 
-func (c cardItem) Title() string       { return c.card.Name }
-func (c cardItem) Description() string { return c.card.TypeLine }
+func (c cardItem) Title() string       { return c.Card.Name }
+func (c cardItem) Description() string { return c.Card.TypeLine }
 func (c cardItem) FilterValue() string {
-	return c.card.Name + " " + c.card.CombinedOracle()
+	return c.Card.Name + " " + c.Card.CombinedOracle()
 }
 
 // ── Color helpers ───────────────────────────────────────────────

@@ -1,13 +1,17 @@
-package main
+package moxfield
 
 import (
+	"scry/internal/scryfall"
+
+	"scry/internal/fetch"
+
+	"scry/internal/deck"
+
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Moxfield serves a deck's whole contents from one endpoint, keyed by the
@@ -15,17 +19,17 @@ import (
 // the deck itself is only a list of ids and quantities — the card data all
 // comes from Scryfall, and deck cards behave like search results everywhere
 // else in the app.
-const moxfieldDeckURL = "https://api2.moxfield.com/v3/decks/all/%s"
+const deckURL = "https://api2.moxfield.com/v3/decks/all/%s"
 
 // ── Moxfield types ──────────────────────────────────────────────
 
 // Only the fields we use — the response also carries prices, comments and
 // per-vendor purchase URLs for every card.
-type moxDeck struct {
-	Name      string              `json:"name"`
-	Format    string              `json:"format"`
-	PublicURL string              `json:"publicUrl"`
-	Boards    map[string]moxBoard `json:"boards"`
+type Deck struct {
+	Name      string           `json:"name"`
+	Format    string           `json:"format"`
+	PublicURL string           `json:"publicUrl"`
+	Boards    map[string]Board `json:"boards"`
 	// The author's own tags for their cards ("Ramp", "Removal"), keyed by
 	// card name and held once for the whole deck rather than per entry. It
 	// keeps tags for cards that have since left the deck, so names that
@@ -36,12 +40,12 @@ type moxDeck struct {
 	} `json:"createdByUser"`
 }
 
-type moxBoard struct {
-	Count int                 `json:"count"`
-	Cards map[string]moxEntry `json:"cards"`
+type Board struct {
+	Count int              `json:"count"`
+	Cards map[string]Entry `json:"cards"`
 }
 
-type moxEntry struct {
+type Entry struct {
 	Quantity int `json:"quantity"`
 	Card     struct {
 		ScryfallID string `json:"scryfall_id"`
@@ -56,9 +60,9 @@ var (
 	moxfieldIDRe  = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 )
 
-// moxfieldURLID pulls the deck id out of a Moxfield URL. A bare id is not
+// URLID pulls the deck id out of a Moxfield URL. A bare id is not
 // accepted here, so an ordinary one-word query is never mistaken for a deck.
-func moxfieldURLID(s string) (string, bool) {
+func URLID(s string) (string, bool) {
 	m := moxfieldURLRe.FindStringSubmatch(strings.TrimSpace(s))
 	if m == nil {
 		return "", false
@@ -66,21 +70,21 @@ func moxfieldURLID(s string) (string, bool) {
 	return m[1], true
 }
 
-// moxfieldIDLen is the shortest bare string taken for a deck id. Moxfield's
+// idLen is the shortest bare string taken for a deck id. Moxfield's
 // are 22 characters; your own decks have names like "ghen" or "winota". A
 // floor well above one and well below the other means a mistyped deck name
 // is answered with "no deck called that" rather than a fruitless trip to
 // Moxfield. A full URL is always taken as one, however short.
-const moxfieldIDLen = 16
+const idLen = 16
 
-// deckRef accepts either form `scry deck` takes: a full URL, or just the id
+// Ref accepts either form `scry deck` takes: a full URL, or just the id
 // out of one.
-func deckRef(s string) (string, bool) {
+func Ref(s string) (string, bool) {
 	s = strings.TrimSpace(s)
-	if id, ok := moxfieldURLID(s); ok {
+	if id, ok := URLID(s); ok {
 		return id, true
 	}
-	if len(s) >= moxfieldIDLen && moxfieldIDRe.MatchString(s) {
+	if len(s) >= idLen && moxfieldIDRe.MatchString(s) {
 		return s, true
 	}
 	return "", false
@@ -88,62 +92,52 @@ func deckRef(s string) (string, bool) {
 
 // ── Loading ─────────────────────────────────────────────────────
 
-func loadDeckCmd(id string) tea.Cmd {
-	return func() tea.Msg {
-		info, cards, err := loadDeck(id)
-		return deckLoadedMsg{info: info, cards: cards, err: err}
-	}
-}
-
-// fetchMoxfield pulls a deck's JSON. Browsing and importing both start here
-// and part ways afterwards: browsing keeps Moxfield's exact printings by
-// resolving the scryfall_ids, while importing writes plain card names.
-func fetchMoxfield(id string) (moxDeck, error) {
-	body, err := doGet(fmt.Sprintf(moxfieldDeckURL, url.PathEscape(id)))
+func Fetch(id string) (Deck, error) {
+	body, err := fetch.Get(fmt.Sprintf(deckURL, url.PathEscape(id)))
 	if err != nil {
-		if _, ok := err.(notFoundError); ok {
-			return moxDeck{}, fmt.Errorf("no public Moxfield deck %q", id)
+		if _, ok := err.(fetch.NotFound); ok {
+			return Deck{}, fmt.Errorf("no public Moxfield deck %q", id)
 		}
-		return moxDeck{}, err
+		return Deck{}, err
 	}
 
-	var d moxDeck
+	var d Deck
 	if err := json.Unmarshal(body, &d); err != nil {
-		return moxDeck{}, fmt.Errorf("moxfield: %w", err)
+		return Deck{}, fmt.Errorf("moxfield: %w", err)
 	}
 	return d, nil
 }
 
-// moxBoardOrder is the order boards are read in, and the deck file section
+// boardOrder is the order boards are read in, and the deck file section
 // each becomes. Moxfield carries more boards than these; the rest are a
 // deck's history rather than the deck, and aren't imported.
-var moxBoardOrder = []struct{ board, section string }{
+var boardOrder = []struct{ board, section string }{
 	{"commanders", "commander"},
 	{"mainboard", "mainboard"},
 }
 
-// importMoxfield turns a Moxfield deck into a deck file. Cards are recorded
+// Import turns a Moxfield deck into a deck file. Cards are recorded
 // by name rather than by printing: the printing Moxfield happens to hold
 // isn't one you chose, and pinning all hundred lines would bury the diffs
 // the format exists to keep readable.
-func importMoxfield(id string) (*deckFile, error) {
-	d, err := fetchMoxfield(id)
+func Import(id string) (*deck.File, error) {
+	d, err := Fetch(id)
 	if err != nil {
 		return nil, err
 	}
-	return moxDeckToFile(d, id)
+	return ToFile(d, id)
 }
 
-// moxDeckToFile is the conversion itself, kept apart from the fetch so it
+// ToFile is the conversion itself, kept apart from the fetch so it
 // can be exercised without the network.
-func moxDeckToFile(d moxDeck, id string) (*deckFile, error) {
-	out := &deckFile{Name: d.Name, Format: d.Format, Source: d.PublicURL}
+func ToFile(d Deck, id string) (*deck.File, error) {
+	out := &deck.File{Name: d.Name, Format: d.Format, Source: d.PublicURL}
 	if out.Source == "" {
 		out.Source = "https://moxfield.com/decks/" + id
 	}
 
 	seen := map[string]bool{}
-	for _, b := range moxBoardOrder {
+	for _, b := range boardOrder {
 		// Moxfield keys a board's cards by an opaque id, so the order they
 		// come back in isn't stable; the deck file is sorted on write, which
 		// makes that moot.
@@ -158,10 +152,10 @@ func moxDeckToFile(d moxDeck, id string) (*deckFile, error) {
 			if qty < 1 {
 				qty = 1
 			}
-			out.Entries = append(out.Entries, deckEntry{
+			out.Entries = append(out.Entries, deck.Entry{
 				Qty:     qty,
 				Name:    name,
-				Tags:    parseTags(strings.Join(d.AuthorTags[name], ",")),
+				Tags:    deck.ParseTags(strings.Join(d.AuthorTags[name], ",")),
 				Section: b.section,
 			})
 		}
@@ -173,12 +167,12 @@ func moxDeckToFile(d moxDeck, id string) (*deckFile, error) {
 	return out, nil
 }
 
-// loadDeck fetches a deck and swaps Moxfield's card stubs for full Scryfall
+// Load fetches a deck and swaps Moxfield's card stubs for full Scryfall
 // cards. Only the command zone and the mainboard are loaded.
-func loadDeck(id string) (deckInfo, []deckCard, error) {
-	d, err := fetchMoxfield(id)
+func Load(id string) (deck.Info, []deck.Card, error) {
+	d, err := Fetch(id)
 	if err != nil {
-		return deckInfo{}, nil, err
+		return deck.Info{}, nil, err
 	}
 
 	type stub struct {
@@ -211,30 +205,30 @@ func loadDeck(id string) (deckInfo, []deckCard, error) {
 	collect("mainboard", false)
 
 	if len(stubs) == 0 {
-		return deckInfo{}, nil, fmt.Errorf("deck %q has no cards", id)
+		return deck.Info{}, nil, fmt.Errorf("deck %q has no cards", id)
 	}
 
 	ids := make([]string, len(stubs))
 	for i, s := range stubs {
 		ids[i] = s.id
 	}
-	byID, err := fetchCollection(ids)
+	byID, err := scryfall.Collection(ids)
 	if err != nil {
-		return deckInfo{}, nil, err
+		return deck.Info{}, nil, err
 	}
 
-	info := deckInfo{
-		name:   d.Name,
-		author: d.CreatedByUser.UserName,
-		format: d.Format,
-		id:     id,
-		url:    d.PublicURL,
+	info := deck.Info{
+		Name:   d.Name,
+		Author: d.CreatedByUser.UserName,
+		Format: d.Format,
+		ID:     id,
+		URL:    d.PublicURL,
 	}
-	if info.url == "" {
-		info.url = "https://moxfield.com/decks/" + id
+	if info.URL == "" {
+		info.URL = "https://moxfield.com/decks/" + id
 	}
 
-	cards := make([]deckCard, 0, len(stubs))
+	cards := make([]deck.Card, 0, len(stubs))
 	for _, s := range stubs {
 		// A card Scryfall no longer serves under that id is dropped rather
 		// than shown as a blank row.
@@ -242,12 +236,12 @@ func loadDeck(id string) (deckInfo, []deckCard, error) {
 		if !ok {
 			continue
 		}
-		cards = append(cards, deckCard{card: c, qty: s.qty, commander: s.commander, tags: s.tags})
-		info.total += s.qty
-		info.unique++
+		cards = append(cards, deck.Card{Card: c, Qty: s.qty, Commander: s.commander, Tags: s.tags})
+		info.Total += s.qty
+		info.Unique++
 	}
 	if len(cards) == 0 {
-		return deckInfo{}, nil, fmt.Errorf("none of deck %q's cards resolved on Scryfall", id)
+		return deck.Info{}, nil, fmt.Errorf("none of deck %q's cards resolved on Scryfall", id)
 	}
 
 	return info, cards, nil

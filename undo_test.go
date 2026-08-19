@@ -22,7 +22,7 @@ func TestUndoAnAdd(t *testing.T) {
 	if len(m.deckCards) != before {
 		t.Errorf("undo left %d cards, want %d", len(m.deckCards), before)
 	}
-	if m.deckIndexOf(sel.card.Name) >= 0 {
+	if m.deckIndexOf(sel.Card.Name) >= 0 {
 		t.Error("the added card is still in the deck")
 	}
 	if !strings.Contains(m.notice, "undo") {
@@ -68,11 +68,11 @@ func TestUndoRemovalAndQuantity(t *testing.T) {
 
 	selectCard(&m.deckPane, "Plains")
 	m = press(m, "+")
-	if m.deckCards[m.deckIndexOf("Plains")].qty != 8 {
+	if m.deckCards[m.deckIndexOf("Plains")].Qty != 8 {
 		t.Fatal("+ did not add a copy")
 	}
 	m = press(m, "u")
-	if got := m.deckCards[m.deckIndexOf("Plains")].qty; got != 7 {
+	if got := m.deckCards[m.deckIndexOf("Plains")].Qty; got != 7 {
 		t.Errorf("undo left %d Plains, want 7", got)
 	}
 
@@ -87,8 +87,8 @@ func TestUndoRemovalAndQuantity(t *testing.T) {
 		t.Fatal("undo did not bring the card back")
 	}
 	// And it comes back whole — quantity, tags and all.
-	if len(m.deckCards[i].tags) != 1 || m.deckCards[i].tags[0] != "ramp" {
-		t.Errorf("the restored card lost its tags: %v", m.deckCards[i].tags)
+	if len(m.deckCards[i].Tags) != 1 || m.deckCards[i].Tags[0] != "ramp" {
+		t.Errorf("the restored card lost its Tags: %v", m.deckCards[i].Tags)
 	}
 }
 
@@ -98,11 +98,11 @@ func TestUndoACommanderToggle(t *testing.T) {
 	selectCard(&m.deckPane, "Sol Ring")
 
 	m = press(m, "c")
-	if !m.deckCards[m.deckIndexOf("Sol Ring")].commander {
+	if !m.deckCards[m.deckIndexOf("Sol Ring")].Commander {
 		t.Fatal("c did not mark it")
 	}
 	m = press(m, "u")
-	if m.deckCards[m.deckIndexOf("Sol Ring")].commander {
+	if m.deckCards[m.deckIndexOf("Sol Ring")].Commander {
 		t.Error("undo did not unmark it")
 	}
 }
@@ -121,7 +121,7 @@ func TestUndoABulkTagIsOneStep(t *testing.T) {
 
 	var tagged int
 	for _, dc := range m.deckCards {
-		for _, tag := range dc.tags {
+		for _, tag := range dc.Tags {
 			if tag == "reviewed" {
 				tagged++
 			}
@@ -133,9 +133,9 @@ func TestUndoABulkTagIsOneStep(t *testing.T) {
 
 	m = press(m, "u")
 	for _, dc := range m.deckCards {
-		for _, tag := range dc.tags {
+		for _, tag := range dc.Tags {
 			if tag == "reviewed" {
-				t.Errorf("%s is still tagged after one undo", dc.card.Name)
+				t.Errorf("%s is still tagged after one undo", dc.Card.Name)
 			}
 		}
 	}
@@ -188,8 +188,8 @@ func TestSearchResultsShowWhatTheDeckHolds(t *testing.T) {
 	m = press(m, "a")
 
 	inDeck := m.deckMembership()
-	if !inDeck[strings.ToLower(sel.card.Name)] {
-		t.Fatalf("%q is not counted as in the deck", sel.card.Name)
+	if !inDeck[strings.ToLower(sel.Card.Name)] {
+		t.Fatalf("%q is not counted as in the deck", sel.Card.Name)
 	}
 
 	view := stripANSI(m.View())
@@ -204,7 +204,7 @@ func TestCommandersAreFlaggedInTheDeck(t *testing.T) {
 	selectCard(&m.deckPane, "Sol Ring")
 	m = press(m, "c")
 
-	if i := m.deckIndexOf("Sol Ring"); i < 0 || !m.deckCards[i].commander {
+	if i := m.deckIndexOf("Sol Ring"); i < 0 || !m.deckCards[i].Commander {
 		t.Fatal("the commander was not recorded")
 	}
 	if !strings.Contains(stripANSI(m.View()), "★") {
@@ -216,7 +216,7 @@ func TestGutterKeepsRowsAlignedWhateverTheFlags(t *testing.T) {
 	// Both gutter columns are always drawn, so a row doesn't shift sideways
 	// when a card joins the deck or becomes a commander.
 	card := ScryfallCard{Name: "Serra Angel", TypeLine: "Creature — Angel", ManaCost: "{3}{W}{W}"}
-	l := list.New([]list.Item{cardItem{card: card}}, compactDelegate{}, 60, 4)
+	l := list.New([]list.Item{cardItem{Card: card}}, compactDelegate{}, 60, 4)
 	key := map[string]bool{"serra angel": true}
 
 	widths := map[string]int{}
@@ -224,11 +224,11 @@ func TestGutterKeepsRowsAlignedWhateverTheFlags(t *testing.T) {
 		d  compactDelegate
 		it cardItem
 	}{
-		"plain":     {compactDelegate{}, cardItem{card: card}},
-		"marked":    {compactDelegate{marks: key}, cardItem{card: card}},
-		"in other":  {compactDelegate{inOther: key}, cardItem{card: card}},
-		"commander": {compactDelegate{}, cardItem{card: card, commander: true}},
-		"both":      {compactDelegate{marks: key}, cardItem{card: card, commander: true}},
+		"plain":     {compactDelegate{}, cardItem{Card: card}},
+		"marked":    {compactDelegate{marks: key}, cardItem{Card: card}},
+		"in other":  {compactDelegate{inOther: key}, cardItem{Card: card}},
+		"commander": {compactDelegate{}, cardItem{Card: card, Commander: true}},
+		"both":      {compactDelegate{marks: key}, cardItem{Card: card, Commander: true}},
 	} {
 		var b strings.Builder
 		tc.d.Render(&b, l, 0, tc.it)

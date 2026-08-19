@@ -25,7 +25,7 @@ func openHistoryOn(t *testing.T) model {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Ghen", slug: "ghen", format: "commander", total: 10},
+		info:  deckInfo{Name: "Ghen", Slug: "ghen", Format: "commander", Total: 10},
 		cards: deckFixture(),
 	})
 	return leaderPress(m, "g")
@@ -49,8 +49,8 @@ func TestDeckHistoryOpens(t *testing.T) {
 	if !ok {
 		t.Fatal("history list holds something other than commits")
 	}
-	if first.commit.subject != "+Mana Crypt, -Sol Ring" {
-		t.Errorf("newest commit = %q", first.commit.subject)
+	if first.commit.Subject != "+Mana Crypt, -Sol Ring" {
+		t.Errorf("newest commit = %q", first.commit.Subject)
 	}
 
 	// The diff for the selected commit is fetched without being asked for.
@@ -83,8 +83,8 @@ func TestDeckHistoryFollowsTheCursor(t *testing.T) {
 	if !ok {
 		t.Fatal("nothing selected")
 	}
-	if sel.commit.subject != "Add Ghen" {
-		t.Fatalf("selected %q, want the first commit", sel.commit.subject)
+	if sel.commit.Subject != "Add Ghen" {
+		t.Fatalf("selected %q, want the first commit", sel.commit.Subject)
 	}
 	// The deck being created shows up as the whole file being added.
 	if !strings.Contains(m.historyDiff, "Ghen, Arcanum Weaver") {
@@ -137,7 +137,7 @@ func TestDeckHistoryNeedsADeckOfYourOwn(t *testing.T) {
 
 	// A deck browsed off Moxfield isn't yours, so it has no history either.
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Someone else's", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7"},
+		info:  deckInfo{Name: "Someone else's", ID: "Y8dZ7", URL: "https://moxfield.com/decks/Y8dZ7"},
 		cards: deckFixture(),
 	})
 	m = leaderPress(m, "g")

@@ -17,11 +17,11 @@ import (
 // deck described properly rather than by name alone.
 
 type deckSummary struct {
-	slug    string
-	name    string
-	format  string
-	total   int
-	unique  int
+	Slug    string
+	Name    string
+	Format  string
+	Total   int
+	Unique  int
 	source  string
 	changed string // when it last changed, as git tells it
 	err     error  // a deck file that won't parse still gets a row
@@ -29,10 +29,10 @@ type deckSummary struct {
 
 type deckListItem struct{ deck deckSummary }
 
-func (d deckListItem) Title() string       { return d.deck.name }
-func (d deckListItem) Description() string { return d.deck.format }
+func (d deckListItem) Title() string       { return d.deck.Name }
+func (d deckListItem) Description() string { return d.deck.Format }
 func (d deckListItem) FilterValue() string {
-	return d.deck.slug + " " + d.deck.name + " " + d.deck.format
+	return d.deck.Slug + " " + d.deck.Name + " " + d.deck.Format
 }
 
 type deckPickerDelegate struct{}
@@ -59,9 +59,9 @@ func (d deckPickerDelegate) Render(w io.Writer, m list.Model, index int, item li
 		nameStyle = nameStyle.Bold(true)
 	}
 
-	name := dk.name
+	name := dk.Name
 	if dk.err != nil {
-		name = dk.slug
+		name = dk.Slug
 	}
 	first := cursor + nameStyle.Render(truncate(name, width))
 
@@ -70,16 +70,16 @@ func (d deckPickerDelegate) Render(w io.Writer, m list.Model, index int, item li
 	case dk.err != nil:
 		detail = lipgloss.NewStyle().Foreground(gruvRed).Render(truncate(dk.err.Error(), width))
 	default:
-		parts := []string{dk.slug}
-		if dk.format != "" {
-			parts = append(parts, dk.format)
+		parts := []string{dk.Slug}
+		if dk.Format != "" {
+			parts = append(parts, dk.Format)
 		}
-		parts = append(parts, fmt.Sprintf("%d cards · %d distinct", dk.total, dk.unique))
+		parts = append(parts, fmt.Sprintf("%d cards · %d distinct", dk.Total, dk.Unique))
 		if dk.changed != "" {
 			parts = append(parts, dk.changed)
 		}
-		detail = slugStyle.Render(dk.slug) +
-			dimStyle.Render(truncate("  "+strings.Join(parts[1:], "  ·  "), width-runeLen(dk.slug)))
+		detail = slugStyle.Render(dk.Slug) +
+			dimStyle.Render(truncate("  "+strings.Join(parts[1:], "  ·  "), width-runeLen(dk.Slug)))
 	}
 
 	fmt.Fprint(w, first+"\n  "+detail)
@@ -101,22 +101,22 @@ func listDecksCmd() tea.Cmd {
 
 		out := make([]deckSummary, 0, len(slugs))
 		for _, slug := range slugs {
-			s := deckSummary{slug: slug, name: slug}
+			s := deckSummary{Slug: slug, Name: slug}
 			d, err := readDeck(slug)
 			if err != nil {
 				s.err = err
 				out = append(out, s)
 				continue
 			}
-			s.name = d.Name
-			s.format = d.Format
+			s.Name = d.Name
+			s.Format = d.Format
 			s.source = d.Source
-			s.total, s.unique = d.counts()
+			s.Total, s.Unique = d.Counts()
 
 			// The last commit that touched it, which is more use than a
 			// modification time when the point is the history.
 			if commits, err := deckHistory(slug, 1); err == nil && len(commits) > 0 {
-				s.changed = commits[0].when
+				s.changed = commits[0].When
 			}
 			out = append(out, s)
 		}
@@ -207,7 +207,7 @@ func (m model) updateDeckPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.showResults()
 			m.deckLoading = true
 			m.searching = true
-			return m, openLocalDeckCmd(sel.deck.slug)
+			return m, openLocalDeckCmd(sel.deck.Slug)
 		}
 	}
 

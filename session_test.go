@@ -126,7 +126,7 @@ func TestABrowsedMoxfieldDeckIsNotYourSession(t *testing.T) {
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m = drive(m, deckLoadedMsg{
-		info:  deckInfo{name: "Someone else's", id: "Y8dZ7", url: "https://moxfield.com/decks/Y8dZ7"},
+		info:  deckInfo{Name: "Someone else's", ID: "Y8dZ7", URL: "https://moxfield.com/decks/Y8dZ7"},
 		cards: deckFixture(),
 	})
 	m.lastQuery = "t:dragon"

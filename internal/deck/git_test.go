@@ -1,4 +1,4 @@
-package main
+package deck
 
 import (
 	"os"
@@ -11,7 +11,7 @@ import (
 // there's no git to shell out to.
 func gitRepo(t *testing.T) string {
 	t.Helper()
-	if !gitAvailable() {
+	if !GitAvailable() {
 		t.Skip("git not installed")
 	}
 	dir := t.TempDir()
@@ -22,9 +22,9 @@ func gitRepo(t *testing.T) string {
 	return dir
 }
 
-func deckOf(t *testing.T, text string) *deckFile {
+func deckOf(t *testing.T, text string) *File {
 	t.Helper()
-	d, err := parseDeckFile(strings.NewReader(text))
+	d, err := ParseFile(strings.NewReader(text))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestCommitSubject(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		before *deckFile
+		before *File
 		after  string
 		want   string
 	}{
@@ -150,9 +150,9 @@ func TestCommitSubjectIsStable(t *testing.T) {
 func TestSaveDeckVersioned(t *testing.T) {
 	gitRepo(t)
 
-	subject, warning, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck))
+	subject, warning, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck))
 	if err != nil {
-		t.Fatalf("saveDeckVersioned: %v", err)
+		t.Fatalf("SaveVersioned: %v", err)
 	}
 	if warning != "" {
 		t.Errorf("unexpected warning: %q", warning)
@@ -161,35 +161,35 @@ func TestSaveDeckVersioned(t *testing.T) {
 		t.Errorf("subject = %q", subject)
 	}
 
-	commits, err := deckHistory("ghen", 10)
+	commits, err := History("ghen", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(commits) != 1 {
 		t.Fatalf("got %d commits, want 1", len(commits))
 	}
-	if commits[0].subject != "Add Ghen" {
-		t.Errorf("commit subject = %q", commits[0].subject)
+	if commits[0].Subject != "Add Ghen" {
+		t.Errorf("commit subject = %q", commits[0].Subject)
 	}
 
 	// A second save with a real change is a second commit.
 	changed := deckOf(t, strings.Replace(gitBaseDeck, "1 Sol Ring [ramp]", "1 Mana Crypt [ramp]", 1))
-	if _, _, err := saveDeckVersioned("ghen", changed); err != nil {
+	if _, _, err := SaveVersioned("ghen", changed); err != nil {
 		t.Fatal(err)
 	}
-	commits, _ = deckHistory("ghen", 10)
+	commits, _ = History("ghen", 10)
 	if len(commits) != 2 {
 		t.Fatalf("got %d commits, want 2", len(commits))
 	}
-	if commits[0].subject != "+Mana Crypt, -Sol Ring" {
-		t.Errorf("commit subject = %q", commits[0].subject)
+	if commits[0].Subject != "+Mana Crypt, -Sol Ring" {
+		t.Errorf("commit subject = %q", commits[0].Subject)
 	}
 
 	// Saving an unchanged deck is not an error, and not a commit either.
-	if _, _, err := saveDeckVersioned("ghen", changed); err != nil {
+	if _, _, err := SaveVersioned("ghen", changed); err != nil {
 		t.Fatal(err)
 	}
-	commits, _ = deckHistory("ghen", 10)
+	commits, _ = History("ghen", 10)
 	if len(commits) != 2 {
 		t.Errorf("saving an unchanged deck made a commit: %d commits", len(commits))
 	}
@@ -198,7 +198,7 @@ func TestSaveDeckVersioned(t *testing.T) {
 func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 	dir := gitRepo(t)
 
-	if _, _, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
+	if _, _, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -210,17 +210,17 @@ func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 
 	// Then scry writes over it. The editor's work must be in the history,
 	// not lost — the whole point of versioning the decks.
-	if _, _, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
+	if _, _, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
 	}
 
-	commits, err := deckHistory("ghen", 10)
+	commits, err := History("ghen", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var found bool
 	for _, c := range commits {
-		if strings.Contains(c.subject, "outside scry") {
+		if strings.Contains(c.Subject, "outside scry") {
 			found = true
 		}
 	}
@@ -230,8 +230,8 @@ func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 
 	// And they can be got back.
 	for _, c := range commits {
-		if strings.Contains(c.subject, "outside scry") {
-			d, err := deckAt("ghen", c.hash)
+		if strings.Contains(c.Subject, "outside scry") {
+			d, err := At("ghen", c.Hash)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -245,25 +245,25 @@ func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 func TestRestoreDeck(t *testing.T) {
 	gitRepo(t)
 
-	if _, _, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
+	if _, _, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
 	}
 	changed := deckOf(t, strings.Replace(gitBaseDeck, "1 Sol Ring [ramp]", "1 Mana Crypt [ramp]", 1))
-	if _, _, err := saveDeckVersioned("ghen", changed); err != nil {
+	if _, _, err := SaveVersioned("ghen", changed); err != nil {
 		t.Fatal(err)
 	}
 
-	commits, _ := deckHistory("ghen", 10)
+	commits, _ := History("ghen", 10)
 	if len(commits) != 2 {
 		t.Fatalf("got %d commits, want 2", len(commits))
 	}
-	first := commits[1].hash
+	first := commits[1].Hash
 
-	if err := restoreDeck("ghen", first); err != nil {
-		t.Fatalf("restoreDeck: %v", err)
+	if err := Restore("ghen", first); err != nil {
+		t.Fatalf("Restore: %v", err)
 	}
 
-	back, err := readDeck("ghen")
+	back, err := Read("ghen")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,29 +273,29 @@ func TestRestoreDeck(t *testing.T) {
 
 	// Restoring moves forward rather than rewinding: the version restored
 	// over is still there.
-	after, _ := deckHistory("ghen", 10)
+	after, _ := History("ghen", 10)
 	if len(after) != 3 {
 		t.Errorf("got %d commits after a restore, want 3 — history should not be rewritten", len(after))
 	}
-	if !strings.HasPrefix(after[0].subject, "Restore") {
-		t.Errorf("newest commit = %q", after[0].subject)
+	if !strings.HasPrefix(after[0].Subject, "Restore") {
+		t.Errorf("newest commit = %q", after[0].Subject)
 	}
 }
 
 func TestDeleteDeckIsRecoverable(t *testing.T) {
 	gitRepo(t)
 
-	if _, _, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
+	if _, _, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
 	}
-	if err := deleteDeckCommitted("ghen"); err != nil {
-		t.Fatalf("deleteDeckCommitted: %v", err)
+	if err := DeleteCommitted("ghen"); err != nil {
+		t.Fatalf("DeleteCommitted: %v", err)
 	}
-	if deckExists("ghen") {
+	if Exists("ghen") {
 		t.Fatal("deck still on disk")
 	}
 
-	commits, err := deckHistory("ghen", 10)
+	commits, err := History("ghen", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestDeleteDeckIsRecoverable(t *testing.T) {
 	}
 
 	// A deck deleted by mistake is still in there.
-	d, err := deckAt("ghen", commits[1].hash)
+	d, err := At("ghen", commits[1].Hash)
 	if err != nil {
 		t.Fatalf("cannot read a deleted deck out of the history: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestRepoWorksWithNoGitIdentity(t *testing.T) {
 	// decks rather than silently failing to commit.
 	gitRepo(t)
 
-	subject, warning, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck))
+	subject, warning, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestRepoWorksWithNoGitIdentity(t *testing.T) {
 	if subject != "Add Ghen" {
 		t.Errorf("subject = %q", subject)
 	}
-	if commits, _ := deckHistory("ghen", 10); len(commits) != 1 {
+	if commits, _ := History("ghen", 10); len(commits) != 1 {
 		t.Errorf("nothing was committed without a global git identity")
 	}
 }
@@ -342,11 +342,11 @@ func TestDeckSurvivesAnUnusableRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	subject, warning, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck))
+	subject, warning, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck))
 	if err != nil {
 		t.Fatalf("a broken repo must not fail the save: %v", err)
 	}
-	if !deckExists("ghen") {
+	if !Exists("ghen") {
 		t.Fatal("the deck was not written")
 	}
 	if warning == "" {
@@ -357,7 +357,7 @@ func TestDeckSurvivesAnUnusableRepo(t *testing.T) {
 	}
 
 	// And the file itself is intact.
-	if _, err := readDeck("ghen"); err != nil {
+	if _, err := Read("ghen"); err != nil {
 		t.Errorf("deck does not read back: %v", err)
 	}
 }
@@ -365,7 +365,7 @@ func TestDeckSurvivesAnUnusableRepo(t *testing.T) {
 func TestOnlyTheNamedDeckIsCommitted(t *testing.T) {
 	dir := gitRepo(t)
 
-	if _, _, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
+	if _, _, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -379,7 +379,7 @@ func TestOnlyTheNamedDeckIsCommitted(t *testing.T) {
 	}
 
 	changed := deckOf(t, strings.Replace(gitBaseDeck, "7 Plains", "9 Plains", 1))
-	if _, _, err := saveDeckVersioned("ghen", changed); err != nil {
+	if _, _, err := SaveVersioned("ghen", changed); err != nil {
 		t.Fatal(err)
 	}
 

@@ -1,6 +1,8 @@
-package main
+package moxfield
 
 import (
+	"scry/internal/fetch"
+
 	"scry/internal/scryfall"
 
 	"encoding/json"
@@ -9,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Browsing someone's decks on Moxfield, so importing one doesn't mean
@@ -40,9 +40,9 @@ const (
 	moxUserMaxPages = 5
 )
 
-// moxUserDeck is one deck in someone's list. Enough to choose by without
+// UserDeck is one deck in someone's list. Enough to choose by without
 // fetching any of them.
-type moxUserDeck struct {
+type UserDeck struct {
 	Name      string   `json:"name"`
 	Format    string   `json:"format"`
 	PublicID  string   `json:"publicId"`
@@ -59,7 +59,7 @@ type moxUserDeck struct {
 // updatedAt is when the deck last changed. A deck Moxfield gave no date for
 // sorts as though it were ancient, rather than as though it were touched at
 // the epoch of everything else.
-func (d moxUserDeck) updatedAt() time.Time {
+func (d UserDeck) UpdatedAt() time.Time {
 	t, err := time.Parse(time.RFC3339, d.Updated)
 	if err != nil {
 		return time.Time{}
@@ -68,7 +68,7 @@ func (d moxUserDeck) updatedAt() time.Time {
 }
 
 // age is how long ago the deck last changed, in the shape git uses.
-func (d moxUserDeck) age() string {
+func (d UserDeck) Age() string {
 	t, err := time.Parse(time.RFC3339, d.Updated)
 	if err != nil {
 		return ""
@@ -87,40 +87,24 @@ func (d moxUserDeck) age() string {
 	return plural(fmt.Sprintf("%d year", days/365), days/365) + " ago"
 }
 
-type moxUserDecksMsg struct {
-	user  string
-	decks []moxUserDeck
-	err   error
-}
-
-func fetchMoxUserDecksCmd(user string) tea.Cmd {
-	return func() tea.Msg {
-		name, decks, err := fetchMoxUserDecks(user)
-		return moxUserDecksMsg{user: name, decks: decks, err: err}
-	}
-}
-
-// fetchMoxUserDecks lists someone's public decks, newest change first. The
-// name it comes back with is Moxfield's own spelling of it, which is what a
-// pasted profile URL or a differently-cased guess should end up showing.
-func fetchMoxUserDecks(user string) (string, []moxUserDeck, error) {
+func UserDecks(user string) (string, []UserDeck, error) {
 	user = strings.TrimSpace(user)
 	if user == "" {
 		return "", nil, fmt.Errorf("no user name")
 	}
 	// A pasted profile URL is a reasonable thing to hand this.
-	if u, ok := moxfieldUserName(user); ok {
+	if u, ok := UserName(user); ok {
 		user = u
 	}
 
-	var mine []moxUserDeck
+	var mine []UserDeck
 	name := user
 
 	for page := 1; page <= moxUserMaxPages; page++ {
 		if page > 1 {
 			time.Sleep(scryfall.PageDelay)
 		}
-		body, err := doGet(fmt.Sprintf(moxSearchURL, page, moxUserPageSize, url.QueryEscape(user)))
+		body, err := fetch.Get(fmt.Sprintf(moxSearchURL, page, moxUserPageSize, url.QueryEscape(user)))
 		if err != nil {
 			// A later page failing still leaves the earlier ones worth
 			// showing.
@@ -131,8 +115,8 @@ func fetchMoxUserDecks(user string) (string, []moxUserDeck, error) {
 		}
 
 		var p struct {
-			TotalPages int           `json:"totalPages"`
-			Data       []moxUserDeck `json:"data"`
+			TotalPages int        `json:"totalPages"`
+			Data       []UserDeck `json:"data"`
 		}
 		if err := json.Unmarshal(body, &p); err != nil {
 			return "", nil, fmt.Errorf("moxfield: %w", err)
@@ -164,18 +148,18 @@ func fetchMoxUserDecks(user string) (string, []moxUserDeck, error) {
 // first. Most of a builder's decks are half-built, and burying the ones that
 // are done under thirty of them makes the list harder to use than it needs
 // to be.
-func sortUserDecks(decks []moxUserDeck) {
+func sortUserDecks(decks []UserDeck) {
 	sort.SliceStable(decks, func(i, j int) bool {
 		if decks[i].Legal != decks[j].Legal {
 			return decks[i].Legal
 		}
-		return decks[i].updatedAt().After(decks[j].updatedAt())
+		return decks[i].UpdatedAt().After(decks[j].UpdatedAt())
 	})
 }
 
-// moxfieldUserName pulls the name out of a profile URL, so pasting one works
+// UserName pulls the name out of a profile URL, so pasting one works
 // as well as typing the name.
-func moxfieldUserName(s string) (string, bool) {
+func UserName(s string) (string, bool) {
 	s = strings.TrimSpace(s)
 	i := strings.Index(strings.ToLower(s), "moxfield.com/users/")
 	if i < 0 {
@@ -189,4 +173,14 @@ func moxfieldUserName(s string) (string, bool) {
 		return "", false
 	}
 	return name, true
+}
+
+// plural is a copy of the one in package deck. Six lines duplicated beats
+// exporting a grammar helper from a package about decks, or inventing a
+// package to hold it.
+func plural(word string, n int) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
 }

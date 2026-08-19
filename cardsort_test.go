@@ -10,21 +10,21 @@ import (
 
 func sortFixture() []list.Item {
 	return []list.Item{
-		cardItem{card: ScryfallCard{
+		cardItem{Card: ScryfallCard{
 			Name: "Sol Ring", TypeLine: "Artifact", CMC: 1, EDHRECRank: 1,
 		}},
-		cardItem{card: ScryfallCard{
+		cardItem{Card: ScryfallCard{
 			Name: "Serra Angel", TypeLine: "Creature — Angel", CMC: 5,
 			Colors: []string{"W"}, EDHRECRank: 4000,
 		}},
-		cardItem{card: ScryfallCard{
+		cardItem{Card: ScryfallCard{
 			Name: "Command Tower", TypeLine: "Land", CMC: 0, EDHRECRank: 2,
 		}},
-		cardItem{card: ScryfallCard{
+		cardItem{Card: ScryfallCard{
 			Name: "Anguished Unmaking", TypeLine: "Instant", CMC: 3,
 			Colors: []string{"W", "B"}, EDHRECRank: 300,
 		}},
-		cardItem{card: ScryfallCard{
+		cardItem{Card: ScryfallCard{
 			Name: "Brainstorm", TypeLine: "Instant", CMC: 1,
 			Colors: []string{"U"},
 		}},
@@ -34,7 +34,7 @@ func sortFixture() []list.Item {
 func names(items []list.Item) []string {
 	out := make([]string, len(items))
 	for i, it := range items {
-		out[i] = it.(cardItem).card.Name
+		out[i] = it.(cardItem).Card.Name
 	}
 	return out
 }
@@ -104,11 +104,11 @@ func TestCommandersSortWithEverythingElse(t *testing.T) {
 	// that's how the deck list is built, not because sorting pins it there
 	// — sorting by mana value means by mana value.
 	items := []list.Item{
-		cardItem{card: ScryfallCard{Name: "Ghen", CMC: 3}, commander: true},
-		cardItem{card: ScryfallCard{Name: "Sol Ring", CMC: 1}},
+		cardItem{Card: ScryfallCard{Name: "Ghen", CMC: 3}, Commander: true},
+		cardItem{Card: ScryfallCard{Name: "Sol Ring", CMC: 1}},
 	}
 	if got := names(sortItems(items, sortMana)); got[0] != "Sol Ring" {
-		t.Errorf("the commander was pinned above a cheaper card: %v", got)
+		t.Errorf("the commander was pinned above a cheaper Card: %v", got)
 	}
 	if got := names(sortItems(items, sortName)); got[0] != "Ghen" {
 		t.Errorf("by name Ghen should come first: %v", got)
@@ -190,8 +190,8 @@ func TestSortKeepsTheCursorOnItsCard(t *testing.T) {
 
 	m = press(m, "o")
 	sel, ok := m.deckPane.selected()
-	if !ok || sel.card.Name != "Ancient Tomb" {
-		t.Errorf("sorting moved the cursor off the card: %+v", sel)
+	if !ok || sel.Card.Name != "Ancient Tomb" {
+		t.Errorf("sorting moved the cursor off the Card: %+v", sel)
 	}
 }
 
