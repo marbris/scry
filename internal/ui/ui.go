@@ -38,6 +38,14 @@ type Model struct {
 	// something. Explicit saving is only safe if leaving asks.
 	quitting bool
 
+	// stats is the statistics mode of the information panel, and the
+	// narrowing it is imposing on the lists it counts.
+	stats statsState
+
+	// hoverSeq rises with every move, so a ruling fetched for a card you
+	// have since scrolled past can be recognised as stale.
+	hoverSeq int
+
 	// notice is a one-line result — "copied", "deleted" — shown along the
 	// bottom until the next keypress.
 	notice string
@@ -61,7 +69,11 @@ type Model struct {
 const defaultQuerySort = 9
 
 func New() Model {
-	return Model{ws: newWorkspace(), history: LoadQueryHistory()}
+	return Model{
+		ws:      newWorkspace(),
+		history: LoadQueryHistory(),
+		stats:   statsState{row: -1},
+	}
 }
 
 // NewWithQuery opens straight onto a search, for `scry --panels <query>`.
@@ -74,9 +86,24 @@ func NewWithQuery(query string) (Model, tea.Cmd) {
 	return m, m.search(p)
 }
 
-func (m Model) Init() tea.Cmd { return tea.EnterAltScreen }
+func (m Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{tea.EnterAltScreen}
+	// Parsed at the start when it's already downloaded, so a card's text is
+	// highlighted from the first search. Not downloaded here: a megabyte
+	// fetched before anyone has asked about a rule is presumptuous.
+	if rules.Cached() {
+		cmds = append(cmds, loadRules)
+	}
+	return tea.Batch(cmds...)
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Views built before the rulebook arrived get it now, so nothing has to
+	// remember to ask. Deferred on a value receiver, which works because
+	// what it changes is reached through the panel pointers rather than
+	// through m itself.
+	defer m.adoptRules()
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -109,6 +136,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case deckWrittenMsg:
 		return m.handleDeckWritten(msg)
 
+	case rulingsTickMsg:
+		return m.handleRulingsTick(msg)
+
+	case rulingsMsg:
+		return m.handleRulings(msg)
+
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)
 
@@ -124,6 +157,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, nil
+}
+
+// adoptRules hands the rulebook to every list of cards, so oracle text is
+// highlighted wherever it appears.
+func (m *Model) adoptRules() {
+	if !m.rules.Loaded() {
+		return
+	}
+	for _, p := range m.ws.panels {
+		if l := p.cardsView(); l != nil && !l.rules.Loaded() {
+			l.rules = m.rules
+		}
+	}
 }
 
 func (m Model) View() string {

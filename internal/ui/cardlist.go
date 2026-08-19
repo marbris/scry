@@ -5,10 +5,10 @@ import (
 
 	"scry/internal/deck"
 	"scry/internal/mtg"
-	"scry/internal/theme"
+	"scry/internal/rules"
+	"scry/internal/stats"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // A list of cards in a panel: what's in it, how it's ordered, what's been
@@ -29,6 +29,11 @@ type cardList struct {
 
 	cursor // where you are in rows, and how far it has scrolled
 
+	// statFilter is the statistics category the list is narrowed to, set by
+	// walking the bars in the information panel. Separate from the text
+	// filter because they compose: filter to "elf", then narrow to lands.
+	statFilter *stats.Row
+
 	// filter is a literal narrowing. Terms are substrings, all of them have
 	// to appear, and they're matched against the name and the rules text —
 	// which is the one thing a fuzzy match makes useless, since over a
@@ -48,6 +53,13 @@ type cardList struct {
 	// local one can be edited; a borrowed one can't.
 	deck *deck.Info
 
+	// rules and rulings are what the information panel needs to describe a
+	// card properly. They arrive after the cards do, and the panel simply
+	// shows less until they have.
+	rules     rules.Data
+	rulings   map[string][]mtg.Ruling
+	rulingErr map[string]error
+
 	// dirty means there are edits not yet written. Saving is explicit, so
 	// this is the only thing standing between an edit and losing it — which
 	// is why quitting asks.
@@ -65,7 +77,10 @@ func newCardList(cards []deck.Card, order cardSort, arrivalName string) *cardLis
 	if arrivalName == "" {
 		arrivalName = "as found"
 	}
-	l := &cardList{all: cards, order: order, marks: map[string]bool{}, arrivalName: arrivalName}
+	l := &cardList{
+		all: cards, order: order, marks: map[string]bool{}, arrivalName: arrivalName,
+		rulings: map[string][]mtg.Ruling{}, rulingErr: map[string]error{},
+	}
 	l.refresh()
 	return l
 }
@@ -82,7 +97,25 @@ func (l *cardList) orderName() string {
 // through here, so the filter and the sort can't be applied in the wrong
 // order or one of them forgotten.
 func (l *cardList) refresh() {
+	rows := l.narrowed()
+	l.rows = sortCards(rows, l.order)
+	l.cursor.clamp(len(l.rows))
+}
+
+// narrowed is the cards after both narrowings, before sorting. The
+// statistics count this, so what the bars say and what the list shows can
+// never disagree.
+func (l *cardList) narrowed() []deck.Card {
 	rows := l.all
+	if l.statFilter != nil {
+		kept := make([]deck.Card, 0, len(rows))
+		for _, c := range rows {
+			if l.statFilter.Match(c) {
+				kept = append(kept, c)
+			}
+		}
+		rows = kept
+	}
 	if terms := filterTerms(l.filter); len(terms) > 0 {
 		kept := make([]deck.Card, 0, len(rows))
 		for _, c := range rows {
@@ -92,8 +125,7 @@ func (l *cardList) refresh() {
 		}
 		rows = kept
 	}
-	l.rows = sortCards(rows, l.order)
-	l.clampCursor()
+	return rows
 }
 
 func (l *cardList) count() int  { return len(l.rows) }
@@ -392,42 +424,11 @@ func (l *cardList) clear() bool {
 	return true
 }
 
-// info describes the card under the cursor. The full rendering — mana
-// symbols, rulings, printed-text history — is the information panel's own
-// phase; this is what a row needs said about it in the meantime.
+// info is the card under the cursor, in full.
 func (l *cardList) info(width int) []string {
 	c, ok := l.current()
 	if !ok {
 		return nil
 	}
-
-	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
-	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
-	body := lipgloss.NewStyle().Foreground(theme.Text)
-
-	out := []string{head.Render(fit(c.Card.Name, width))}
-	if cost := manaCost(c.Card); cost != "" {
-		out = append(out, dim.Render(fit(cost, width)))
-	}
-	out = append(out, dim.Render(fit(c.Card.TypeLine, width)), "")
-	out = append(out, wrapStyled(c.Card.CombinedOracle(), width, body)...)
-
-	if pt := powerToughness(c.Card); pt != "" {
-		out = append(out, "", dim.Render(fit(pt, width)))
-	}
-	if len(c.Tags) > 0 {
-		out = append(out, "", lipgloss.NewStyle().Foreground(theme.Highlight).
-			Render(fit(strings.Join(c.Tags, " "), width)))
-	}
-	return out
-}
-
-func powerToughness(c mtg.Card) string {
-	if c.Power == "" && c.Toughness == "" {
-		if c.Loyalty != "" {
-			return "loyalty " + c.Loyalty
-		}
-		return ""
-	}
-	return c.Power + "/" + c.Toughness
+	return cardInfo(c, width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
 }

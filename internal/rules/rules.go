@@ -761,3 +761,11 @@ func (d Data) Subrules(number string) []Rule {
 	}
 	return out
 }
+
+// Cached reports whether the rulebook is already on disk. Parsing it to
+// highlight a card's text is worth doing; downloading a megabyte to do so,
+// before anyone has asked about a rule, is not.
+func Cached() bool {
+	_, err := os.Stat(FilePath())
+	return err == nil
+}

@@ -165,6 +165,9 @@ func (p *panel) show(v view) {
 	p.stack = []view{v}
 	p.searchOpen = false
 	p.search.Blur()
+	// Whatever was being waited for has arrived, by definition.
+	p.loading = false
+	p.err = nil
 }
 
 // push steps into something reached from the current view — a deck's

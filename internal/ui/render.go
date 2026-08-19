@@ -157,7 +157,12 @@ func (m Model) viewInfo(width, height int) string {
 		lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)),
 	}
 
-	body := m.infoBody(inner)
+	var body []string
+	if m.info.mode == infoStats {
+		body = m.renderStats(inner)
+	} else {
+		body = m.infoBody(inner)
+	}
 	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
 	// read, never focused.
 	room := maxInt(height-2-len(lines), 1)

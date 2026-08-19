@@ -40,7 +40,7 @@ var leaderMenu = []leaderCmd{
 	{"d", "decks", func(m *Model) { m.ws.open(KindDecks).show(newDeckList()) }},
 	{"r", "rules", nil}, // needs a command, so it is run below
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
-	{"s", "stats", func(m *Model) { m.info.mode = infoStats }},
+	{"s", "stats (everything)", func(m *Model) { m.toggleStats(true) }},
 	{"c", "close", func(m *Model) { m.ws.close() }},
 	{"o", "only", func(m *Model) { m.ws.only() }},
 	{"h", "move left", func(m *Model) { m.ws.movePanel(-1) }},
@@ -147,7 +147,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// The view has first refusal on anything that isn't the workspace's.
 	if v := p.top(); v != nil {
 		if handled, cmd := v.key(key, &m, p); handled {
-			return m, cmd
+			// The cursor may have moved, so start the clock on whatever is
+			// under it now.
+			return m, tea.Batch(cmd, m.hover())
 		}
 	}
 
@@ -157,8 +159,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "h", "left":
 		m.ws.step(-1)
+		return m, m.hover()
 	case "l", "right":
 		m.ws.step(1)
+		return m, m.hover()
 
 	case "i":
 		// The bar keeps the query that produced what's on screen, so i is
@@ -178,16 +182,24 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.goPrefix = true
 
 	case "K", "shift+up":
-		m.info.move(-1)
+		if m.info.mode == infoStats {
+			m.moveStat(-1)
+		} else {
+			m.info.move(-1)
+		}
 	case "J", "shift+down":
-		m.info.move(1)
+		if m.info.mode == infoStats {
+			m.moveStat(1)
+		} else {
+			m.info.move(1)
+		}
 	case "ctrl+k":
 		m.info.scroll(-1)
 	case "ctrl+j":
 		m.info.scroll(1)
 
 	case "s":
-		m.info.toggle(infoStats)
+		m.toggleStats(false)
 
 	case "?":
 		m.showKeys = true
@@ -198,6 +210,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Closing the last one lands on the splash rather than quitting —
 		// esc *from* the splash is what leaves.
 		switch {
+		// A statistics narrowing is the outermost thing esc undoes: it was
+		// imposed from the panel beside the list, so it comes off first.
+		case m.info.mode == infoStats && m.stats.row >= 0:
+			m.stats.row = -1
+			m.applyStatFilter()
+		case m.info.mode == infoStats:
+			m.toggleStats(m.stats.global)
 		case p.top() != nil && p.top().clear():
 		case p.pop():
 		default:
@@ -406,4 +425,22 @@ func (m Model) saveEverything() tea.Cmd {
 		}
 	}
 	return tea.Batch(cmds...)
+}
+
+// toggleStats turns the statistics on or off. Turning them off puts back
+// whatever they were narrowing, because a narrowing you can no longer see
+// the reason for is a bug you'd spend a while finding.
+func (m *Model) toggleStats(global bool) {
+	if m.info.mode == infoStats && m.stats.global == global {
+		m.info.mode = infoCard
+		m.stats.row = -1
+		m.clearStatFilter()
+		return
+	}
+	m.info.mode = infoStats
+	m.stats.global = global
+	m.stats.row = -1
+	m.info.offset = 0
+	m.clearStatFilter()
+	m.buildStats()
 }
