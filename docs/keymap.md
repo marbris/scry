@@ -167,9 +167,18 @@ shifted form.
 The name prompt defaults to something useful — the remote deck's title, or
 the query string for search results.
 
-Note that `c` on a remote row in the decks panel reaches the same operation
-from the other direction. One operation, two doorways, depending on where you
-happen to be when you think of it.
+### `w` and `c` are not the same operation
+
+Each acts on its own level, and they produce different things:
+
+| | acts on | produces |
+|---|---|---|
+| `c` (decks panel) | a **row** — one deck among many | another **row**: a local copy beside it, or a sync if the copy exists |
+| `w` (card list) | the **list** — the cards in front of you | another **list**: this panel becomes the local deck, or `W` opens it in a new one |
+
+`c` copies an item within a collection. `w` writes the thing you are looking
+at. The decks panel never stops being a decks panel; the card panel stops
+being remote.
 
 ## Search bars
 
