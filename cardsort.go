@@ -147,7 +147,7 @@ func typeRank(typeLine string) int {
 // multicoloured, then the colourless — which is how a deck is usually laid
 // out when it's laid out by colour at all.
 func colorRank(c ScryfallCard) int {
-	colors := c.displayColors()
+	colors := c.DisplayColors()
 	switch len(colors) {
 	case 0:
 		return 6

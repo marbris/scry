@@ -50,35 +50,6 @@ type deckLoadedMsg struct {
 	err   error
 }
 
-// deckSections is the order the list is grouped in: the command zone first,
-// then spells roughly in the order they get cast, then lands.
-var deckSections = []string{
-	"Commander", "Creature", "Planeswalker", "Battle",
-	"Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Other",
-}
-
-// typePrecedence decides the one section a card with several types lands in.
-// Creature wins over everything, so an Artifact Creature is a creature; Land
-// comes before Artifact and Enchantment, so an artifact land is a land.
-var typePrecedence = []string{
-	"Creature", "Planeswalker", "Battle", "Land",
-	"Instant", "Sorcery", "Artifact", "Enchantment",
-}
-
-func primaryType(typeLine string) string {
-	// Modal double-faced cards join their halves with "//"; the front face
-	// is the one that decides where the card is listed.
-	if i := strings.Index(typeLine, "//"); i >= 0 {
-		typeLine = typeLine[:i]
-	}
-	for _, t := range typePrecedence {
-		if strings.Contains(typeLine, t) {
-			return t
-		}
-	}
-	return "Other"
-}
-
 // deckFileFrom builds a deck file out of a deck that's already open, so
 // saving what's on screen never needs to fetch it again — and works with no
 // network at all.

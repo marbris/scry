@@ -14,123 +14,6 @@ import (
 // into, and the panel block it renders as. Nothing here knows about search
 // or decks — both feed the same ScryfallCard through the same renderers.
 
-// ── Scryfall types ──────────────────────────────────────────────
-
-type ScryfallResponse struct {
-	Data       []ScryfallCard `json:"data"`
-	TotalCards int            `json:"total_cards"`
-	HasMore    bool           `json:"has_more"`
-	NextPage   string         `json:"next_page"`
-}
-
-type ScryfallCard struct {
-	ID              string `json:"id"`
-	OracleID        string `json:"oracle_id"`
-	PrintsSearchURI string `json:"prints_search_uri"`
-	Set             string `json:"set"`
-	CollectorNumber string `json:"collector_number"`
-	ReleasedAt      string `json:"released_at"`
-	Lang            string `json:"lang"`
-	Digital         bool   `json:"digital"`
-
-	Name          string            `json:"name"`
-	ManaCost      string            `json:"mana_cost"`
-	TypeLine      string            `json:"type_line"`
-	OracleText    string            `json:"oracle_text"`
-	Colors        []string          `json:"colors"`
-	ColorIdentity []string          `json:"color_identity"`
-	Power         string            `json:"power"`
-	Toughness     string            `json:"toughness"`
-	Loyalty       string            `json:"loyalty"`
-	SetName       string            `json:"set_name"`
-	Rarity        string            `json:"rarity"`
-	RulingsURI    string            `json:"rulings_uri"`
-	Legalities    map[string]string `json:"legalities"`
-	CMC           float64           `json:"cmc"`
-	EDHRECRank    int               `json:"edhrec_rank"`
-
-	// Transforming and modal double-faced cards carry no top-level oracle
-	// text, mana cost or colors at all — it's per face.
-	CardFaces []CardFace `json:"card_faces"`
-}
-
-type CardFace struct {
-	Name       string   `json:"name"`
-	ManaCost   string   `json:"mana_cost"`
-	TypeLine   string   `json:"type_line"`
-	OracleText string   `json:"oracle_text"`
-	Colors     []string `json:"colors"`
-	Power      string   `json:"power"`
-	Toughness  string   `json:"toughness"`
-	Loyalty    string   `json:"loyalty"`
-}
-
-// faces returns a card's printed faces as cards in their own right, so
-// anything that renders a card can work a face at a time. A single-faced
-// card comes back as itself.
-func (c ScryfallCard) faces() []ScryfallCard {
-	if len(c.CardFaces) < 2 {
-		return []ScryfallCard{c}
-	}
-	out := make([]ScryfallCard, 0, len(c.CardFaces))
-	for _, f := range c.CardFaces {
-		fc := c
-		fc.CardFaces = nil
-		fc.Name = f.Name
-		fc.ManaCost = f.ManaCost
-		fc.TypeLine = f.TypeLine
-		fc.OracleText = f.OracleText
-		fc.Power = f.Power
-		fc.Toughness = f.Toughness
-		fc.Loyalty = f.Loyalty
-		if len(f.Colors) > 0 {
-			fc.Colors = f.Colors
-		}
-		out = append(out, fc)
-	}
-	return out
-}
-
-// combinedOracle is every face's text at once, for the places that match
-// against a card's wording rather than display it.
-func (c ScryfallCard) combinedOracle() string {
-	if len(c.CardFaces) < 2 {
-		return c.OracleText
-	}
-	var parts []string
-	for _, f := range c.CardFaces {
-		if f.OracleText != "" {
-			parts = append(parts, f.OracleText)
-		}
-	}
-	return strings.Join(parts, "\n")
-}
-
-// displayColors and displayManaCost fall back to the front face, which is
-// where a transforming card keeps them.
-func (c ScryfallCard) displayColors() []string {
-	if len(c.Colors) > 0 || len(c.CardFaces) == 0 {
-		return c.Colors
-	}
-	return c.CardFaces[0].Colors
-}
-
-func (c ScryfallCard) displayManaCost() string {
-	if c.ManaCost != "" || len(c.CardFaces) == 0 {
-		return c.ManaCost
-	}
-	return c.CardFaces[0].ManaCost
-}
-
-type Ruling struct {
-	Source  string `json:"source"`
-	Comment string `json:"comment"`
-}
-
-type RulingsResponse struct {
-	Data []Ruling `json:"data"`
-}
-
 // ── Single-line delegate ────────────────────────────────────────
 
 // compactDelegate draws one card per line.
@@ -219,7 +102,7 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 		nameW, manaW, typeW := listColumns(m.Width())
 		dim := lipgloss.NewStyle().Foreground(gruvGray)
 
-		mana, manaLen := renderManaWidth(c.displayManaCost(), manaW)
+		mana, manaLen := renderManaWidth(c.DisplayManaCost(), manaW)
 		mana = stripStyle(mana)
 		if manaLen == 0 {
 			mana, manaLen = "·", 1
@@ -255,12 +138,12 @@ func (d compactDelegate) Render(w io.Writer, m list.Model, index int, item list.
 
 	nameStyle := lipgloss.NewStyle().
 		Width(nameW).
-		Foreground(colorForCard(c.displayColors()))
+		Foreground(colorForCard(c.DisplayColors()))
 	typeStyle := lipgloss.NewStyle().
 		Width(typeW).
 		Foreground(gruvFgDim)
 
-	renderedMana, manaLen := renderManaWidth(c.displayManaCost(), manaW)
+	renderedMana, manaLen := renderManaWidth(c.DisplayManaCost(), manaW)
 	if manaLen == 0 {
 		renderedMana = lipgloss.NewStyle().Foreground(gruvFgDim).Render("·")
 		manaLen = 1
@@ -303,7 +186,7 @@ type cardItem struct {
 func (c cardItem) Title() string       { return c.card.Name }
 func (c cardItem) Description() string { return c.card.TypeLine }
 func (c cardItem) FilterValue() string {
-	return c.card.Name + " " + c.card.combinedOracle()
+	return c.card.Name + " " + c.card.CombinedOracle()
 }
 
 // ── Color helpers ───────────────────────────────────────────────
@@ -409,7 +292,7 @@ func faceHeading(f ScryfallCard, nameStyle lipgloss.Style) string {
 // one per face for a double-faced one, each labelled with the face it
 // belongs to, since Scryfall keeps no text on the card itself.
 func oracleBlock(c ScryfallCard, width int, rules RulesData) string {
-	faces := c.faces()
+	faces := c.Faces()
 
 	var b strings.Builder
 	for i, f := range faces {
@@ -436,7 +319,7 @@ func (m model) renderPreview(c ScryfallCard, maxW int) string {
 
 	// A double-faced card's name, cost and P/T live on its faces; the front
 	// one stands in for the card at the top of the panel.
-	front := c.faces()[0]
+	front := c.Faces()[0]
 
 	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(colorForCard(front.Colors))
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvAqua).MarginTop(1)

@@ -64,7 +64,7 @@ func colorRows() []statRow {
 				if isLand(ci.card) {
 					return false
 				}
-				for _, c := range ci.card.displayColors() {
+				for _, c := range ci.card.DisplayColors() {
 					if c == code {
 						return true
 					}
@@ -77,13 +77,13 @@ func colorRows() []statRow {
 		statRow{
 			group: "Color", label: "Colorless", color: gruvFgDim,
 			match: func(ci cardItem) bool {
-				return !isLand(ci.card) && len(ci.card.displayColors()) == 0
+				return !isLand(ci.card) && len(ci.card.DisplayColors()) == 0
 			},
 		},
 		statRow{
 			group: "Color", label: "Multi", color: gruvYellow,
 			match: func(ci cardItem) bool {
-				return !isLand(ci.card) && len(ci.card.displayColors()) > 1
+				return !isLand(ci.card) && len(ci.card.DisplayColors()) > 1
 			},
 		},
 	)
@@ -167,7 +167,6 @@ func cmcRows() []statRow {
 
 // isLand reports whether a card's front face is a land, which is what
 // decides where it's counted.
-func isLand(c ScryfallCard) bool { return primaryType(c.TypeLine) == "Land" }
 
 func typeRows() []statRow {
 	types := []string{"Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land"}

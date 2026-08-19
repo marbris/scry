@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,48 +31,6 @@ var sortOptions = []string{
 }
 
 // ── HTTP helper ─────────────────────────────────────────────────
-
-type notFoundError struct{}
-
-func (e notFoundError) Error() string { return "no results found" }
-
-func doGet(u string) ([]byte, error) {
-	req, err := http.NewRequest("GET", u, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Accept", "application/json;q=0.9,*/*;q=0.8")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode == 404 {
-		return nil, notFoundError{}
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s (%d): %s", hostOf(u), resp.StatusCode, string(body))
-	}
-	return body, nil
-}
-
-// hostOf labels an error with the service that produced it — cards and
-// rulings come from Scryfall, decks from Moxfield.
-func hostOf(u string) string {
-	parsed, err := url.Parse(u)
-	if err != nil || parsed.Host == "" {
-		return "request"
-	}
-	return strings.TrimPrefix(parsed.Host, "api.")
-}
 
 // ── Commands ────────────────────────────────────────────────────
 
@@ -237,29 +191,4 @@ func fetchCollection(ids []string) (map[string]ScryfallCard, error) {
 		out[c.ID] = c
 	}
 	return out, nil
-}
-
-func doPost(u string, payload []byte) ([]byte, error) {
-	req, err := http.NewRequest("POST", u, bytes.NewReader(payload))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s (%d)", hostOf(u), resp.StatusCode)
-	}
-	return body, nil
 }

@@ -5,12 +5,11 @@ package main
 // glossary terms, and matches them against a card's oracle text.
 
 import (
-	"fmt"
-	"io"
-	"net/http"
 	"os"
+
 	"path/filepath"
 	"regexp"
+	"scry/internal/fetch"
 	"sort"
 	"strings"
 	"unicode"
@@ -545,7 +544,7 @@ func (d RulesData) MatchCard(c ScryfallCard) []RuleMatch {
 
 	// Both halves of a double-faced card, so the back face's keywords
 	// still turn up in the rules panel.
-	oracle := c.combinedOracle()
+	oracle := c.CombinedOracle()
 
 	for _, sp := range scan(d.keywordRe, oracle) {
 		kw, ok := d.keywords[strings.ToLower(sp.text)]
@@ -624,48 +623,15 @@ func cardTypes(typeLine string) []string {
 
 const rulesURL = "https://media.wizards.com/2026/downloads/MagicCompRules%2020260417.txt"
 
-func dataDir() string {
-	dir := filepath.Join(os.Getenv("HOME"), ".local", "share", "scry")
-	os.MkdirAll(dir, 0755)
-	return dir
-}
-
 func rulesFilePath() string {
 	return filepath.Join(dataDir(), "comprules.txt")
 }
 
 func downloadRules() error {
-	client := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Preserve headers through redirects
-			req.Header.Set("User-Agent", "scry/1.0")
-			req.Header.Set("Accept", "*/*")
-			return nil
-		},
-	}
-
-	req, err := http.NewRequest("GET", rulesURL, nil)
+	body, err := fetch.GetFile(rulesURL)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return err
 	}
-	req.Header.Set("User-Agent", "scry/1.0")
-	req.Header.Set("Accept", "*/*")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("status %d from %s", resp.StatusCode, rulesURL)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("reading body: %w", err)
-	}
-
 	return os.WriteFile(rulesFilePath(), body, 0644)
 }
 

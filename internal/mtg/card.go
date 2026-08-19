@@ -1,0 +1,124 @@
+// Package mtg is the game's own vocabulary: a card as Scryfall sends it, and
+// the handful of facts about card types that everything else agrees on.
+//
+// Nothing here knows about searching, decks, or the terminal. It is the
+// bottom of the dependency graph and stays that way.
+package mtg
+
+import "strings"
+
+// SearchResponse is a page of results from Scryfall's search endpoint.
+type SearchResponse struct {
+	Data       []Card `json:"data"`
+	TotalCards int    `json:"total_cards"`
+	HasMore    bool   `json:"has_more"`
+	NextPage   string `json:"next_page"`
+}
+
+type Card struct {
+	ID              string `json:"id"`
+	OracleID        string `json:"oracle_id"`
+	PrintsSearchURI string `json:"prints_search_uri"`
+	Set             string `json:"set"`
+	CollectorNumber string `json:"collector_number"`
+	ReleasedAt      string `json:"released_at"`
+	Lang            string `json:"lang"`
+	Digital         bool   `json:"digital"`
+
+	Name          string            `json:"name"`
+	ManaCost      string            `json:"mana_cost"`
+	TypeLine      string            `json:"type_line"`
+	OracleText    string            `json:"oracle_text"`
+	Colors        []string          `json:"colors"`
+	ColorIdentity []string          `json:"color_identity"`
+	Power         string            `json:"power"`
+	Toughness     string            `json:"toughness"`
+	Loyalty       string            `json:"loyalty"`
+	SetName       string            `json:"set_name"`
+	Rarity        string            `json:"rarity"`
+	RulingsURI    string            `json:"rulings_uri"`
+	Legalities    map[string]string `json:"legalities"`
+	CMC           float64           `json:"cmc"`
+	EDHRECRank    int               `json:"edhrec_rank"`
+
+	// Transforming and modal double-faced cards carry no top-level oracle
+	// text, mana cost or colors at all — it's per face.
+	CardFaces []Face `json:"card_faces"`
+}
+
+type Face struct {
+	Name       string   `json:"name"`
+	ManaCost   string   `json:"mana_cost"`
+	TypeLine   string   `json:"type_line"`
+	OracleText string   `json:"oracle_text"`
+	Colors     []string `json:"colors"`
+	Power      string   `json:"power"`
+	Toughness  string   `json:"toughness"`
+	Loyalty    string   `json:"loyalty"`
+}
+
+// Faces returns a card's printed faces as cards in their own right, so
+// anything that renders a card can work a face at a time. A single-faced
+// card comes back as itself.
+func (c Card) Faces() []Card {
+	if len(c.CardFaces) < 2 {
+		return []Card{c}
+	}
+	out := make([]Card, 0, len(c.CardFaces))
+	for _, f := range c.CardFaces {
+		fc := c
+		fc.CardFaces = nil
+		fc.Name = f.Name
+		fc.ManaCost = f.ManaCost
+		fc.TypeLine = f.TypeLine
+		fc.OracleText = f.OracleText
+		fc.Power = f.Power
+		fc.Toughness = f.Toughness
+		fc.Loyalty = f.Loyalty
+		if len(f.Colors) > 0 {
+			fc.Colors = f.Colors
+		}
+		out = append(out, fc)
+	}
+	return out
+}
+
+// CombinedOracle is every face's text at once, for the places that match
+// against a card's wording rather than display it.
+func (c Card) CombinedOracle() string {
+	if len(c.CardFaces) < 2 {
+		return c.OracleText
+	}
+	var parts []string
+	for _, f := range c.CardFaces {
+		if f.OracleText != "" {
+			parts = append(parts, f.OracleText)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// DisplayColors and DisplayManaCost fall back to the front face, which is
+// where a transforming card keeps them.
+func (c Card) DisplayColors() []string {
+	if len(c.Colors) > 0 || len(c.CardFaces) == 0 {
+		return c.Colors
+	}
+	return c.CardFaces[0].Colors
+}
+
+func (c Card) DisplayManaCost() string {
+	if c.ManaCost != "" || len(c.CardFaces) == 0 {
+		return c.ManaCost
+	}
+	return c.CardFaces[0].ManaCost
+}
+
+type Ruling struct {
+	Source  string `json:"source"`
+	Comment string `json:"comment"`
+}
+
+type RulingsResponse struct {
+	Data []Ruling `json:"data"`
+}

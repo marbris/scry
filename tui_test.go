@@ -1024,7 +1024,7 @@ func dfcFixture() ScryfallCard {
 func TestFacesStandInForTheCard(t *testing.T) {
 	c := dfcFixture()
 
-	faces := c.faces()
+	faces := c.Faces()
 	if len(faces) != 2 {
 		t.Fatalf("got %d faces, want 2", len(faces))
 	}
@@ -1037,22 +1037,22 @@ func TestFacesStandInForTheCard(t *testing.T) {
 	}
 
 	// A single-faced card is its own only face.
-	if got := len(testCards()[0].faces()); got != 1 {
+	if got := len(testCards()[0].Faces()); got != 1 {
 		t.Errorf("single-faced card produced %d faces", got)
 	}
 
-	if !strings.Contains(c.combinedOracle(), "Double strike") ||
-		!strings.Contains(c.combinedOracle(), "Living metal") {
-		t.Errorf("combined oracle text missed a face: %q", c.combinedOracle())
+	if !strings.Contains(c.CombinedOracle(), "Double strike") ||
+		!strings.Contains(c.CombinedOracle(), "Living metal") {
+		t.Errorf("combined oracle text missed a face: %q", c.CombinedOracle())
 	}
 
 	// The top level carries no cost or colors for a transforming card, so
 	// the list has to fall back to the front face.
-	if c.displayManaCost() != "{4}{R}" {
-		t.Errorf("display mana cost = %q, want the front face's", c.displayManaCost())
+	if c.DisplayManaCost() != "{4}{R}" {
+		t.Errorf("display mana cost = %q, want the front face's", c.DisplayManaCost())
 	}
-	if len(c.displayColors()) != 1 || c.displayColors()[0] != "R" {
-		t.Errorf("display colors = %v, want the front face's", c.displayColors())
+	if len(c.DisplayColors()) != 1 || c.DisplayColors()[0] != "R" {
+		t.Errorf("display colors = %v, want the front face's", c.DisplayColors())
 	}
 }
 

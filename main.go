@@ -26,7 +26,7 @@ func printCardStdout(c ScryfallCard) {
 	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvAqua)
 	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
 
-	front := c.faces()[0]
+	front := c.Faces()[0]
 	fmt.Print(faceHeading(front, lipgloss.NewStyle().Bold(true).Foreground(colorForCard(front.Colors))))
 
 	fmt.Println(dimStyle.Render(fmt.Sprintf("%s · %s · CMC %.0f", c.SetName, c.Rarity, c.CMC)))
