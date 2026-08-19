@@ -128,6 +128,14 @@ func main() {
 		}
 	}
 
+	// `scry --panels` — the panel workspace, which is replacing the
+	// two-pane screen a phase at a time. Behind a flag until it can do
+	// everything the old one can.
+	if len(os.Args) > 1 && (os.Args[1] == "--panels" || os.Args[1] == "panels") {
+		runPanels()
+		return
+	}
+
 	// `scry theme [name | edit name]` — colours.
 	if len(os.Args) > 1 && os.Args[1] == "theme" {
 		runTheme(os.Args[2:])
