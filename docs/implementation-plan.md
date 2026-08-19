@@ -142,12 +142,34 @@ rather than being retrofitted.
 
 Each phase compiles and runs.
 
-**1. Repackage.** Move the surviving domain code into `internal/` and export
-what crosses boundaries. Update the old UI's references mechanically so the
-tree stays green; those references die on their own as files get deleted in
-later phases. Domain tests move with their packages. No behaviour change.
+**1. Repackage. — done**, in four commits. ~4,700 lines now live in ten
+packages under `internal/`; 6,978 lines of old UI remain in `package main`,
+to be replaced from phase 3 on.
 
-**2. Theme.** Define the roles, convert the surviving files to them, add the
+| Package | Lines | |
+|---|---|---|
+| `deck` | 2,165 | file format, git, card cache, resolution |
+| `rules` | 762 | parser, indexes, card matching |
+| `moxfield` | 531 | deck import, user decks |
+| `prints` | 376 | MTGJSON printed-text history |
+| `stats` | 350 | statistic rows and groups |
+| `scryfall` | 179 | search, rulings, collection |
+| `mtg` | 165 | the card, and card-type facts |
+| `fetch` | 99 | the network, one User-Agent |
+| `paths` | 41 | where files live |
+| `theme` | 27 | the palette |
+
+Three rules held throughout:
+
+- **Domain packages return answers, not `tea.Cmd`s.** The UI is the only
+  part with a main thread to stay off, so the wrapping lives there.
+- **`compat.go` bridges the old names**, so the doomed UI compiled untouched
+  rather than being rewritten on its way to deletion. It is 167 lines and
+  shrinks to nothing as its clients go.
+- **Tests moved with their code.** `tui_test.go` was asserting internals two
+  packages away; `moxuser_test.go` turned out to be two files in one.
+
+**2. Theme. — next.** Define the roles, convert the surviving files to them, add the
 config file, embedded built-ins, per-role fallback, and the `scry theme`
 commands. A second theme (a light one) to prove the fallback works.
 
