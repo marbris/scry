@@ -124,6 +124,10 @@ Configuration:
 
 - `~/.config/scry/config.json` — `{"theme": "gruvbox"}`, honouring
   `XDG_CONFIG_HOME`.
+- Files split across all four XDG directories: **config** for what you wrote,
+  **data** for decks, **state** for session and query history, **cache** for
+  everything re-downloadable. `paths.Migrate` moves what's left in the old
+  single directory, on startup, without ever overwriting.
 - `~/.config/scry/themes/<name>.json` — user themes.
 - Built-ins embedded with `//go:embed`; gruvbox stays the default.
 - **Partial themes fall back role by role** to the default, so a user file
@@ -169,11 +173,11 @@ Three rules held throughout:
 - **Tests moved with their code.** `tui_test.go` was asserting internals two
   packages away; `moxuser_test.go` turned out to be two files in one.
 
-**2. Theme. — next.** Define the roles, convert the surviving files to them, add the
+**2. Theme. — done.** Define the roles, convert the surviving files to them, add the
 config file, embedded built-ins, per-role fallback, and the `scry theme`
 commands. A second theme (a light one) to prove the fallback works.
 
-**3. Workspace shell.** `workspace`, `panel`, the layout arithmetic (equal
+**3. Workspace shell. — next.** `workspace`, `panel`, the layout arithmetic (equal
 shares, minimum width, horizontal overflow), the focus ring on `h`/`l`, the
 `<space>` prefix and its which-key popup, splash screen, empty information
 panel, panel create/close/move/jump. No content in the panels yet.
