@@ -88,9 +88,10 @@ and "next row" are the same key, and that key is `j`.
 | `/` | filter, narrowing as you type · `esc` abandons it |
 | `o` `O` | cycle sort forward / back |
 | `v` `V` | select row / select all shown |
-| `a` `x` | add / remove selected cards to the editing deck |
+| `a` `x` | add / remove a copy — `a a a` gives you three, `x` takes them back |
+| `u` | undo the last edit |
 | `y` `p` | yank selected cards · put them in this list |
-| `t` `T` | tag · tag with the last tag and add |
+| `t` `T` | tag (`ramp -draw` does both) · add and tag with the last tag |
 | `c` | set as commander |
 | `s` | statistics for this list |
 | `gv` | printed-text history of this card |

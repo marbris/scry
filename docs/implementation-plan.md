@@ -240,9 +240,14 @@ doc always said; and `g` is a prefix only, so `gg` and `gv` coexist.
 characters — an emoji is one rune and two columns — and a real deck name
 proved it.
 
-**7. Editing deck and transfers. — next.** The derived-target rule and `e` pinning,
+**7. Editing deck and transfers. — done.** The derived-target rule and `e` pinning,
 `gd`, `a`/`x`, the `y`/`p` register carrying quantity and tags, `t`/`T`, `c`,
 undo, `w`/`W`, and the unsaved-changes prompt on quit.
+
+`a` counts up rather than refusing a card already there, which makes `a`/`x`
+symmetric and removes the need for `+`/`-`. Undo keeps whole copies of the
+deck rather than a diff — a diff that gets it wrong corrupts the deck rather
+than merely failing — and an edit that changed nothing drops its own step.
 
 `w` and `c` are different operations at different levels, and both are
 needed:
@@ -252,7 +257,7 @@ needed:
 | `c` in a decks panel | a **row** — one deck among many | another row: a local copy beside it, or a sync if it exists |
 | `w` in a card list | the **list** in front of you | this panel becomes the local deck; `W` opens it in a new panel |
 
-**8. Rules panel.** Paragraph search results, the full rule in the
+**8. Rules panel. — next.** Paragraph search results, the full rule in the
 information panel, and card-scoped opening (abilities / actions / zones /
 glossary).
 
