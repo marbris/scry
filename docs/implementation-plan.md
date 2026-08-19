@@ -144,7 +144,7 @@ rather than being retrofitted.
 
 ## Phases
 
-Each phase compiles and runs.
+All twelve are done. Each compiled and ran on its own.
 
 **1. Repackage. — done**, in four commits. ~4,700 lines now live in ten
 packages under `internal/`; 6,978 lines of old UI remain in `package main`,
@@ -302,9 +302,24 @@ a deck of yours by slug, nothing borrowed and nothing empty. **The suite went
 from 125 seconds to under one** — that was the old tests reaching the
 network.
 
-**12. Tests. — next.** Most of this landed alongside each phase rather than
-after it: layout arithmetic, the abbreviation ladder, the focus ring, the
-`esc` cascade, panel create/close, the `y`/`p` register and stats filtering
-across lists all have tests already. What is left is a pass for gaps, and
-deciding what — if anything — should cover the packages that still have no
-test files (`fetch`, `mtg`, `scryfall`).
+**12. Tests. — done.** Most landed alongside each phase, so this was a gap
+pass guided by coverage. Four packages had none at all.
+
+| | before | after |
+|---|---|---|
+| `mtg` | 0% | 100% |
+| `scryfall` | 0% | 89% |
+| `fetch` | 0% | 85% |
+| `deck` | 70% | 84% |
+| `ui` | 69% | 77% |
+| `moxfield` | 18% | 43% |
+| `prints` | 20% | 44% |
+
+`scryfall.Search` needed an injectable URL to be testable at all — paging and
+the partial-answer rule are the subtlest code here and had only been checked
+by reading. What stays uncovered is HTTP plumbing over already-tested pieces,
+and the platform branches in `paths` that can't run on Linux.
+
+The pass found two bugs: `/` did nothing in a rules panel (a type switch with
+no case, failing silently), and a tag with a space could be imported but
+never typed.
