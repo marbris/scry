@@ -221,12 +221,26 @@ the panel that asked for it and the row can be reordered or closed
 meanwhile. An answer to a closed panel, or to a query that panel has since
 moved on from, is dropped.
 
-**6. Decks panel. — next.** The unified list — local decks, remote links, Moxfield
+**6. Decks panel. — done.** The unified list — local decks, remote links, Moxfield
 usernames — with the compact columns. `i` to add a remote or a user,
 `n`/`r`/`x`/`c`, `enter`/`L`, and the sub-views (`gv` versions, a user's
 decks) on the panel's stack.
 
-**7. Editing deck and transfers.** The derived-target rule and `e` pinning,
+Panels hold a **stack of views**, not one — some are reached from inside
+another, and esc pops back rather than closing. `cardList` and `deckList`
+both implement the interface; the movement keys live once, on a shared
+cursor.
+
+Three corrections: a decks panel opens **on your decks**, not an empty search
+bar (`i` reaches the bar, which follows rather than searches); `esc` no
+longer empties a panel back to its bar — clear, pop, close, as the design
+doc always said; and `g` is a prefix only, so `gg` and `gv` coexist.
+
+**Every width is a display width.** A rune count overflows on wide
+characters — an emoji is one rune and two columns — and a real deck name
+proved it.
+
+**7. Editing deck and transfers. — next.** The derived-target rule and `e` pinning,
 `gd`, `a`/`x`, the `y`/`p` register carrying quantity and tags, `t`/`T`, `c`,
 undo, `w`/`W`, and the unsaved-changes prompt on quit.
 

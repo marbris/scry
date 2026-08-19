@@ -106,9 +106,9 @@ in the information panel as the cursor moves.
 
 | Key | Action |
 |---|---|
-| `i` | search bar: add a moxfield user or deck URL |
+| `i` | the bar: follow a Moxfield deck URL, or a person by name |
 | `/` `o` `O` | filter, sort |
-| `n` `r` `x` `c` | new · rename · delete · copy/sync |
+| `n` `r` `x` `c` | new · rename · delete (asks first) · copy/sync |
 | `gv` | git versions of this deck |
 | `enter` `L` | open here / in a new panel |
 
