@@ -291,10 +291,20 @@ Runs from the **card cache alone**, so opening the decks panel checks a
 directory of decks without touching the network. A deck whose cards aren't
 all cached is reported unknown, never legal.
 
-**11. Persistence and entry points. — next.** Workspace in `session.json`, splash,
-and the CLI paths (`scry <query>`, `scry deck …`, `scry rules …`, `scry theme
-…`) rehomed onto the new shell.
+**11. Persistence and entry points. — done.** Workspace in `session.json`,
+splash, and every CLI path rehomed onto the new shell — which is now simply
+the shell. The two-pane screen is deleted: 25 files and 18 test files, with
+`compat.go` among them, empty at last because there is no old UI to bridge.
+Package `main` is four files.
 
-**12. Tests.** Rebuild the TUI tests against the workspace: layout
-arithmetic and the abbreviation ladder, the focus ring, the `esc` cascade,
-panel create/close, the `y`/`p` register, and stats filtering across lists.
+The session keeps what will still be there tomorrow: a search as its query,
+a deck of yours by slug, nothing borrowed and nothing empty. **The suite went
+from 125 seconds to under one** — that was the old tests reaching the
+network.
+
+**12. Tests. — next.** Most of this landed alongside each phase rather than
+after it: layout arithmetic, the abbreviation ladder, the focus ring, the
+`esc` cascade, panel create/close, the `y`/`p` register and stats filtering
+across lists all have tests already. What is left is a pass for gaps, and
+deciding what — if anything — should cover the packages that still have no
+test files (`fetch`, `mtg`, `scryfall`).
