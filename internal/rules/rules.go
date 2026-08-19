@@ -627,7 +627,7 @@ func cardTypes(typeLine string) []string {
 const rulesURL = "https://media.wizards.com/2026/downloads/MagicCompRules%2020260417.txt"
 
 func FilePath() string {
-	return filepath.Join(paths.Data(), "comprules.txt")
+	return filepath.Join(paths.Cache(), "comprules.txt")
 }
 
 func Download() error {

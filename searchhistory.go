@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/paths"
+
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -21,7 +23,7 @@ const (
 )
 
 func queryHistoryPath() string {
-	return filepath.Join(dataDir(), queryHistoryFile)
+	return filepath.Join(paths.State(), queryHistoryFile)
 }
 
 // loadQueryHistory reads the queries, oldest first. A missing or unreadable

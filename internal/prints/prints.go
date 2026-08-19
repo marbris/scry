@@ -184,7 +184,7 @@ func download(set string) (map[string]string, error) {
 // ── Disk cache ──────────────────────────────────────────────────
 
 func cacheDir() string {
-	dir := filepath.Join(paths.Data(), "originals")
+	dir := filepath.Join(paths.Cache(), "originals")
 	os.MkdirAll(dir, 0755)
 	return dir
 }

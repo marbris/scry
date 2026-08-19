@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/paths"
+
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -23,7 +25,7 @@ type session struct {
 }
 
 func sessionPath() string {
-	return filepath.Join(dataDir(), sessionFile)
+	return filepath.Join(paths.State(), sessionFile)
 }
 
 // loadSession reads the last one. Anything wrong with the file means a fresh

@@ -33,7 +33,7 @@ type cardCache struct {
 }
 
 func CachePath() string {
-	return filepath.Join(paths.Data(), cardCacheFile)
+	return filepath.Join(paths.Cache(), cardCacheFile)
 }
 
 // entryKey is what a deck line resolves by: a pinned printing if it has one,

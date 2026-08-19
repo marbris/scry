@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/paths"
+
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -105,6 +107,10 @@ func loadCachedRules() RulesData {
 // ── Entry point ─────────────────────────────────────────────────
 
 func main() {
+	// Files used to live in one directory; put any left there where they
+	// now belong, before anything goes looking for them.
+	paths.Migrate()
+
 	m := initialModel()
 
 	if len(os.Args) > 1 {
