@@ -45,3 +45,16 @@ func msgOf(cmd tea.Cmd) tea.Msg {
 }
 
 func sizeOf(w, h int) tea.WindowSizeMsg { return tea.WindowSizeMsg{Width: w, Height: h} }
+
+// focusOn moves focus to a panel by index, without going through the keys.
+func focusOn(m Model, at int) Model {
+	m.ws.focus(at)
+	return m
+}
+
+func keyMsg(k string) tea.KeyMsg {
+	if k == "esc" {
+		return tea.KeyMsg{Type: tea.KeyEsc}
+	}
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+}

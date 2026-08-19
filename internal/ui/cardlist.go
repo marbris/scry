@@ -45,6 +45,13 @@ type cardList struct {
 	// local one can be edited; a borrowed one can't.
 	deck *deck.Info
 
+	// dirty means there are edits not yet written. Saving is explicit, so
+	// this is the only thing standing between an edit and losing it — which
+	// is why quitting asks.
+	dirty bool
+	// undo holds the deck as it stood before each edit.
+	undo []undoStep
+
 	// arrivalName is what to call the order the cards came in — "as found"
 	// says nothing, where "scryfall order" and "decklist" say what you're
 	// looking at.
@@ -329,10 +336,44 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		l.markAll()
 	case "/":
 		p.openFilter(l.filter)
+
+	// ── Editing ─────────────────────────────────────────────────
+
+	case "a":
+		m.add(l.selection())
+	case "x":
+		m.remove(l.selection())
+	case "y":
+		m.yank(l.selection())
+		l.clearMarks()
+	case "p":
+		m.put(l)
+	case "t":
+		p.ask(askTag, "tag", "")
+	case "T":
+		m.tagWithLast(l.selection())
+	case "c":
+		return true, m.commander(currentOr(l))
+	case "u":
+		m.undo()
+
+	case "w":
+		return true, m.write(l, p, false)
+	case "W":
+		return true, m.write(l, p, true)
+
 	default:
 		return false, nil
 	}
 	return true, nil
+}
+
+// currentOr is the card c acts on: the one under the cursor. Unlike the
+// others, setting a commander is about one card — a deck with four of them
+// is a mistake you'd have to mean.
+func currentOr(l *cardList) deck.Card {
+	c, _ := l.current()
+	return c
 }
 
 // clear undoes one narrowing: the selection first, then the filter.

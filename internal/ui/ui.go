@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/deck"
 	"scry/internal/theme"
 )
 
@@ -25,6 +26,16 @@ type Model struct {
 	leader   bool
 	goPrefix bool
 	showKeys bool
+
+	// register is what y picked up, waiting for p. Whole deck cards, so a
+	// card moved between decks brings its quantity and tags with it.
+	register []deck.Card
+	// lastTag is what T reaches for.
+	lastTag string
+
+	// quitting is the unsaved-changes question, raised when q would lose
+	// something. Explicit saving is only safe if leaving asks.
+	quitting bool
 
 	// notice is a one-line result — "copied", "deleted" — shown along the
 	// bottom until the next keypress.
@@ -83,6 +94,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.notice = msg.text
 		}
 		return m, reloadDecks
+
+	case deckSavedMsg:
+		return m.handleDeckSaved(msg)
+
+	case deckWrittenMsg:
+		return m.handleDeckWritten(msg)
 
 	case versionsMsg:
 		return m.handleVersions(msg)

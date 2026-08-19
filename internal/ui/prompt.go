@@ -24,6 +24,8 @@ const (
 	askNewDeck
 	askRename
 	askFollow
+	askTag
+	askWrite
 )
 
 // ask raises the prompt.
@@ -70,6 +72,16 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if e, ok := l.current(); ok {
 					return m, renameCmd(e, answer)
 				}
+			}
+
+		case askTag:
+			if l := p.cardsView(); l != nil {
+				m.tag(l.selection(), answer)
+			}
+
+		case askWrite:
+			if l := p.cardsView(); l != nil {
+				return m, saveAsNew(p.id, p.writeToNewPane, answer, l.all)
 			}
 		}
 		return m, nil

@@ -116,6 +116,9 @@ type panel struct {
 	// to follow — open only while you're answering it.
 	asking   askKind
 	askInput textinput.Model
+	// writeToNewPane remembers whether it was w or W that raised the
+	// save-as prompt, since the answer arrives long after the key.
+	writeToNewPane bool
 
 	// loading is a request in flight; err is the last one that failed.
 	loading bool
@@ -280,4 +283,18 @@ func (p *panel) subtitle() string {
 		return v.subtitle()
 	}
 	return ""
+}
+
+// subtitleWithState adds the one thing about a deck that isn't visible in
+// its rows: whether it has been changed since it was last written. Saving is
+// explicit, so a deck that needs saving has to say so.
+func (p *panel) subtitleWithState() string {
+	out := p.subtitle()
+	if l := p.cardsView(); l != nil && l.dirty {
+		if out != "" {
+			out += " · "
+		}
+		out += "unsaved"
+	}
+	return out
 }

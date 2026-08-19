@@ -79,6 +79,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleGoto(key)
 	}
 
+	// The unsaved-changes question takes every key until it's answered.
+	if m.quitting {
+		m.quitting = false
+		switch key {
+		case "y":
+			return m, tea.Quit
+		case "w":
+			return m, m.saveEverything()
+		}
+		return m, nil
+	}
+
 	if m.leader {
 		// Sequenced rather than returned inline: the command mutates m, and
 		// `return m, m.handleLeader(key)` leaves the compiler free to copy
@@ -100,7 +112,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case leaderKey, leaderAlt:
 			m.leader = true
 		case "q", "esc", "ctrl+c":
-			return m, tea.Quit
+			return m.tryQuit()
 		case "?":
 			m.showKeys = true
 		}
@@ -186,11 +198,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ws.close()
 		}
 
-	case "q":
-		return m, tea.Quit
-
-	case "ctrl+c":
-		return m, tea.Quit
+	case "q", "ctrl+c":
+		return m.tryQuit()
 	}
 	return m, nil
 }
@@ -358,4 +367,29 @@ func (m *Model) versions(p *panel) tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// tryQuit leaves, unless something would be lost by leaving.
+//
+// Saving is explicit, so this is the price of that: a deck edited and not
+// written is only safe if the way out asks about it.
+func (m Model) tryQuit() (tea.Model, tea.Cmd) {
+	if len(m.dirtyDecks()) == 0 {
+		return m, tea.Quit
+	}
+	m.quitting = true
+	return m, nil
+}
+
+// saveEverything writes every deck with unsaved edits, for the w in the
+// quit question.
+func (m Model) saveEverything() tea.Cmd {
+	var cmds []tea.Cmd
+	for _, p := range m.ws.panels {
+		l := p.cardsView()
+		if l != nil && l.dirty && l.deck != nil && l.deck.Local() {
+			cmds = append(cmds, saveDeck(p.id, *l.deck, l.all))
+		}
+	}
+	return tea.Batch(cmds...)
 }

@@ -58,7 +58,7 @@ func (m Model) viewPanel(p *panel, index, width, height int) string {
 		headLine = head.Render(fit(text, inner))
 	}
 	lines := []string{headLine}
-	if sub := p.subtitle(); sub != "" {
+	if sub := p.subtitleWithState(); sub != "" {
 		lines = append(lines, lipgloss.NewStyle().
 			Foreground(theme.TextMuted).Render(fit(sub, inner)))
 	}
@@ -179,10 +179,45 @@ func (m Model) viewInfo(width, height int) string {
 // viewFooter is the leader menu while the leader is waiting, and otherwise
 // the keys that apply where you are.
 func (m Model) viewFooter(l layout) string {
-	if m.leader {
+	switch {
+	case m.quitting:
+		return m.viewQuitQuestion()
+	case m.leader:
 		return m.viewLeaderBar()
+	case m.notice != "":
+		return m.viewNotice()
 	}
 	return m.viewHint(l)
+}
+
+// viewNotice is the result of the last thing you did, along the bottom until
+// the next keypress. A line rather than a dialogue: "+1 Sol Ring" is worth
+// saying and not worth interrupting anyone for.
+func (m Model) viewNotice() string {
+	style := lipgloss.NewStyle().Foreground(theme.Success)
+	if strings.HasPrefix(m.notice, "error:") {
+		style = lipgloss.NewStyle().Foreground(theme.Error)
+	}
+	return " " + style.Render(truncate(m.notice, maxInt(m.width-2, 1)))
+}
+
+// viewQuitQuestion is what stands between an unsaved deck and losing it.
+func (m Model) viewQuitQuestion() string {
+	decks := m.dirtyDecks()
+	what := decks[0]
+	if len(decks) > 1 {
+		what = itoa(len(decks)) + " decks have"
+	} else {
+		what += " has"
+	}
+
+	key := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+	text := lipgloss.NewStyle().Foreground(theme.Text)
+	return lipgloss.NewStyle().
+		Background(theme.SurfaceAlt).Width(m.width).MaxWidth(m.width).
+		Render(" " + text.Render(what+" unsaved edits — ") +
+			key.Render("w") + text.Render(" save and quit · ") +
+			key.Render("y") + text.Render(" quit anyway · any other key stays"))
 }
 
 // viewLeaderBar is the menu the leader raises, so it never has to be
@@ -215,9 +250,12 @@ func (m Model) viewHint(l layout) string {
 
 	var left string
 	if p := m.ws.current(); p != nil {
-		if p.searchOpen && p.search.Focused() {
+		switch {
+		case p.searchOpen && p.search.Focused():
 			left = "tab target · ↑↓ history · ctrl+o order · enter run"
-		} else {
+		case p.cardsView() != nil && p.cardsView().deck != nil:
+			left = "a/x add · y/p move · t tag · w save · space menu · ? keys"
+		default:
 			left = "h/l panel · i search · s stats · space menu · ? keys"
 		}
 	}
