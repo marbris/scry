@@ -314,15 +314,16 @@ func TestJAndKMoveTheCursor(t *testing.T) {
 	}
 }
 
-func TestGAndShiftGGoToTheEnds(t *testing.T) {
+func TestGGAndShiftGGoToTheEnds(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	m = drive(m, "G")
 	if c, _ := m.ws.current().cardsView().current(); c.Card.Name != "Forest" {
 		t.Errorf("G landed on %s, want the last card", c.Card.Name)
 	}
-	m = drive(m, "g")
+	// gg, not g: g is a prefix so that gd and gv can exist.
+	m = drive(m, "g", "g")
 	if m.ws.current().cardsView().cursor.at != 0 {
-		t.Error("g did not go back to the top")
+		t.Error("gg did not go back to the top")
 	}
 }
 

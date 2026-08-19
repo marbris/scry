@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -20,6 +22,10 @@ type versionList struct {
 	slug    string
 	name    string
 	commits []deck.Commit
+	// diffs are what each commit did, fetched as the cursor reaches it.
+	// Local git, so this is fast enough not to need the debouncing a
+	// network request does.
+	diffs map[string]string
 }
 
 type versionsMsg struct {
@@ -52,10 +58,13 @@ func (m Model) handleVersions(msg versionsMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	v := &versionList{slug: msg.slug, name: msg.name, commits: msg.commits}
+	v := &versionList{
+		slug: msg.slug, name: msg.name, commits: msg.commits,
+		diffs: map[string]string{},
+	}
 	p.push(v)
 	p.title = v.title()
-	return m, nil
+	return m, v.wantDiff()
 }
 
 func (l *versionList) title() string { return l.name + " · versions" }
@@ -99,11 +108,48 @@ func (l *versionList) clear() bool { return false }
 
 func (l *versionList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	if l.cursor.navKey(k, len(l.commits), m.pageStep()) {
-		return true, nil
+		return true, l.wantDiff()
 	}
 	return false, nil
 }
 
+// wantDiff fetches the diff for whatever the cursor has landed on, if it
+// isn't already in hand.
+func (l *versionList) wantDiff() tea.Cmd {
+	if l.cursor.at >= len(l.commits) {
+		return nil
+	}
+	c := l.commits[l.cursor.at]
+	if _, have := l.diffs[c.Hash]; have {
+		return nil
+	}
+	slug, hash := l.slug, c.Hash
+	return func() tea.Msg {
+		text, err := deck.Diff(slug, hash)
+		if err != nil {
+			text = "couldn't read this version: " + err.Error()
+		}
+		return diffMsg{slug: slug, hash: hash, diff: text}
+	}
+}
+
+type diffMsg struct {
+	slug string
+	hash string
+	diff string
+}
+
+func (m Model) handleDiff(msg diffMsg) (tea.Model, tea.Cmd) {
+	for _, p := range m.ws.panels {
+		if v, ok := p.top().(*versionList); ok && v.slug == msg.slug {
+			v.diffs[msg.hash] = msg.diff
+		}
+	}
+	return m, nil
+}
+
+// info is what the version under the cursor did to the deck. A commit
+// subject says "+3 cards"; the diff says which three.
 func (l *versionList) info(width int) []string {
 	if l.cursor.at >= len(l.commits) {
 		return nil
@@ -113,9 +159,46 @@ func (l *versionList) info(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
-	return []string{
+	out := []string{
 		head.Render(fit(c.Subject, width)),
-		"",
 		dim.Render(fit(c.Short+" · "+c.When, width)),
+		"",
 	}
+
+	diff, have := l.diffs[c.Hash]
+	if !have {
+		return append(out, mutedLine("…", width))
+	}
+	return append(out, renderDiff(diff, width)...)
+}
+
+// renderDiff shows what changed and nothing else. Git's headers — the index
+// line, the file names, the @@ markers — are noise here: there is one file,
+// and you know which.
+func renderDiff(diff string, width int) []string {
+	add := lipgloss.NewStyle().Foreground(theme.DiffAdd)
+	remove := lipgloss.NewStyle().Foreground(theme.DiffRemove)
+	same := lipgloss.NewStyle().Foreground(theme.TextMuted)
+
+	var out []string
+	for _, line := range strings.Split(diff, "\n") {
+		switch {
+		case strings.HasPrefix(line, "+++"), strings.HasPrefix(line, "---"),
+			strings.HasPrefix(line, "diff "), strings.HasPrefix(line, "index "),
+			strings.HasPrefix(line, "@@"):
+			continue
+		case strings.HasPrefix(line, "+"):
+			out = append(out, add.Render(fit(line, width)))
+		case strings.HasPrefix(line, "-"):
+			out = append(out, remove.Render(fit(line, width)))
+		case strings.TrimSpace(line) == "":
+			continue
+		default:
+			out = append(out, same.Render(fit(line, width)))
+		}
+	}
+	if len(out) == 0 {
+		return []string{mutedLine("nothing changed in the deck itself", width)}
+	}
+	return out
 }

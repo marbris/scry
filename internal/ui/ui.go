@@ -42,6 +42,10 @@ type Model struct {
 	// narrowing it is imposing on the lists it counts.
 	stats statsState
 
+	// histories are the printed-text histories fetched so far, by oracle id
+	// — the identity that survives reprinting, which is the whole subject.
+	histories map[string]*cardHistory
+
 	// hoverSeq rises with every move, so a ruling fetched for a card you
 	// have since scrolled past can be recognised as stale.
 	hoverSeq int
@@ -70,9 +74,10 @@ const defaultQuerySort = 9
 
 func New() Model {
 	return Model{
-		ws:      newWorkspace(),
-		history: LoadQueryHistory(),
-		stats:   statsState{row: -1},
+		ws:        newWorkspace(),
+		history:   LoadQueryHistory(),
+		stats:     statsState{row: -1},
+		histories: map[string]*cardHistory{},
 	}
 }
 
@@ -83,7 +88,8 @@ func NewWithQuery(query string) (Model, tea.Cmd) {
 	p.history = m.history
 	p.search.SetValue(query)
 	p.search.CursorEnd()
-	return m, m.search(p)
+	cmd := m.search(p)
+	return m, cmd
 }
 
 func (m Model) Init() tea.Cmd {
@@ -136,6 +142,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case deckWrittenMsg:
 		return m.handleDeckWritten(msg)
 
+	case printingsMsg:
+		return m.handlePrintings(msg)
+
+	case setTextMsg:
+		return m.handleSetText(msg)
+
 	case rulingsTickMsg:
 		return m.handleRulingsTick(msg)
 
@@ -144,6 +156,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)
+
+	case diffMsg:
+		return m.handleDiff(msg)
 
 	case versionsMsg:
 		return m.handleVersions(msg)

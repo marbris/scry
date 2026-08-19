@@ -52,7 +52,7 @@ func (m *Model) openRules() tea.Cmd {
 
 // focusedCard is the card under the cursor in the panel you were on, which
 // is what a rules panel opens about.
-func (m *Model) focusedCard() *mtg.Card {
+func (m Model) focusedCard() *mtg.Card {
 	p := m.ws.current()
 	if p == nil {
 		return nil
@@ -68,6 +68,10 @@ func (m *Model) focusedCard() *mtg.Card {
 	card := c.Card
 	return &card
 }
+
+// focusedCardValue is focusedCard without the pointer receiver, for the
+// drawing side, which only ever reads.
+func (m Model) focusedCardValue() *mtg.Card { return m.focusedCard() }
 
 // ensureRules starts the parse if it hasn't happened, and marks the panel as
 // waiting for it.

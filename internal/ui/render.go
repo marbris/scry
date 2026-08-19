@@ -150,7 +150,7 @@ func (m Model) viewInfo(width, height int) string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	title := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).
-		Render(fit(m.info.mode.String(), inner))
+		Render(fit(m.infoTitle(), inner))
 
 	lines := []string{
 		title,
@@ -158,9 +158,12 @@ func (m Model) viewInfo(width, height int) string {
 	}
 
 	var body []string
-	if m.info.mode == infoStats {
+	switch {
+	case m.info.mode == infoStats:
 		body = m.renderStats(inner)
-	} else {
+	case m.info.mode == infoVersions:
+		body = m.infoVersions(inner)
+	default:
 		body = m.infoBody(inner)
 	}
 	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
@@ -195,6 +198,37 @@ func (m Model) viewInfo(width, height int) string {
 		Render(block)
 }
 
+// infoTitle names what the information panel is describing. The mode when
+// there is one, and otherwise whatever is under the cursor — a panel headed
+// "card" while showing a git diff is a small lie told constantly.
+func (m Model) infoTitle() string {
+	switch m.info.mode {
+	case infoStats:
+		if m.stats.global {
+			return "statistics · everything"
+		}
+		return "statistics"
+	case infoVersions:
+		return "printed text"
+	}
+
+	p := m.ws.current()
+	if p == nil {
+		return "card"
+	}
+	switch p.top().(type) {
+	case *deckList:
+		return "deck"
+	case *rulesView:
+		return "rule"
+	case *versionList:
+		return "version"
+	case *userDeckList:
+		return "deck"
+	}
+	return "card"
+}
+
 // infoBody is what the focused panel has to say about its highlighted row.
 func (m Model) infoBody(width int) []string {
 	p := m.ws.current()
@@ -206,6 +240,15 @@ func (m Model) infoBody(width int) []string {
 		return nil
 	}
 	return v.info(width)
+}
+
+// infoVersions is gv: a card's printed wordings, or — when what is
+// highlighted isn't a card — whatever the view has to say.
+func (m Model) infoVersions(width int) []string {
+	if c := m.focusedCardValue(); c != nil {
+		return m.renderHistory(*c, width)
+	}
+	return m.infoBody(width)
 }
 
 // ── The bottom line ─────────────────────────────────────────────

@@ -92,15 +92,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y":
 			return m, tea.Quit
 		case "w":
-			return m, m.saveEverything()
+			cmd := m.saveEverything()
+			return m, cmd
 		}
 		return m, nil
 	}
 
 	if m.leader {
-		// Sequenced rather than returned inline: the command mutates m, and
-		// `return m, m.handleLeader(key)` leaves the compiler free to copy
-		// m before the call runs.
+		// Sequenced rather than returned inline. This is the shape to watch
+		// for throughout: the call mutates m, and `return m, m.f()` leaves
+		// the compiler free to copy m for the return value before f runs.
+		// Every call of that shape in this package is split in two.
 		cmd := m.handleLeader(key)
 		return m, cmd
 	}
@@ -144,12 +146,34 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchKey(msg)
 	}
 
+	// y in the printed-text panel is the go-ahead to download the sets that
+	// aren't cached. It has to be claimed before the view sees it, because
+	// a card list takes y for yank.
+	if key == "y" && m.info.mode == infoVersions {
+		if c := m.focusedCard(); c != nil {
+			if h, ok := m.histories[c.OracleID]; ok && h.state == histWaiting {
+				cmd := m.fetchAllSets(h)
+				return m, cmd
+			}
+		}
+	}
+
+	// g is a prefix everywhere and never a key on its own, so it has to be
+	// claimed before any view sees it — a list would otherwise take it for
+	// "go to the top" and gd and gv could never be typed. gg still means
+	// the top: handleGoto passes the second g back down.
+	if key == "g" {
+		m.goPrefix = true
+		return m, nil
+	}
+
 	// The view has first refusal on anything that isn't the workspace's.
 	if v := p.top(); v != nil {
 		if handled, cmd := v.key(key, &m, p); handled {
 			// The cursor may have moved, so start the clock on whatever is
 			// under it now.
-			return m, tea.Batch(cmd, m.hover())
+			hover := m.hover()
+			return m, tea.Batch(cmd, hover)
 		}
 	}
 
@@ -159,10 +183,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "h", "left":
 		m.ws.step(-1)
-		return m, m.hover()
+		cmd := m.hover()
+		return m, cmd
 	case "l", "right":
 		m.ws.step(1)
-		return m, m.hover()
+		cmd := m.hover()
+		return m, cmd
 
 	case "i":
 		// The bar keeps the query that produced what's on screen, so i is
@@ -174,12 +200,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "e":
 		m.ws.pin()
-
-	case "g":
-		// g is a prefix, never a key on its own: gg to the top, gd to the
-		// editing deck, gv for versions. That is what lets gg and gv live
-		// side by side.
-		m.goPrefix = true
 
 	case "K", "shift+up":
 		if m.info.mode == infoStats {
@@ -375,7 +395,8 @@ func (m Model) handleGoto(key string) (tea.Model, tea.Cmd) {
 		}
 
 	case "v":
-		return m, m.versions(p)
+		cmd := m.versions(p)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -394,9 +415,14 @@ func (m *Model) versions(p *panel) tea.Cmd {
 		return loadVersions(p.id, e.slug, e.name)
 
 	case *cardList:
+		// A deck's versions are its commits; a card's are the wordings it
+		// has been printed with. Same question, two kinds of thing.
 		if v.deck != nil && v.deck.Local() {
 			p.loading = true
 			return loadVersions(p.id, v.deck.Slug, v.deck.Name)
+		}
+		if c, ok := v.current(); ok {
+			return m.openHistory(c.Card)
 		}
 	}
 	return nil

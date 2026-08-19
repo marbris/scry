@@ -58,3 +58,5 @@ func keyMsg(k string) tea.KeyMsg {
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
 }
+
+func mkReader(s string) *strings.Reader { return strings.NewReader(s) }
