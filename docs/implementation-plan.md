@@ -283,10 +283,15 @@ yank.
 `g` is now genuinely a prefix: every list had been claiming it for "go to the
 top" before the workspace saw it, so `gd` and `gv` could never be typed.
 
-**10. Legality engine. — next.** Per-card legality plus deck size, singleton and
-commander colour identity. Feeds the decks panel's flag column.
+**10. Legality engine. — done.** Per-card legality plus deck size, singleton
+and commander colour identity, with partners, basics and "any number" cards
+handled. Feeds the decks panel's flag column and the panel you're editing in.
 
-**11. Persistence and entry points.** Workspace in `session.json`, splash,
+Runs from the **card cache alone**, so opening the decks panel checks a
+directory of decks without touching the network. A deck whose cards aren't
+all cached is reported unknown, never legal.
+
+**11. Persistence and entry points. — next.** Workspace in `session.json`, splash,
 and the CLI paths (`scry <query>`, `scry deck …`, `scry rules …`, `scry theme
 …`) rehomed onto the new shell.
 
