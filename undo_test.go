@@ -167,7 +167,6 @@ func TestUndoOfNothingIsNotAnEdit(t *testing.T) {
 
 func TestUndoNeedsAnEditableDeck(t *testing.T) {
 	gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 190, Height: 40})

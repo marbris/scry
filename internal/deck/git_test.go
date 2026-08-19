@@ -14,7 +14,10 @@ func gitRepo(t *testing.T) string {
 	if !GitAvailable() {
 		t.Skip("git not installed")
 	}
-	dir := t.TempDir()
+	dir := filepath.Join(isolate(t), "decks")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("SCRY_DECKS_DIR", dir)
 	// Keep the test off whatever the machine's git identity is.
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(dir, "nonexistent-gitconfig"))

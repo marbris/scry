@@ -2,6 +2,7 @@ package main
 
 import (
 	"scry/internal/paths"
+	"scry/internal/theme"
 
 	"encoding/json"
 	"fmt"
@@ -111,6 +112,12 @@ func main() {
 	// now belong, before anything goes looking for them.
 	paths.Migrate()
 
+	// A broken theme file is worth saying so about, but not worth refusing
+	// to start over: the default is already in force.
+	if err := theme.Load(); err != nil {
+		fmt.Fprintln(os.Stderr, "Warning:", err)
+	}
+
 	m := initialModel()
 
 	if len(os.Args) > 1 {
@@ -119,6 +126,12 @@ func main() {
 			printUsage()
 			return
 		}
+	}
+
+	// `scry theme [name | edit name]` — colours.
+	if len(os.Args) > 1 && os.Args[1] == "theme" {
+		runTheme(os.Args[2:])
+		return
 	}
 
 	// `scry rules [update | query…]` — the old mtg-rules entry point.

@@ -12,7 +12,6 @@ import (
 func openHistoryOn(t *testing.T) model {
 	t.Helper()
 	gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	if _, _, err := saveDeckVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
@@ -120,7 +119,6 @@ func TestDeckHistoryRestores(t *testing.T) {
 
 func TestDeckHistoryNeedsADeckOfYourOwn(t *testing.T) {
 	gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})

@@ -15,7 +15,7 @@ import (
 // without touching the network.
 func seedCache(t *testing.T, cards map[string]mtg.Card) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	body, err := json.Marshal(cards)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestResolveEntriesSurvivesAnUnreachableScryfall(t *testing.T) {
 }
 
 func TestCardCacheSurvivesRubbishOnDisk(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	if err := os.WriteFile(CachePath(), []byte("{not json"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestCardCacheSurvivesRubbishOnDisk(t *testing.T) {
 }
 
 func TestCardCacheWritesOnlyWhenChanged(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	c := loadCardCache()
 	if err := c.save(); err != nil {

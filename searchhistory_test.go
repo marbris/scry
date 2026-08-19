@@ -39,7 +39,7 @@ func TestRememberQuery(t *testing.T) {
 }
 
 func TestQueryHistorySurvivesTheSession(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	if got := loadQueryHistory(); got != nil {
 		t.Errorf("a fresh install has history: %v", got)
@@ -61,7 +61,7 @@ func TestQueryHistorySurvivesTheSession(t *testing.T) {
 }
 
 func TestUpWalksTheQueryHistory(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -94,7 +94,7 @@ func TestUpWalksTheQueryHistory(t *testing.T) {
 }
 
 func TestHistoryKeepsWhatYouWereTyping(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -118,7 +118,7 @@ func TestHistoryKeepsWhatYouWereTyping(t *testing.T) {
 }
 
 func TestTypingLeavesTheHistory(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -143,7 +143,7 @@ func TestTypingLeavesTheHistory(t *testing.T) {
 }
 
 func TestRunningASearchRemembersIt(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -163,7 +163,7 @@ func TestRunningASearchRemembersIt(t *testing.T) {
 }
 
 func TestAPastedDeckURLIsNotAQuery(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -179,7 +179,7 @@ func TestAPastedDeckURLIsNotAQuery(t *testing.T) {
 }
 
 func TestHistoryWithNothingInIt(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -227,7 +227,6 @@ func TestOpeningADeckLeavesTheSearchBarAlone(t *testing.T) {
 
 func TestADeckIsNeverRememberedAsAQuery(t *testing.T) {
 	gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})
@@ -245,7 +244,7 @@ func TestADeckIsNeverRememberedAsAQuery(t *testing.T) {
 }
 
 func TestTheBarStartsOnYourLastSearch(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	if err := saveQueryHistory([]string{"t:angel", "t:dragon c:r"}); err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +264,7 @@ func TestTheBarStartsOnYourLastSearch(t *testing.T) {
 	}
 
 	// Nothing searched ever means nothing to show.
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	if got := initialModel().startWithLastQuery().searchInput.Value(); got != "" {
 		t.Errorf("a fresh install starts with %q in the bar", got)
 	}

@@ -64,7 +64,6 @@ func TestNewDeckRejectsNonsense(t *testing.T) {
 
 func TestAnEmptyDeckOpens(t *testing.T) {
 	gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	slug, d, err := newDeck("Ghen", "")
 	if err != nil {

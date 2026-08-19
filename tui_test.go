@@ -1020,7 +1020,7 @@ func TestSlugify(t *testing.T) {
 }
 
 func TestSaveDeckFromTheApp(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 160, Height: 40})

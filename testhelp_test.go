@@ -19,7 +19,10 @@ func gitRepo(t *testing.T) string {
 	if !gitAvailable() {
 		t.Skip("git not installed")
 	}
-	dir := t.TempDir()
+	dir := filepath.Join(isolate(t), "decks")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("SCRY_DECKS_DIR", dir)
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(dir, "nonexistent-gitconfig"))
 	t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(dir, "nonexistent-gitconfig"))
@@ -31,7 +34,7 @@ func gitRepo(t *testing.T) string {
 // reason.
 func seedCache(t *testing.T, cards map[string]ScryfallCard) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 
 	body, err := json.Marshal(cards)
 	if err != nil {
@@ -66,3 +69,18 @@ format: commander
 1 Arcane Signet [ramp]
 7 Plains
 `
+
+// isolate gives one test its own directories. TestMain isolates the package
+// from the machine; this isolates a test from its neighbours, which matters
+// for anything asserting that a file was or wasn't written.
+func isolate(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
+	t.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
+	t.Setenv("SCRY_DECKS_DIR", filepath.Join(root, "decks"))
+	return root
+}

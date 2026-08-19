@@ -295,7 +295,6 @@ func TestEditingKeepsTagsAndSections(t *testing.T) {
 
 func TestAMoxfieldDeckIsReadOnly(t *testing.T) {
 	gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 190, Height: 40})

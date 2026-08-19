@@ -55,11 +55,11 @@ func colorRows() []Row {
 		code  string
 		color lipgloss.Color
 	}{
-		{"White", "W", theme.White},
-		{"Blue", "U", theme.Blue},
-		{"Black", "B", theme.Gray},
-		{"Red", "R", theme.Red},
-		{"Green", "G", theme.Green},
+		{"White", "W", theme.ManaW},
+		{"Blue", "U", theme.ManaU},
+		{"Black", "B", theme.ManaB},
+		{"Red", "R", theme.ManaR},
+		{"Green", "G", theme.ManaG},
 	}
 
 	rows := make([]Row, 0, len(spec)+2)
@@ -82,13 +82,13 @@ func colorRows() []Row {
 	}
 	rows = append(rows,
 		Row{
-			Group: "Color", Label: "Colorless", Color: theme.FgDim,
+			Group: "Color", Label: "Colorless", Color: theme.ManaC,
 			Match: func(ci deck.Card) bool {
 				return !mtg.IsLand(ci.Card) && len(ci.Card.DisplayColors()) == 0
 			},
 		},
 		Row{
-			Group: "Color", Label: "Multi", Color: theme.Yellow,
+			Group: "Color", Label: "Multi", Color: theme.ManaMulti,
 			Match: func(ci deck.Card) bool {
 				return !mtg.IsLand(ci.Card) && len(ci.Card.DisplayColors()) > 1
 			},
@@ -99,8 +99,9 @@ func colorRows() []Row {
 
 func rarityRows(entries []deck.Card) []Row {
 	color := map[string]lipgloss.Color{
-		"common": theme.Fg, "uncommon": theme.FgDim, "rare": theme.Yellow,
-		"mythic": theme.Orange, "special": theme.Purple,
+		"common": theme.RarityCommon, "uncommon": theme.RarityUncommon,
+		"rare": theme.RarityRare, "mythic": theme.RarityMythic,
+		"special": theme.RaritySpecial,
 	}
 
 	// The usual rarities in their usual order, then anything unexpected.
@@ -127,7 +128,7 @@ func rarityRows(entries []deck.Card) []Row {
 		rarity := r
 		col, ok := color[rarity]
 		if !ok {
-			col = theme.Gray
+			col = theme.TextMuted
 		}
 		rows = append(rows, Row{
 			Group: "Rarity", Label: rarity, Color: col,
@@ -156,7 +157,7 @@ func cmcRows() []Row {
 			label = "7+"
 		}
 		rows = append(rows, Row{
-			Group: "Mana Value", Label: label, Color: theme.Aqua,
+			Group: "Mana Value", Label: label, Color: theme.BarFill,
 			Match: func(ci deck.Card) bool {
 				if mtg.IsLand(ci.Card) {
 					return false
@@ -181,7 +182,7 @@ func typeRows() []Row {
 	for _, t := range types {
 		cardType := t
 		rows = append(rows, Row{
-			Group: "Type", Label: cardType, Color: theme.Purple,
+			Group: "Type", Label: cardType, Color: theme.Special,
 			Match: func(ci deck.Card) bool {
 				return strings.Contains(ci.Card.TypeLine, cardType)
 			},
@@ -209,7 +210,7 @@ func tagRows(entries []deck.Card) []Row {
 	for _, l := range labels {
 		tag := l
 		rows = append(rows, Row{
-			Group: "Tags", Label: tag, Color: theme.Yellow,
+			Group: "Tags", Label: tag, Color: theme.Highlight,
 			Match: func(ci deck.Card) bool {
 				for _, t := range ci.Tags {
 					if t == tag {

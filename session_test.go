@@ -142,7 +142,7 @@ func TestABrowsedMoxfieldDeckIsNotYourSession(t *testing.T) {
 }
 
 func TestAFreshInstallStartsEmpty(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	t.Setenv("SCRY_DECKS_DIR", t.TempDir())
 
 	m := initialModel().restore()
@@ -152,7 +152,7 @@ func TestAFreshInstallStartsEmpty(t *testing.T) {
 }
 
 func TestASessionFileThatWontParse(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	if err := os.WriteFile(sessionPath(), []byte("{not json"), 0644); err != nil {
 		t.Fatal(err)
 	}

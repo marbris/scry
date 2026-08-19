@@ -162,7 +162,7 @@ var dataDir = paths.Data
 
 var (
 	gruvBg      = theme.Bg
-	gruvBgLight = theme.BgLight
+	gruvBgLight = theme.BgAlt
 	gruvFg      = theme.Fg
 	gruvFgDim   = theme.FgDim
 	gruvWhite   = theme.White

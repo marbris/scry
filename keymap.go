@@ -391,13 +391,16 @@ Usage:
   scry <moxfield url>       Browse a public Moxfield deck
   scry deck …               Your decks — see ` + "`scry deck`" + `
   scry rules …              The comprehensive rules — see ` + "`scry rules`" + `
+  scry theme …              Colours — see ` + "`scry theme`" + `
   scry -h, --help           This
 
 Queries use Scryfall's own syntax, and the app's ,s shows a reference:
   scry 't:creature c:rw cmc<=3'
   scry 'o:"draw a card" f:commander'
 
-Data lives in ~/.local/share/scry/. Decks are files in a git repository —
-SCRY_DECKS_DIR moves them somewhere else.`
+Files follow the XDG directories: decks in the data directory, settings and
+themes in the config directory, session state in the state directory, and
+everything re-downloadable in the cache. Decks are files in a git repository
+— SCRY_DECKS_DIR moves them somewhere else.`
 
 func printUsage() { fmt.Println(cliUsage) }

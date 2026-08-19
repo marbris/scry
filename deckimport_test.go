@@ -290,7 +290,7 @@ format: commander
 }
 
 func TestLocalDeckInTheApp(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	t.Setenv("SCRY_DECKS_DIR", t.TempDir())
 
 	m := initialModel()
@@ -327,7 +327,7 @@ func TestLocalDeckInTheApp(t *testing.T) {
 }
 
 func TestDeckLoadWithUnresolvedCardsStillOpens(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolate(t)
 	t.Setenv("SCRY_DECKS_DIR", t.TempDir())
 
 	m := initialModel()

@@ -96,7 +96,6 @@ func TestDeckPickerOpensADeck(t *testing.T) {
 
 func TestDeckPickerWithNoDecks(t *testing.T) {
 	gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	m := initialModel()
 	m = drive(m, tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -117,7 +116,6 @@ func TestDeckPickerWithNoDecks(t *testing.T) {
 
 func TestDeckPickerSurvivesABrokenDeckFile(t *testing.T) {
 	dir := gitRepo(t)
-	t.Setenv("HOME", t.TempDir())
 
 	good, _ := parseDeckFile(strings.NewReader("name: Fine\n[mainboard]\n1 Sol Ring\n"))
 	if _, _, err := saveDeckVersioned("fine", good); err != nil {
