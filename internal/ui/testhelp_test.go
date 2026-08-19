@@ -1,6 +1,10 @@
 package ui
 
-import "strings"
+import (
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // splitLines and visibleWidth measure a rendered frame the way a terminal
 // would: by what it shows, not by the escape sequences that colour it.
@@ -30,3 +34,14 @@ func stripANSI(s string) string {
 	}
 	return b.String()
 }
+
+// msgOf runs a command and hands back what it produced, for tests that want
+// the answer without a running program.
+func msgOf(cmd tea.Cmd) tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	return cmd()
+}
+
+func sizeOf(w, h int) tea.WindowSizeMsg { return tea.WindowSizeMsg{Width: w, Height: h} }

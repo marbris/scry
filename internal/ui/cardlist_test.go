@@ -39,7 +39,7 @@ func names(l *cardList) []string {
 }
 
 func TestArrivalOrderIsLeftAlone(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	got := strings.Join(names(l), ",")
 	want := "Dwynen, Gilt-Leaf Daen,Llanowar Elves,Sol Ring,Forest"
 	if got != want {
@@ -48,7 +48,7 @@ func TestArrivalOrderIsLeftAlone(t *testing.T) {
 }
 
 func TestSortingByManaValue(t *testing.T) {
-	l := newCardList(sample(), sortMana)
+	l := newCardList2(sample(), sortMana)
 	if got := names(l)[0]; got != "Forest" {
 		t.Errorf("cheapest is %s, want the zero-cost land", got)
 	}
@@ -60,14 +60,14 @@ func TestSortingByManaValue(t *testing.T) {
 func TestCommandersSortWithEveryoneElse(t *testing.T) {
 	// They lead a decklist because that's how a decklist is built, not
 	// because anything pins them there.
-	l := newCardList(sample(), sortMana)
+	l := newCardList2(sample(), sortMana)
 	if names(l)[0] == "Dwynen, Gilt-Leaf Daen" {
 		t.Error("the commander was pinned to the top of a mana-value sort")
 	}
 }
 
 func TestSortingKeepsTheCursorOnTheSameCard(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.move(2) // Sol Ring
 	if c, _ := l.current(); c.Card.Name != "Sol Ring" {
 		t.Fatalf("cursor is on %s", c.Card.Name)
@@ -80,7 +80,7 @@ func TestSortingKeepsTheCursorOnTheSameCard(t *testing.T) {
 }
 
 func TestFilteringIsLiteralAndSearchesTheRulesText(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 
 	l.setFilter("elf")
 	if got := len(l.rows); got != 2 {
@@ -94,7 +94,7 @@ func TestFilteringIsLiteralAndSearchesTheRulesText(t *testing.T) {
 }
 
 func TestFilterTermsAllHaveToMatch(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.setFilter("elf druid")
 	if got := names(l); len(got) != 1 || got[0] != "Llanowar Elves" {
 		t.Errorf("got %v, want only the Elf Druid", got)
@@ -102,7 +102,7 @@ func TestFilterTermsAllHaveToMatch(t *testing.T) {
 }
 
 func TestAQuotedPhraseStaysTogether(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.setFilter(`"elf archer"`)
 	if got := names(l); len(got) != 1 || got[0] != "Dwynen, Gilt-Leaf Daen" {
 		t.Errorf("got %v, want the one Elf Archer", got)
@@ -110,7 +110,7 @@ func TestAQuotedPhraseStaysTogether(t *testing.T) {
 }
 
 func TestClearingAFilterBringsEverythingBack(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.setFilter("elf")
 	l.setFilter("")
 	if got := len(l.rows); got != 4 {
@@ -121,7 +121,7 @@ func TestClearingAFilterBringsEverythingBack(t *testing.T) {
 func TestMarksSurviveFilteringAndSorting(t *testing.T) {
 	// Marks are held by name for exactly this reason: the rows they were
 	// made on get rebuilt underneath them constantly.
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.toggleMark() // Dwynen
 
 	l.setFilter("forest")
@@ -137,7 +137,7 @@ func TestMarksSurviveFilteringAndSorting(t *testing.T) {
 }
 
 func TestMarkingStepsDownSoVVVTakesThree(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.toggleMark()
 	l.toggleMark()
 	l.toggleMark()
@@ -147,7 +147,7 @@ func TestMarkingStepsDownSoVVVTakesThree(t *testing.T) {
 }
 
 func TestMarkAllTakesWhatTheFilterLeft(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.setFilter("elf")
 	l.markAll()
 	if l.markCount() != 2 {
@@ -164,7 +164,7 @@ func TestMarkAllTakesWhatTheFilterLeft(t *testing.T) {
 func TestSelectionFallsBackToTheCursor(t *testing.T) {
 	// Every command that acts on "the selected cards" needs an answer when
 	// nothing is selected, and the answer is the row you're looking at.
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	sel := l.selection()
 	if len(sel) != 1 || sel[0].Card.Name != "Dwynen, Gilt-Leaf Daen" {
 		t.Errorf("got %v, want the card under the cursor", sel)
@@ -178,7 +178,7 @@ func TestSelectionFallsBackToTheCursor(t *testing.T) {
 }
 
 func TestSelectionIsInArrivalOrderNotCursorOrder(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.move(2)
 	l.toggleMark() // Sol Ring, third in the list
 	l.top()
@@ -195,7 +195,7 @@ func TestSelectionIsInArrivalOrderNotCursorOrder(t *testing.T) {
 }
 
 func TestTheCursorStaysInsideTheList(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.move(-5)
 	if l.cursor != 0 {
 		t.Errorf("cursor ran off the top to %d", l.cursor)
@@ -211,7 +211,7 @@ func TestScrollingFollowsTheCursorMinimally(t *testing.T) {
 	for i := range many {
 		many[i] = deck.Card{Card: mtg.Card{Name: "Card " + itoa(i)}}
 	}
-	l := newCardList(many, sortArrival)
+	l := newCardList(many, sortArrival, "")
 
 	l.scrollInto(10)
 	if l.offset != 0 {
@@ -232,7 +232,7 @@ func TestScrollingFollowsTheCursorMinimally(t *testing.T) {
 }
 
 func TestAnEmptyFilterResultDoesNotBreakTheCursor(t *testing.T) {
-	l := newCardList(sample(), sortArrival)
+	l := newCardList2(sample(), sortArrival)
 	l.setFilter("nonesuch")
 	if l.count() != 0 {
 		t.Fatalf("%d rows matched nonsense", l.count())
@@ -242,4 +242,10 @@ func TestAnEmptyFilterResultDoesNotBreakTheCursor(t *testing.T) {
 	}
 	l.move(1)
 	l.render(20, 5, nil, true) // must not panic
+}
+
+// newCardList2 is newCardList with the arrival name left to its default, so
+// the tests above stay about behaviour rather than labels.
+func newCardList2(cards []deck.Card, order cardSort) *cardList {
+	return newCardList(cards, order, "")
 }

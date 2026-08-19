@@ -34,12 +34,28 @@ type cardList struct {
 	// marks are the cards picked out with v, by lowercased name so they
 	// survive the list being filtered or re-sorted underneath them.
 	marks map[string]bool
+
+	// arrivalName is what to call the order the cards came in — "as found"
+	// says nothing, where "scryfall order" and "decklist" say what you're
+	// looking at.
+	arrivalName string
 }
 
-func newCardList(cards []deck.Card, order cardSort) *cardList {
-	l := &cardList{all: cards, order: order, marks: map[string]bool{}}
+func newCardList(cards []deck.Card, order cardSort, arrivalName string) *cardList {
+	if arrivalName == "" {
+		arrivalName = "as found"
+	}
+	l := &cardList{all: cards, order: order, marks: map[string]bool{}, arrivalName: arrivalName}
 	l.refresh()
 	return l
+}
+
+// orderName is what the panel calls its current order.
+func (l *cardList) orderName() string {
+	if l.order == sortArrival {
+		return l.arrivalName
+	}
+	return l.order.String()
 }
 
 // refresh rebuilds what's on screen. Everything that changes the list goes

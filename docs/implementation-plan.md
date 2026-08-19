@@ -207,10 +207,21 @@ with shortened ones, and the trailing full stop is what says which is which —
 the longest would cost the names that fit perfectly well and gain only
 tidiness.
 
-**5. Find panel. — next.** Search bar, `tab` target cycling, `up`/`down` query
-history, `ctrl+o` query sort, results feeding a card list view.
+**5. Find panel. — done.** Search bar, `tab` target cycling, `up`/`down`
+query history, `ctrl+o` query sort, results feeding a card list view.
+`scry --panels <query>` opens straight onto a search.
 
-**6. Decks panel.** The unified list — local decks, remote links, Moxfield
+Results are kept **in Scryfall's order**, not re-sorted on arrival: the query
+asked for an order — EDHREC rank by default — and re-sorting would throw away
+the answer to the question just asked. The panel calls it "scryfall order"
+rather than "as found".
+
+Panels carry an id, because a search in flight has to find its way back to
+the panel that asked for it and the row can be reordered or closed
+meanwhile. An answer to a closed panel, or to a query that panel has since
+moved on from, is dropped.
+
+**6. Decks panel. — next.** The unified list — local decks, remote links, Moxfield
 usernames — with the compact columns. `i` to add a remote or a user,
 `n`/`r`/`x`/`c`, `enter`/`L`, and the sub-views (`gv` versions, a user's
 decks) on the panel's stack.

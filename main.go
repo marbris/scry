@@ -132,7 +132,7 @@ func main() {
 	// two-pane screen a phase at a time. Behind a flag until it can do
 	// everything the old one can.
 	if len(os.Args) > 1 && (os.Args[1] == "--panels" || os.Args[1] == "panels") {
-		runPanels()
+		runPanels(os.Args[2:])
 		return
 	}
 

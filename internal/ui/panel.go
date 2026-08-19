@@ -92,6 +92,9 @@ func (k Kind) next(delta int) Kind {
 }
 
 type panel struct {
+	// id survives reordering and closing, which an index doesn't — a search
+	// in flight has to find its way back to the panel that asked for it.
+	id   int
 	kind Kind
 
 	// search is the bar, and searchOpen says whether it's showing. It starts
@@ -109,6 +112,23 @@ type panel struct {
 	// filtering is the / prompt, open only while you're typing in it.
 	filtering   bool
 	filterInput textinput.Model
+
+	// loading is a request in flight; err is the last one that failed.
+	loading bool
+	err     error
+	// total is how many cards the query matched, which is usually more than
+	// were fetched.
+	total int
+
+	// querySort is the order the *request* asks for — which cards come back
+	// — as an index into scryfall.SortOptions.
+	querySort int
+
+	// history is the queries run before this one, with where up and down
+	// have walked to and what was in the bar before the walk started.
+	history   []string
+	historyAt int
+	draft     string
 }
 
 func newPanel(kind Kind) *panel {
@@ -120,16 +140,22 @@ func newPanel(kind Kind) *panel {
 	f := textinput.New()
 	f.Prompt = "/"
 
-	p := &panel{kind: kind, search: in, searchOpen: true, filterInput: f}
+	p := &panel{
+		kind: kind, search: in, searchOpen: true, filterInput: f,
+		historyAt: historyIdle,
+		// EDHREC rank is the useful default for a Commander player: the
+		// cards other people actually play come back first.
+		querySort: defaultQuerySort,
+	}
 	p.restyle()
 	return p
 }
 
 // show puts a list of cards in the panel, which is what turns a search bar
 // into a header.
-func (p *panel) show(title string, cards []deck.Card, order cardSort) {
+func (p *panel) show(title string, cards []deck.Card, order cardSort, arrivalName string) {
 	p.title = title
-	p.cards = newCardList(cards, order)
+	p.cards = newCardList(cards, order, arrivalName)
 	p.searchOpen = false
 	p.search.Blur()
 }
@@ -184,19 +210,32 @@ func (p *panel) list() *cardList {
 }
 
 // emptyList is shared and never shown; keys land on it and do nothing.
-var emptyList = newCardList(nil, sortArrival)
+var emptyList = newCardList(nil, sortArrival, "")
 
 // subtitle is the count line under the header: how many cards, and what has
 // been done to narrow or reorder them.
 func (p *panel) subtitle() string {
+	// While the bar is open a find panel says what order it will ask for,
+	// since that's the one thing about the request you can't see in the bar.
+	if p.searchOpen {
+		if p.kind == KindFind {
+			return "order: " + p.queryOrder() + " · ctrl+o"
+		}
+		return ""
+	}
 	if p.cards == nil || p.cards.total() == 0 {
 		return ""
 	}
+
 	out := itoa(p.cards.count())
 	if p.cards.count() != p.cards.total() {
 		out += "/" + itoa(p.cards.total())
+	} else if p.total > p.cards.total() {
+		// Scryfall matched more than one page; say so, or 175 looks like
+		// the whole answer.
+		out += "/" + itoa(p.total)
 	}
-	out += " · " + p.cards.order.String()
+	out += " · " + p.cards.orderName()
 	if n := p.cards.markCount(); n > 0 {
 		out += " · " + itoa(n) + " picked"
 	}

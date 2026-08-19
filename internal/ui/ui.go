@@ -25,11 +25,29 @@ type Model struct {
 	leader   bool
 	showKeys bool
 
+	// history is every query run, shared by every find panel: searches you
+	// ran in one panel are worth recalling in the next.
+	history []string
+
 	width, height int
 }
 
+// defaultQuerySort is EDHREC rank — for a Commander player the cards other
+// people actually play are the ones worth seeing first.
+const defaultQuerySort = 9
+
 func New() Model {
-	return Model{ws: newWorkspace()}
+	return Model{ws: newWorkspace(), history: LoadQueryHistory()}
+}
+
+// NewWithQuery opens straight onto a search, for `scry --panels <query>`.
+func NewWithQuery(query string) (Model, tea.Cmd) {
+	m := New()
+	p := m.ws.open(KindFind)
+	p.history = m.history
+	p.search.SetValue(query)
+	p.search.CursorEnd()
+	return m, m.search(p)
 }
 
 func (m Model) Init() tea.Cmd { return tea.EnterAltScreen }
@@ -43,6 +61,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
+
+	case searchDoneMsg:
+		return m.handleSearchDone(msg)
 	}
 	return m, nil
 }

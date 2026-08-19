@@ -290,7 +290,7 @@ func TestOffScreenPanelsAreFlagged(t *testing.T) {
 // phase 5 will run.
 func withCards(m Model, key string, cards []deck.Card, order cardSort) Model {
 	m = openPanel(m, key, "query")
-	m.ws.current().show("query", cards, order)
+	m.ws.current().show("query", cards, order, "")
 	return m
 }
 

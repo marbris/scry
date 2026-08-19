@@ -126,8 +126,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ws.step(1)
 
 	case "i":
+		// The bar keeps the query that produced what's on screen, so i is
+		// "edit this search" rather than "start again" — with the cursor
+		// where you'd carry on typing.
 		p.searchOpen = true
 		p.search.Focus()
+		p.search.CursorEnd()
 
 	// ── The list ────────────────────────────────────────────────
 
@@ -240,9 +244,11 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "enter":
-		// Running a query is phase 5; for now the panel simply takes the
-		// name of what was asked for, which is enough to see the header
-		// replace the bar.
+		if p.kind == KindFind {
+			cmd := m.search(p)
+			return m, cmd
+		}
+		// The other kinds get their own bar in the phases that build them.
 		if q := p.search.Value(); q != "" {
 			p.title = p.kind.String() + ": " + q
 			p.searchOpen = false
@@ -250,12 +256,29 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "up":
+		p.recall(-1)
+		return m, nil
+	case "down":
+		p.recall(1)
+		return m, nil
+
+	case "ctrl+o":
+		cmd := m.cycleQuerySort(p, 1)
+		return m, cmd
+
 	case "ctrl+c":
 		return m, tea.Quit
 	}
 
+	// Anything else is typing, which ends a walk through the history: what
+	// is in the bar is yours again rather than something recalled.
+	before := p.search.Value()
 	var cmd tea.Cmd
 	p.search, cmd = p.search.Update(msg)
+	if p.search.Value() != before {
+		p.leaveHistory()
+	}
 	return m, cmd
 }
 

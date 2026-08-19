@@ -10,6 +10,7 @@ import (
 	"scry/internal/scryfall"
 	"scry/internal/stats"
 	"scry/internal/theme"
+	"scry/internal/ui"
 )
 
 // The bridge between the old UI and the packages the domain now lives in.
@@ -157,6 +158,14 @@ var statGroups = stats.Groups
 // ── Files ───────────────────────────────────────────────────────
 
 var dataDir = paths.Data
+
+// ── Query history ───────────────────────────────────────────────
+
+var (
+	loadQueryHistory = ui.LoadQueryHistory
+	saveQueryHistory = ui.SaveQueryHistory
+	rememberQuery    = ui.RememberQuery
+)
 
 // ── Colours ─────────────────────────────────────────────────────
 

@@ -79,23 +79,37 @@ func (m Model) viewPanel(p *panel, index, width, height int) string {
 func (m Model) viewPanelBody(p *panel, width, height int) []string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
+	if p.loading {
+		return fillTo([]string{dim.Render(fit("searching…", width))}, width, height)
+	}
+	if p.err != nil {
+		return fillTo([]string{
+			lipgloss.NewStyle().Foreground(theme.Error).Render(fit(errorText(p.err), width)),
+		}, width, height)
+	}
+
 	if p.cards != nil {
 		if p.cards.count() == 0 {
-			lines := []string{dim.Render(fit("nothing matches", width))}
-			for len(lines) < height {
-				lines = append(lines, strings.Repeat(" ", width))
+			what := "nothing matches"
+			if p.cards.total() == 0 {
+				what = "no results"
 			}
-			return lines
+			return fillTo([]string{dim.Render(fit(what, width))}, width, height)
 		}
 		focused := m.ws.panels[m.ws.focused] == p
 		return p.cards.render(width, height, m.membersFor(p), focused)
 	}
 
-	lines := []string{
+	return fillTo([]string{
 		dim.Render(fit("nothing here yet", width)),
 		"",
 		dim.Render(fit("type a "+p.kind.prompt(), width)),
-	}
+	}, width, height)
+}
+
+// fillTo pads a block out to the height it has to occupy, so the panel below
+// it doesn't collapse around short content.
+func fillTo(lines []string, width, height int) []string {
 	for len(lines) < height {
 		lines = append(lines, strings.Repeat(" ", width))
 	}
@@ -203,7 +217,7 @@ func (m Model) viewHint(l layout) string {
 	var left string
 	if p := m.ws.current(); p != nil {
 		if p.searchOpen && p.search.Focused() {
-			left = "tab target · enter run · esc back"
+			left = "tab target · ↑↓ history · ctrl+o order · enter run"
 		} else {
 			left = "h/l panel · i search · s stats · space menu · ? keys"
 		}

@@ -21,6 +21,9 @@ type workspace struct {
 	// scroll is the leftmost visible panel when they don't all fit.
 	scroll int
 
+	// nextID hands out panel identities, which outlive a panel's position.
+	nextID int
+
 	width, height int
 }
 
@@ -46,8 +49,10 @@ func (w *workspace) current() *panel {
 // into it. To the right rather than at the end, because a panel is opened
 // in the middle of doing something with the one you're on, and it belongs
 // beside it.
-func (w *workspace) open(kind Kind) {
+func (w *workspace) open(kind Kind) *panel {
+	w.nextID++
 	p := newPanel(kind)
+	p.id = w.nextID
 	at := w.focused + 1
 	if w.empty() {
 		at = 0
@@ -56,6 +61,18 @@ func (w *workspace) open(kind Kind) {
 	copy(w.panels[at+1:], w.panels[at:])
 	w.panels[at] = p
 	w.focus(at)
+	return p
+}
+
+// byID finds a panel that a request was started from, or nil if it has since
+// been closed.
+func (w *workspace) byID(id int) *panel {
+	for _, p := range w.panels {
+		if p.id == id {
+			return p
+		}
+	}
+	return nil
 }
 
 // close removes the focused panel. Focus goes to its left neighbour, which

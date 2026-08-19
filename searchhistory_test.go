@@ -8,58 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestRememberQuery(t *testing.T) {
-	var h []string
-	h = rememberQuery(h, "t:dragon")
-	h = rememberQuery(h, "t:angel")
-	if strings.Join(h, "|") != "t:dragon|t:angel" {
-		t.Errorf("history = %v, want oldest first", h)
-	}
-
-	// Running an old search again moves it to the end rather than adding a
-	// second copy, so walking back never steps through the same query twice.
-	h = rememberQuery(h, "t:dragon")
-	if strings.Join(h, "|") != "t:angel|t:dragon" {
-		t.Errorf("history = %v, want the repeat moved to the end", h)
-	}
-
-	// Blank searches aren't searches.
-	h = rememberQuery(h, "   ")
-	if len(h) != 2 {
-		t.Errorf("a blank query was remembered: %v", h)
-	}
-
-	// It doesn't grow without limit.
-	for i := 0; i < queryHistoryMax*2; i++ {
-		h = rememberQuery(h, string(rune('a'+i%26))+string(rune('a'+i/26)))
-	}
-	if len(h) > queryHistoryMax {
-		t.Errorf("history grew to %d, cap is %d", len(h), queryHistoryMax)
-	}
-}
-
-func TestQueryHistorySurvivesTheSession(t *testing.T) {
-	isolate(t)
-
-	if got := loadQueryHistory(); got != nil {
-		t.Errorf("a fresh install has history: %v", got)
-	}
-	if err := saveQueryHistory([]string{"t:dragon", "t:angel"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := loadQueryHistory(); strings.Join(got, "|") != "t:dragon|t:angel" {
-		t.Errorf("history did not come back: %v", got)
-	}
-
-	// Rubbish on disk is no history rather than a crash.
-	if err := writeString(queryHistoryPath(), "{not json"); err != nil {
-		t.Fatal(err)
-	}
-	if got := loadQueryHistory(); got != nil {
-		t.Errorf("a corrupt history file loaded as %v", got)
-	}
-}
-
 func TestUpWalksTheQueryHistory(t *testing.T) {
 	isolate(t)
 
