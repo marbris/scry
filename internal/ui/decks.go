@@ -123,6 +123,7 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	l := newCardList(msg.cards, sortArrival, "decklist")
 	l.name = msg.info.Name
 	l.deck = &msg.info
+	l.recheck()
 
 	// A deck opened in its own panel replaces what was there; one opened
 	// from the decks list steps into it, so esc goes back to the list.
@@ -324,3 +325,38 @@ func follow(input string) tea.Cmd {
 
 // reloadDecks tells every decks panel to read the directory again.
 func reloadDecks() tea.Msg { return reloadDecksMsg{} }
+
+// ── Legality ────────────────────────────────────────────────────
+
+// legalityMsg carries the verdict on one deck back to the lists showing it.
+type legalityMsg struct {
+	slug     string
+	legality deck.Legality
+}
+
+// checkLegality works out whether each local deck is legal, from the card
+// cache alone. One command per deck rather than one for all of them, so the
+// first answers appear while the rest are still being worked out.
+func checkLegality(slugs []string) tea.Cmd {
+	cmds := make([]tea.Cmd, 0, len(slugs))
+	for _, slug := range slugs {
+		s := slug
+		cmds = append(cmds, func() tea.Msg {
+			return legalityMsg{slug: s, legality: deck.CheckCached(s)}
+		})
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m Model) handleLegality(msg legalityMsg) (tea.Model, tea.Cmd) {
+	for _, p := range m.ws.panels {
+		if l, ok := p.top().(*deckList); ok {
+			l.setLegality(msg.slug, msg.legality)
+		}
+		if l := p.cardsView(); l != nil && l.deck != nil && l.deck.Slug == msg.slug {
+			legality := msg.legality
+			l.legality = &legality
+		}
+	}
+	return m, nil
+}

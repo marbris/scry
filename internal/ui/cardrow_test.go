@@ -173,3 +173,34 @@ func TestAVeryNarrowPanelStillShowsSomething(t *testing.T) {
 func deckCardNamed(name string) deck.Card {
 	return deck.Card{Card: mtg.Card{Name: name}}
 }
+
+func TestAnEmojiPresentationSequenceIsMeasuredAsTwoCells(t *testing.T) {
+	// U+FE0F asks for the emoji form of the character before it, which
+	// terminals draw double-width. runewidth measures the base alone and
+	// says one, which overflows the row by a column.
+	if got := textWidth("♟️"); got != 2 {
+		t.Errorf("width of a chess pawn with the emoji selector is %d, want 2", got)
+	}
+	if got := textWidth("👑"); got != 2 {
+		t.Errorf("width of a crown is %d, want 2", got)
+	}
+	if got := textWidth("abc"); got != 3 {
+		t.Errorf("plain text measured %d", got)
+	}
+}
+
+func TestTruncateAgreesWithTextWidth(t *testing.T) {
+	// If the two use different measures, a row is cut to a width that then
+	// measures as something else and the line wraps.
+	for _, s := range []string{
+		"👑-Marchesa d'Amati, First of her Name: Queens Gambit♟️",
+		"Dwynen, Gilt-Leaf Daen",
+		"日本語のカード名",
+	} {
+		for width := 1; width <= 40; width++ {
+			if got := textWidth(truncate(s, width)); got > width {
+				t.Errorf("truncate(%q, %d) measures %d", s, width, got)
+			}
+		}
+	}
+}

@@ -37,7 +37,7 @@ type leaderCmd struct {
 // getting rid of them, then moving among them.
 var leaderMenu = []leaderCmd{
 	{"f", "find", func(m *Model) { m.ws.open(KindFind) }},
-	{"d", "decks", func(m *Model) { m.ws.open(KindDecks).show(newDeckList()) }},
+	{"d", "decks", nil}, // opens the list and checks it, so it needs a command
 	{"r", "rules", nil}, // needs a command, so it is run below
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
 	{"s", "stats (everything)", func(m *Model) { m.toggleStats(true) }},
@@ -60,10 +60,15 @@ func (m *Model) handleLeader(key string) tea.Cmd {
 		return nil
 	}
 
-	// The rules panel is the one entry that may have to fetch something,
-	// so it hands back a command rather than just changing the workspace.
+	// Two entries hand back a command rather than only changing the
+	// workspace, so they can't sit in the table above.
 	if key == "r" {
 		return m.openRules()
+	}
+	if key == "d" {
+		l := newDeckList()
+		m.ws.open(KindDecks).show(l)
+		return checkLegality(l.localSlugs())
 	}
 
 	for _, c := range leaderMenu {

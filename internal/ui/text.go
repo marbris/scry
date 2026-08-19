@@ -14,9 +14,39 @@ import (
 // panel a line taller than the one beside it. Every width in this package is
 // a display width.
 
-func textWidth(s string) int { return runewidth.StringWidth(s) }
+func textWidth(s string) int {
+	w := 0
+	for _, r := range s {
+		w += runeWidth(r)
+	}
+	return w
+}
 
-// truncate cuts to a display width, marking the cut.
+// runeWidth is how many cells a rune takes.
+//
+// runewidth alone isn't quite enough. A variation selector U+FE0F asks for
+// the *emoji* presentation of the character before it, which terminals draw
+// double-width — but runewidth measures the base character on its own and
+// calls something like ♟ (U+265F) one cell. Counting the selector as one
+// cell rather than zero gets the pair to the two the terminal will use. A
+// deck of mine called "…Queens Gambit♟️" is what found this, twice.
+//
+// Emoji width in terminals is genuinely not fully determinable — different
+// terminals disagree — so this is the closest honest approximation rather
+// than a guarantee.
+func runeWidth(r rune) int {
+	switch r {
+	case 0xFE0F: // emoji presentation
+		return 1
+	case 0xFE0E: // text presentation: leave the base narrow
+		return 0
+	}
+	return runewidth.RuneWidth(r)
+}
+
+// truncate cuts to a display width, marking the cut. Walks runes with the
+// same measure as textWidth, rather than runewidth's own, so the two can't
+// disagree about where the cut falls.
 func truncate(s string, max int) string {
 	if max <= 0 {
 		return ""
@@ -27,7 +57,19 @@ func truncate(s string, max int) string {
 	if max == 1 {
 		return "…"
 	}
-	return runewidth.Truncate(s, max, "…")
+
+	room := max - 1 // the ellipsis takes one
+	w, cut := 0, 0
+	for i, r := range s {
+		rw := runeWidth(r)
+		if w+rw > room {
+			cut = i
+			break
+		}
+		w += rw
+		cut = i + len(string(r))
+	}
+	return s[:cut] + "…"
 }
 
 // pad extends a string to a display width, for lining columns up by hand

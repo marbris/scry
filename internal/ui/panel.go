@@ -293,7 +293,16 @@ func (p *panel) subtitle() string {
 // explicit, so a deck that needs saving has to say so.
 func (p *panel) subtitleWithState() string {
 	out := p.subtitle()
-	if l := p.cardsView(); l != nil && l.dirty {
+	l := p.cardsView()
+	if l == nil {
+		return out
+	}
+	// A deck that isn't legal says so where you are working on it; the
+	// reasons are in the decks panel, which has room for them.
+	if l.legality != nil && l.legality.Known && !l.legality.Legal {
+		out += " · illegal"
+	}
+	if l.dirty {
 		if out != "" {
 			out += " · "
 		}

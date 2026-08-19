@@ -57,3 +57,14 @@ func Summaries() ([]Summary, error) {
 	}
 	return out, nil
 }
+
+// CheckCached works out a deck's legality from what is already in the card
+// cache. A deck whose cards aren't all known comes back unknown.
+func CheckCached(slug string) Legality {
+	d, err := Read(slug)
+	if err != nil {
+		return Legality{}
+	}
+	cards, complete := ResolveCached(d.MainEntries())
+	return Check(d.Format, cards, complete)
+}

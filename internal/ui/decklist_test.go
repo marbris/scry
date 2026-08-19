@@ -323,3 +323,44 @@ func TestWideCharactersInACardRowToo(t *testing.T) {
 		}
 	}
 }
+
+func TestTheFlagColumnSaysWhetherADeckIsLegal(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		v    deck.Legality
+		want string
+	}{
+		{"legal", deck.Legality{Known: true, Legal: true}, "*"},
+		{"illegal", deck.Legality{Known: true}, "!"},
+		{"unchecked", deck.Legality{}, " "},
+	} {
+		got := stripANSI(renderEntry(deckEntry{
+			kind: entryLocal, name: "Deck", count: 100, legal: c.v,
+		}, 30, false))
+		if !strings.Contains(got, "L"+c.want) {
+			t.Errorf("%s rendered %q, want L%s", c.name, got, c.want)
+		}
+	}
+}
+
+func TestTheInfoPanelSaysWhyADeckIsIllegal(t *testing.T) {
+	// A deck that is merely "illegal" tells you nothing you can act on.
+	l := &deckList{all: []deckEntry{{
+		kind: entryLocal, name: "Too Big", count: 157,
+		legal: deck.Legality{
+			Format: "commander", Known: true,
+			Problems: []deck.Problem{
+				{Text: "157 cards, needs exactly 100"},
+				{Text: "outside the commander's colours", Cards: []string{"Llanowar Elves"}},
+			},
+		},
+	}}}
+	l.refresh()
+
+	info := stripANSI(strings.Join(l.info(60), "\n"))
+	for _, want := range []string{"not legal in commander", "needs exactly 100", "Llanowar Elves"} {
+		if !strings.Contains(info, want) {
+			t.Errorf("%q is missing from:\n%s", want, info)
+		}
+	}
+}

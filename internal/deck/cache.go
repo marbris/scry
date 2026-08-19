@@ -248,3 +248,32 @@ func (idx cardIndex) lookup(e Entry) (mtg.Card, bool) {
 	c, ok := idx.byName[strings.ToLower(e.Name)]
 	return c, ok
 }
+
+// ResolveCached fills in a deck's cards from what has already been looked
+// up, without going near the network, and says whether it managed all of
+// them.
+//
+// This is what lets the decks panel report legality for a directory of decks
+// the moment it opens. Checking a dozen decks properly would mean a dozen
+// rounds of requests; checking them from the cache costs a file read, and a
+// deck it can't finish is reported as unknown rather than guessed at.
+func ResolveCached(entries []Entry) ([]Card, bool) {
+	cache := loadCardCache()
+
+	out := make([]Card, 0, len(entries))
+	complete := true
+	for _, e := range entries {
+		card, ok := cache.get(e)
+		if !ok {
+			complete = false
+			continue
+		}
+		out = append(out, Card{
+			Card:      card,
+			Qty:       e.Qty,
+			Commander: e.commander(),
+			Tags:      e.Tags,
+		})
+	}
+	return out, complete
+}

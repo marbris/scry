@@ -89,6 +89,7 @@ func (m *Model) add(cards []deck.Card) {
 		added++
 	}
 	l.refresh()
+	l.recheck()
 	m.notice = addNotice(cards, added, raised)
 }
 
@@ -116,6 +117,7 @@ func (m *Model) remove(cards []deck.Card) {
 		removed++
 	}
 	l.refresh()
+	l.recheck()
 
 	switch {
 	case removed == 0:
@@ -189,6 +191,7 @@ func (m *Model) put(l *cardList) {
 		l.all = append(l.all, put)
 	}
 	l.refresh()
+	l.recheck()
 	m.notice = "put " + itoa(len(m.register)) + " " + plural("card", len(m.register))
 }
 
@@ -283,6 +286,7 @@ func (m *Model) commander(c deck.Card) tea.Cmd {
 		l.pushUndo("commander " + c.Card.Name)
 		l.all = append(l.all, deck.Card{Card: c.Card, Qty: 1, Commander: true})
 		l.refresh()
+		l.recheck()
 		m.notice = c.Card.Name + " is the commander"
 		return nil
 	}
@@ -290,6 +294,7 @@ func (m *Model) commander(c deck.Card) tea.Cmd {
 	l.pushUndo("commander " + c.Card.Name)
 	l.all[i].Commander = !l.all[i].Commander
 	l.refresh()
+	l.recheck()
 	if l.all[i].Commander {
 		m.notice = c.Card.Name + " is the commander"
 	} else {
@@ -338,5 +343,6 @@ func (m *Model) undo() {
 	l.undo = l.undo[:n-1]
 	l.all = step.cards
 	l.refresh()
+	l.recheck()
 	m.notice = "undid " + step.what
 }

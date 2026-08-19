@@ -336,3 +336,37 @@ func TestTheQuitQuestionCannotBeAnsweredByAccident(t *testing.T) {
 		t.Error("the question is still standing")
 	}
 }
+
+func TestEditingRechecksLegality(t *testing.T) {
+	// Adding a card is exactly the thing that makes a deck illegal, so the
+	// answer has to keep up with the edits rather than waiting for a save.
+	m, search, target := editing(t)
+	target.deck.Format = "commander"
+	target.recheck()
+
+	if target.legality == nil || target.legality.Legal {
+		t.Fatal("a one-card deck should not be a legal Commander deck")
+	}
+	before := len(target.legality.Problems)
+
+	m = focusOn(m, 0)
+	search.selectByName("Llanowar Elves")
+	m = drive(m, "a")
+
+	if target.legality == nil {
+		t.Fatal("the verdict went missing after an edit")
+	}
+	if len(target.legality.Problems) == 0 && before > 0 {
+		t.Error("the verdict was not recomputed")
+	}
+}
+
+func TestAnIllegalDeckSaysSoWhereYouAreWorkingOnIt(t *testing.T) {
+	m, _, target := editing(t)
+	target.deck.Format = "commander"
+	target.recheck()
+
+	if !strings.Contains(stripANSI(m.View()), "illegal") {
+		t.Errorf("the panel does not flag it:\n%s", stripANSI(m.View()))
+	}
+}

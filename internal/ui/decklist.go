@@ -58,9 +58,9 @@ type deckEntry struct {
 	format   string
 	count    int // cards for a deck, decks for a user
 	modified time.Time
-	// legal is nil when nothing has worked it out yet, which is every local
-	// deck until the legality engine lands.
-	legal  *bool
+	// legal is the verdict, which stays unknown until the background pass
+	// gets to this deck.
+	legal  deck.Legality
 	broken bool
 }
 
@@ -93,6 +93,11 @@ type deckList struct {
 	order  deckListSort
 	filter string
 
+	// legality is what the background pass has worked out so far, kept
+	// across reloads so the flags don't blink off every time a deck is
+	// written.
+	legality map[string]deck.Legality
+
 	// confirming is a deletion waiting for a yes, and holds the row it
 	// would delete so that moving the cursor can't redirect it.
 	confirming *deckEntry
@@ -100,9 +105,34 @@ type deckList struct {
 
 // newDeckList reads what's on disk and what's bookmarked.
 func newDeckList() *deckList {
-	l := &deckList{order: byModified}
+	l := &deckList{order: byModified, legality: map[string]deck.Legality{}}
 	l.reload()
 	return l
+}
+
+// localSlugs is every deck of yours in the list, for the legality pass.
+func (l *deckList) localSlugs() []string {
+	var out []string
+	for _, e := range l.all {
+		if e.kind == entryLocal {
+			out = append(out, e.slug)
+		}
+	}
+	return out
+}
+
+// setLegality files a verdict and puts it on the row it belongs to.
+func (l *deckList) setLegality(slug string, verdict deck.Legality) {
+	if l.legality == nil {
+		l.legality = map[string]deck.Legality{}
+	}
+	l.legality[slug] = verdict
+	for i := range l.all {
+		if l.all[i].kind == entryLocal && l.all[i].slug == slug {
+			l.all[i].legal = verdict
+		}
+	}
+	l.refresh()
 }
 
 // reload rebuilds from disk. Every change goes through it, so the list can
@@ -115,6 +145,7 @@ func (l *deckList) reload() {
 		all = append(all, deckEntry{
 			kind: entryLocal, name: s.Name, slug: s.Slug, format: s.Format,
 			count: s.Total, modified: s.Modified, broken: s.Broken,
+			legal: l.legality[s.Slug],
 		})
 	}
 
@@ -255,10 +286,7 @@ func renderEntry(e deckEntry, width int, under bool) string {
 	// The kind and its legality mark travel together: they are two
 	// characters saying what this is and whether it's playable.
 	kind := e.kind.letter()
-	legal := " "
-	if e.legal != nil && *e.legal {
-		legal = "*"
-	}
+	legal := e.legal.Flag()
 
 	tail := []string{kind + legal}
 	if e.count > 0 {
@@ -400,13 +428,12 @@ func (l *deckList) info(width int) []string {
 	switch e.kind {
 	case entryLocal:
 		out = append(out, dim.Render(fit("a deck of yours", width)))
-		if e.format != "" {
-			out = append(out, dim.Render(fit(e.format, width)))
-		}
 		out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
 		if age := shortAge(e.modified); age != "" {
 			out = append(out, dim.Render(fit("touched "+age+" ago", width)))
 		}
+		out = append(out, "")
+		out = append(out, legalityLines(e.legal, width)...)
 		out = append(out, "", mutedLine("enter to open · gv for versions", width))
 	case entryRemote:
 		out = append(out, dim.Render(fit("on Moxfield", width)))
@@ -414,6 +441,29 @@ func (l *deckList) info(width int) []string {
 	case entryUser:
 		out = append(out, dim.Render(fit("a person on Moxfield", width)))
 		out = append(out, "", mutedLine("enter for their decks", width))
+	}
+	return out
+}
+
+// legalityLines is the verdict and, when it is bad news, what is wrong with
+// it. A deck that is merely "illegal" tells you nothing you can act on.
+func legalityLines(verdict deck.Legality, width int) []string {
+	style := lipgloss.NewStyle().Foreground(theme.TextMuted)
+	switch {
+	case verdict.Legal:
+		style = lipgloss.NewStyle().Foreground(theme.Success)
+	case verdict.Known:
+		style = lipgloss.NewStyle().Foreground(theme.Error)
+	}
+
+	out := wrapStyled(verdict.Summary(), width, style)
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+	for _, p := range verdict.Problems {
+		out = append(out, wrapStyled("· "+p.Text, width, dim)...)
+		if len(p.Cards) > 0 {
+			out = append(out, wrapStyled("  "+strings.Join(p.Cards, ", "), width,
+				lipgloss.NewStyle().Foreground(theme.TextMuted))...)
+		}
 	}
 	return out
 }

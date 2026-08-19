@@ -163,13 +163,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case versionsMsg:
 		return m.handleVersions(msg)
 
+	case legalityMsg:
+		return m.handleLegality(msg)
+
 	case reloadDecksMsg:
+		var slugs []string
 		for _, p := range m.ws.panels {
 			if l, ok := p.top().(*deckList); ok {
 				l.reload()
+				slugs = append(slugs, l.localSlugs()...)
 			}
 		}
-		return m, nil
+		return m, checkLegality(slugs)
 	}
 	return m, nil
 }

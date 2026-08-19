@@ -60,6 +60,11 @@ type cardList struct {
 	rulings   map[string][]mtg.Ruling
 	rulingErr map[string]error
 
+	// legality is the verdict on this deck, when it is one and someone has
+	// worked it out. Recomputed as you edit, since an edit is exactly what
+	// changes the answer.
+	legality *deck.Legality
+
 	// dirty means there are edits not yet written. Saving is explicit, so
 	// this is the only thing standing between an edit and losing it — which
 	// is why quitting asks.
@@ -83,6 +88,19 @@ func newCardList(cards []deck.Card, order cardSort, arrivalName string) *cardLis
 	}
 	l.refresh()
 	return l
+}
+
+// recheck works out this deck's legality again, from the cards in hand.
+// Called after every edit: adding a card is the thing that makes a deck
+// illegal, so the answer has to keep up.
+func (l *cardList) recheck() {
+	if l.deck == nil {
+		return
+	}
+	// The cards are already resolved — they're on screen — so this needs
+	// nothing fetched and can happen on every keystroke.
+	verdict := deck.Check(l.deck.Format, l.all, true)
+	l.legality = &verdict
 }
 
 // orderName is what the panel calls its current order.
