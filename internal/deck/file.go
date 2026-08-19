@@ -238,7 +238,7 @@ func (d *File) String() string {
 	}
 
 	for _, sec := range d.sectionOrder() {
-		entries := d.section(sec)
+		entries := d.Section(sec)
 		if len(entries) == 0 {
 			continue
 		}
@@ -265,7 +265,8 @@ func (e Entry) String() string {
 }
 
 // section returns one section's entries, sorted by name.
-func (d *File) section(name string) []Entry {
+// Section is the entries filed under one heading.
+func (d *File) Section(name string) []Entry {
 	var out []Entry
 	for _, e := range d.Entries {
 		if e.Section == name {

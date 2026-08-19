@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -274,3 +275,139 @@ func TestOpeningTheRulesWithNoCardGivesYouTheBar(t *testing.T) {
 		t.Error("with nothing highlighted there is nothing to explain, so it should ask")
 	}
 }
+
+func TestTheRulesListDrawsNumbersAndFirstLines(t *testing.T) {
+	m := sized(140, 30)
+	m.rules = fakeRules(t)
+	p := m.ws.open(KindRules)
+	p.show(newRuleSearch(m.rules, "sacrifice"))
+
+	view := stripANSI(m.View())
+	if !strings.Contains(view, "701.13") {
+		t.Errorf("no rule numbers:\n%s", view)
+	}
+	if !strings.Contains(view, "rules: sacrifice") {
+		t.Errorf("the header does not say what was searched:\n%s", view)
+	}
+}
+
+func TestJAndKWalkTheRulesAndTheInfoPanelFollows(t *testing.T) {
+	m := sized(140, 30)
+	m.rules = fakeRules(t)
+	p := m.ws.open(KindRules)
+	v := newRuleSearch(m.rules, "flying")
+	p.show(v)
+
+	first := stripANSI(strings.Join(v.info(50), "\n"))
+	m = drive(m, "j")
+	second := stripANSI(strings.Join(v.info(50), "\n"))
+
+	if first == second {
+		t.Error("moving down did not change what the panel describes")
+	}
+}
+
+func TestOSwapsBetweenRelevanceAndRuleNumber(t *testing.T) {
+	m := sized(140, 30)
+	m.rules = fakeRules(t)
+	p := m.ws.open(KindRules)
+	v := newRuleSearch(m.rules, "creature")
+	p.show(v)
+
+	before := v.order
+	m = drive(m, "o")
+	if v.order == before {
+		t.Error("o did not change the order")
+	}
+	if !strings.Contains(stripANSI(m.View()), v.order.String()) {
+		t.Error("the panel does not say which order it is in")
+	}
+}
+
+func TestACardsRulesAreNotReordered(t *testing.T) {
+	// The headings are the point; sorting the rows would scatter them.
+	m := sized(140, 30)
+	m.rules = fakeRules(t)
+	p := m.ws.open(KindRules)
+	v := newCardRules(m.rules, mtg.Card{
+		Name: "Bird", TypeLine: "Creature — Bird", OracleText: "Flying",
+	})
+	p.show(v)
+
+	before := len(v.rows)
+	m = drive(m, "o")
+	if len(v.rows) != before {
+		t.Errorf("the rows changed: %d then %d", before, len(v.rows))
+	}
+	if !v.grouped {
+		t.Error("the grouping was lost")
+	}
+}
+
+func TestSlashNarrowsTheRules(t *testing.T) {
+	m := sized(140, 30)
+	m.rules = fakeRules(t)
+	p := m.ws.open(KindRules)
+	v := newRuleSearch(m.rules, "a")
+	p.show(v)
+
+	before := len(v.rows)
+	m = drive(m, "/", "f", "l", "y", "i", "n", "g", "enter")
+	if len(v.rows) >= before {
+		t.Errorf("filtering left %d of %d rows", len(v.rows), before)
+	}
+
+	m = drive(m, "esc")
+	if len(v.rows) != before {
+		t.Errorf("esc left %d of %d rows", len(v.rows), before)
+	}
+}
+
+func TestASearchThatMatchesNothingSaysSo(t *testing.T) {
+	m := sized(140, 30)
+	m.rules = fakeRules(t)
+	p := m.ws.open(KindRules)
+	p.show(newRuleSearch(m.rules, "zzzznothing"))
+
+	if !strings.Contains(stripANSI(m.View()), "nothing in the rules") {
+		t.Errorf("got:\n%s", stripANSI(m.View()))
+	}
+}
+
+func TestTheRulebookArrivesAfterThePanelDoes(t *testing.T) {
+	// A panel opened before the parse finishes is filled when it lands
+	// rather than refusing.
+	m := sized(140, 30)
+	p := m.ws.open(KindRules)
+	m.pending = append(m.pending, wantRules{panel: p.id, query: "flying"})
+	p.loading = true
+
+	next, _ := m.Update(rulesLoadedMsg{data: fakeRules(t)})
+	m = next.(Model)
+
+	if p.loading {
+		t.Error("the panel is still waiting")
+	}
+	if _, ok := p.top().(*rulesView); !ok {
+		t.Fatalf("the panel is showing %T", p.top())
+	}
+}
+
+func TestARulebookThatWontLoadIsReportedNotSwallowed(t *testing.T) {
+	m := sized(140, 30)
+	p := m.ws.open(KindRules)
+	m.pending = append(m.pending, wantRules{panel: p.id, query: "flying"})
+	p.loading = true
+
+	next, _ := m.Update(rulesLoadedMsg{err: errRules})
+	m = next.(Model)
+
+	if p.err == nil {
+		t.Error("the failure was swallowed")
+	}
+	if !strings.Contains(stripANSI(m.View()), "no rulebook") {
+		t.Errorf("got:\n%s", stripANSI(m.View()))
+	}
+}
+
+var errRules = errors.New("no rulebook here")

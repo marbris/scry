@@ -199,13 +199,20 @@ func (p *panel) cardsView() *cardList {
 	return l
 }
 
-// setFilter narrows whatever the panel is showing, for the views that can
-// be narrowed. A view that can't simply ignores it.
+// filterable is a view that / can narrow.
+//
+// An interface rather than a type switch, because the switch had no case for
+// the rules panel and so / did nothing there — silently, since a filter that
+// matches everything looks exactly like one that wasn't applied. A view that
+// can be narrowed now says so in its own file.
+type filterable interface {
+	setFilter(string)
+}
+
+// setFilter narrows whatever the panel is showing. A view that can't be
+// narrowed simply ignores it.
 func (p *panel) setFilter(s string) {
-	switch v := p.top().(type) {
-	case *cardList:
-		v.setFilter(s)
-	case *deckList:
+	if v, ok := p.top().(filterable); ok {
 		v.setFilter(s)
 	}
 }

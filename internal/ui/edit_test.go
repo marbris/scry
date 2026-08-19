@@ -370,3 +370,26 @@ func TestAnIllegalDeckSaysSoWhereYouAreWorkingOnIt(t *testing.T) {
 		t.Errorf("the panel does not flag it:\n%s", stripANSI(m.View()))
 	}
 }
+
+func TestATagWithASpaceCanBeTypedIfQuoted(t *testing.T) {
+	// A deck imported from Moxfield can arrive carrying "fast mana"; without
+	// quotes it could be read but never removed.
+	add, remove := parseTagEdit(`"fast mana" ramp -"card draw"`)
+	if len(add) != 2 || add[0] != "fast mana" || add[1] != "ramp" {
+		t.Errorf("adding %v", add)
+	}
+	if len(remove) != 1 || remove[0] != "card draw" {
+		t.Errorf("removing %v", remove)
+	}
+}
+
+func TestTagEditsAreLowercased(t *testing.T) {
+	// So "Ramp" and "ramp" are one category in the statistics rather than
+	// two bars saying the same thing.
+	add, _ := parseTagEdit("Ramp RAMP")
+	for _, tag := range add {
+		if tag != "ramp" {
+			t.Errorf("got %q", tag)
+		}
+	}
+}

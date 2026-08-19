@@ -53,10 +53,55 @@ func focusOn(m Model, at int) Model {
 }
 
 func keyMsg(k string) tea.KeyMsg {
-	if k == "esc" {
+	switch k {
+	case "esc":
 		return tea.KeyMsg{Type: tea.KeyEsc}
+	case "enter":
+		return tea.KeyMsg{Type: tea.KeyEnter}
+	case "space":
+		return tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
 	}
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+}
+
+// press sends one key and hands back the command it produced, for the paths
+// that do their work off the main thread.
+func press(m Model, k string) (Model, tea.Cmd) {
+	next, cmd := m.Update(keyMsg(k))
+	return next.(Model), cmd
+}
+
+// settle runs a command and feeds its message back, the way the program
+// would — unwrapping batches, which hand back a list of commands rather than
+// running them.
+func settle(m Model, cmd tea.Cmd) Model {
+	for _, msg := range messages(cmd) {
+		next, more := m.Update(msg)
+		m = next.(Model)
+		if more != nil {
+			m = settle(m, more)
+		}
+	}
+	return m
+}
+
+// messages runs a command and flattens whatever it produced.
+func messages(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		return []tea.Msg{msg}
+	}
+	var out []tea.Msg
+	for _, c := range batch {
+		out = append(out, messages(c)...)
+	}
+	return out
 }
 
 func mkReader(s string) *strings.Reader { return strings.NewReader(s) }

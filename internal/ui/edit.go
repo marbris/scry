@@ -256,15 +256,20 @@ func (m *Model) tagWithLast(cards []deck.Card) {
 
 // parseTagEdit splits an answer into tags to add and tags to take away. A
 // leading minus removes, so "ramp -draw" does both at once.
+//
+// Quoting works the same way it does in a filter, which matters because a
+// deck imported from Moxfield can arrive carrying tags like "fast mana":
+// without quotes those could be read but never typed, and so never removed.
+// One query syntax across the program, again.
 func parseTagEdit(input string) (add, remove []string) {
-	for _, field := range strings.Fields(input) {
-		if strings.HasPrefix(field, "-") {
-			if t := strings.TrimPrefix(field, "-"); t != "" {
-				remove = append(remove, strings.ToLower(t))
+	for _, term := range filterTerms(input) {
+		if strings.HasPrefix(term, "-") {
+			if t := strings.TrimPrefix(term, "-"); t != "" {
+				remove = append(remove, t)
 			}
 			continue
 		}
-		add = append(add, strings.ToLower(field))
+		add = append(add, term)
 	}
 	return add, remove
 }

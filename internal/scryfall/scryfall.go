@@ -34,6 +34,11 @@ var SortOptions = []string{
 	"review",
 }
 
+// SearchURL is the endpoint, as a variable so a test can point it at a
+// server it controls. Paging is the part of this worth testing and it can't
+// be exercised against the real Scryfall without asking for a lot of cards.
+var SearchURL = "https://api.scryfall.com/cards/search"
+
 // Search runs a query, following pages until it has limit cards or Scryfall
 // runs out. It returns the cards, and how many the query matched in total —
 // which is usually more than were fetched.
@@ -43,9 +48,8 @@ func Search(query, sort string, limit int) ([]mtg.Card, int, error) {
 	var all []mtg.Card
 
 	for page := 1; ; page++ {
-		u := fmt.Sprintf(
-			"https://api.scryfall.com/cards/search?q=%s&order=%s&page=%d",
-			url.QueryEscape(query), url.QueryEscape(sort), page,
+		u := fmt.Sprintf("%s?q=%s&order=%s&page=%d",
+			SearchURL, url.QueryEscape(query), url.QueryEscape(sort), page,
 		)
 		body, err := fetch.Get(u)
 		if err != nil {

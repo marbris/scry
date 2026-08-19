@@ -3,6 +3,7 @@ package deck
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -46,4 +47,20 @@ func isolate(t *testing.T) string {
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 	t.Setenv("SCRY_DECKS_DIR", filepath.Join(root, "decks"))
 	return root
+}
+
+// seed writes a deck straight into the decks directory.
+func seed(t *testing.T, slug, body string) {
+	t.Helper()
+	d, err := ParseFile(strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(slug, d); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeFile(path, body string) error {
+	return os.WriteFile(path, []byte(body), 0644)
 }
