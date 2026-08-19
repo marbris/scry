@@ -257,11 +257,17 @@ needed:
 | `c` in a decks panel | a **row** — one deck among many | another row: a local copy beside it, or a sync if it exists |
 | `w` in a card list | the **list** in front of you | this panel becomes the local deck; `W` opens it in a new panel |
 
-**8. Rules panel. — next.** Paragraph search results, the full rule in the
-information panel, and card-scoped opening (abilities / actions / zones /
-glossary).
+**8. Rules panel. — done.** Paragraph search results, the full rule in the
+information panel, and card-scoped opening — grouped into abilities, actions,
+ability words, zones, card types and glossary.
 
-**9. Information panel.** Card, deck, rule and diff renderers; `K`/`J` to
+Views now say what the information panel should show; phase 9 fills in the
+rest. Relevance ranks by how early and how tightly the terms appear —
+"sacrifice a creature" used to lead with rule 101.4, because "a" is in every
+rule. The rules bar quotes the same way the card filter does, so there is one
+query syntax in the program.
+
+**9. Information panel. — next.** Card, deck, rule and diff renderers; `K`/`J` to
 move and `ctrl+k`/`ctrl+j` to scroll; `s`/`<space>s` statistics with live
 cross-list filtering; `gv` for both kinds of version history.
 
