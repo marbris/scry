@@ -177,12 +177,22 @@ Three rules held throughout:
 config file, embedded built-ins, per-role fallback, and the `scry theme`
 commands. A second theme (a light one) to prove the fallback works.
 
-**3. Workspace shell. — next.** `workspace`, `panel`, the layout arithmetic (equal
+**3. Workspace shell. — done**, behind `scry --panels` while it grows, so
+the working app stays working. `internal/ui` is one package as planned.
+
+Two consequences of a space leader, found by running it and kept because
+both are vim's own answer: the leader is dead inside a search bar (that's
+insert mode), and `esc` cascades — clear the query, leave the bar, close the
+panel, and closing the last one lands on the splash rather than quitting.
+
+The layout is a pure function with tests: panels cover the terminal exactly,
+differ by at most a column, never shrink below a readable floor (the row
+scrolls instead), and the focused panel is always on screen. `workspace`, `panel`, the layout arithmetic (equal
 shares, minimum width, horizontal overflow), the focus ring on `h`/`l`, the
 `<space>` prefix and its which-key popup, splash screen, empty information
 panel, panel create/close/move/jump. No content in the panels yet.
 
-**4. Card list view.** The row delegate: name plus the sort column, and the
+**4. Card list view. — next.** The row delegate: name plus the sort column, and the
 degradation ladder — type line to an initialism (`Legendary Creature - Elf
 Faerie Noble` → `LC-EFN`), then the name (`Dwynen, Gilt-Leaf Daen` → `D,GLD.`).
 Plus `o`/`O`, `/`, `v`/`V`, and the membership marks. Bubbles' default list

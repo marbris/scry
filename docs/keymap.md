@@ -30,6 +30,12 @@ else — the panel formerly called "lists" is the **decks** panel.
 `,` stays bound as an alias for `<space>`, since the leader popup is already
 built around it.
 
+**The leader does nothing inside a search bar**, where space is a space —
+the bar is insert mode, and vim's leader doesn't work there either. A fresh
+panel opens with its bar focused, so opening a second empty panel means
+finishing or abandoning the first. An empty panel is a question you haven't
+answered.
+
 ## Panels — `<space>`
 
 | Key | Action |
@@ -84,6 +90,7 @@ default. That keymap must be stripped wholesale.
 | `w` | write this list — see **Writing a list** |
 | `W` | write it, and open the result in a new panel |
 | `esc` | clear selection → clear filter → pop sub-view → close panel |
+| | in a search bar: clear the query → leave the bar → close the panel |
 
 `enter` and `L` are unbound here: individual cards don't open, they're shown
 in the information panel as the cursor moves.
