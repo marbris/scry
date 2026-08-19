@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/deck"
 	"scry/internal/theme"
 )
 
@@ -100,6 +101,14 @@ type panel struct {
 
 	// title is what the header says once the bar has closed.
 	title string
+
+	// cards is what the panel holds, once something has filled it. Nil
+	// until then, which is what "empty" means.
+	cards *cardList
+
+	// filtering is the / prompt, open only while you're typing in it.
+	filtering   bool
+	filterInput textinput.Model
 }
 
 func newPanel(kind Kind) *panel {
@@ -108,9 +117,21 @@ func newPanel(kind Kind) *panel {
 	in.Placeholder = kind.placeholder()
 	in.Focus()
 
-	p := &panel{kind: kind, search: in, searchOpen: true}
+	f := textinput.New()
+	f.Prompt = "/"
+
+	p := &panel{kind: kind, search: in, searchOpen: true, filterInput: f}
 	p.restyle()
 	return p
+}
+
+// show puts a list of cards in the panel, which is what turns a search bar
+// into a header.
+func (p *panel) show(title string, cards []deck.Card, order cardSort) {
+	p.title = title
+	p.cards = newCardList(cards, order)
+	p.searchOpen = false
+	p.search.Blur()
 }
 
 // restyle repaints the search bar. Colours are read at render time rather
@@ -119,6 +140,8 @@ func (p *panel) restyle() {
 	p.search.PromptStyle = lipgloss.NewStyle().Foreground(theme.Accent)
 	p.search.TextStyle = lipgloss.NewStyle().Foreground(theme.Text)
 	p.search.PlaceholderStyle = lipgloss.NewStyle().Foreground(theme.TextMuted)
+	p.filterInput.PromptStyle = lipgloss.NewStyle().Foreground(theme.Highlight)
+	p.filterInput.TextStyle = lipgloss.NewStyle().Foreground(theme.Text)
 }
 
 // setKind retargets a panel, which only means anything while it's empty.
@@ -128,11 +151,16 @@ func (p *panel) setKind(k Kind) {
 }
 
 // header is the line at the top of a panel: the search bar while it's open,
-// otherwise a description of what's below it.
+// the filter while you're typing one, otherwise a description of what's
+// below it.
 func (p *panel) header(width int) string {
 	if p.searchOpen {
 		p.search.Width = maxInt(width-4, 4)
 		return p.search.View()
+	}
+	if p.filtering {
+		p.filterInput.Width = maxInt(width-3, 4)
+		return p.filterInput.View()
 	}
 	name := p.title
 	if name == "" {
@@ -143,4 +171,34 @@ func (p *panel) header(width int) string {
 
 // empty reports whether a panel has nothing in it yet, which is what makes
 // esc close it rather than clear something.
-func (p *panel) empty() bool { return p.title == "" }
+func (p *panel) empty() bool { return p.cards == nil && p.title == "" }
+
+// list is the panel's cards, or an empty stand-in. Every list key goes
+// through here so none of them has to check whether the panel has anything
+// in it yet.
+func (p *panel) list() *cardList {
+	if p.cards == nil {
+		return emptyList
+	}
+	return p.cards
+}
+
+// emptyList is shared and never shown; keys land on it and do nothing.
+var emptyList = newCardList(nil, sortArrival)
+
+// subtitle is the count line under the header: how many cards, and what has
+// been done to narrow or reorder them.
+func (p *panel) subtitle() string {
+	if p.cards == nil || p.cards.total() == 0 {
+		return ""
+	}
+	out := itoa(p.cards.count())
+	if p.cards.count() != p.cards.total() {
+		out += "/" + itoa(p.cards.total())
+	}
+	out += " · " + p.cards.order.String()
+	if n := p.cards.markCount(); n > 0 {
+		out += " · " + itoa(n) + " picked"
+	}
+	return out
+}

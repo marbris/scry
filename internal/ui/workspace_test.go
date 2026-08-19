@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"scry/internal/deck"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -279,5 +281,132 @@ func TestOffScreenPanelsAreFlagged(t *testing.T) {
 	view := stripANSI(m.View())
 	if !strings.Contains(view, "↔") {
 		t.Errorf("no sign that panels are off screen:\n%s", view)
+	}
+}
+
+// ── The list, driven through the model ──────────────────────────
+
+// withCards opens a panel and fills it, standing in for the search that
+// phase 5 will run.
+func withCards(m Model, key string, cards []deck.Card, order cardSort) Model {
+	m = openPanel(m, key, "query")
+	m.ws.current().show("query", cards, order)
+	return m
+}
+
+func TestJAndKMoveTheCursor(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, "j", "j")
+	if c, _ := m.ws.current().cards.current(); c.Card.Name != "Sol Ring" {
+		t.Errorf("two js landed on %s", c.Card.Name)
+	}
+	m = drive(m, "k")
+	if c, _ := m.ws.current().cards.current(); c.Card.Name != "Llanowar Elves" {
+		t.Errorf("k landed on %s", c.Card.Name)
+	}
+}
+
+func TestGAndShiftGGoToTheEnds(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, "G")
+	if c, _ := m.ws.current().cards.current(); c.Card.Name != "Forest" {
+		t.Errorf("G landed on %s, want the last card", c.Card.Name)
+	}
+	m = drive(m, "g")
+	if m.ws.current().cards.cursor != 0 {
+		t.Error("g did not go back to the top")
+	}
+}
+
+func TestOCyclesTheSortAndTheHeaderSaysSo(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, "o")
+	if got := m.ws.current().cards.order; got != sortMana {
+		t.Errorf("o moved to %v, want mana value", got)
+	}
+	if !strings.Contains(stripANSI(m.View()), "mana value") {
+		t.Error("the panel does not say what it is sorted by")
+	}
+	m = drive(m, "O", "O")
+	if got := m.ws.current().cards.order; got != sortEDHREC {
+		t.Errorf("O wrapped to %v", got)
+	}
+}
+
+func TestSlashOpensTheFilterAndNarrowsAsYouType(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, "/")
+	if !m.ws.current().filtering {
+		t.Fatal("/ did not open the filter")
+	}
+	m = drive(m, "e", "l", "f")
+	if got := m.ws.current().cards.count(); got != 2 {
+		t.Errorf("filtering to 'elf' left %d cards", got)
+	}
+	m = drive(m, "enter")
+	if m.ws.current().filtering {
+		t.Error("enter left the filter prompt open")
+	}
+}
+
+func TestEscAbandonsTheFilterPrompt(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, "/", "e", "l", "f", "esc")
+	if m.ws.current().cards.count() != 4 {
+		t.Error("esc left the half-typed narrowing in place")
+	}
+}
+
+func TestTheEscCascadeInAList(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, "/", "e", "l", "f", "enter")
+	m = drive(m, "v") // pick one out
+
+	m = drive(m, "esc") // marks first
+	if m.ws.current().cards.markCount() != 0 {
+		t.Error("the first esc did not clear the selection")
+	}
+	m = drive(m, "esc") // then the filter
+	if m.ws.current().cards.filter != "" {
+		t.Error("the second esc did not clear the filter")
+	}
+	m = drive(m, "esc") // then back to the search bar
+	if m.ws.current().cards != nil {
+		t.Error("the third esc did not empty the panel")
+	}
+	if m.ws.count() != 1 {
+		t.Error("the panel closed before it had been emptied")
+	}
+}
+
+func TestEveryListFlagsWhatTheEditingDeckHolds(t *testing.T) {
+	m := sized(160, 30)
+	m = withCards(m, "f", sample(), sortArrival)
+	m = withCards(m, "d", sample()[:2], sortArrival)
+
+	// Pretend the second panel is the deck being built.
+	m.ws.editing, m.ws.pinned = 1, true
+
+	members := m.membersFor(m.ws.panels[0])
+	if members["sol ring"] {
+		t.Error("Sol Ring is not in the deck but was flagged")
+	}
+	if !members["llanowar elves"] {
+		t.Error("Llanowar Elves is in the deck and should be flagged in the search")
+	}
+}
+
+func TestTheEditingDeckFlagsWhatTheListsHaveTurnedUp(t *testing.T) {
+	m := sized(160, 30)
+	m = withCards(m, "f", sample()[2:], sortArrival) // Sol Ring, Forest
+	m = withCards(m, "d", sample(), sortArrival)
+	m.ws.editing, m.ws.pinned = 1, true
+
+	members := m.membersFor(m.ws.panels[1])
+	if !members["sol ring"] {
+		t.Error("the deck should flag the card the search turned up")
+	}
+	if members["dwynen, gilt-leaf daen"] {
+		t.Error("a card no list is showing was flagged in the deck")
 	}
 }

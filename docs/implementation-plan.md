@@ -192,13 +192,22 @@ shares, minimum width, horizontal overflow), the focus ring on `h`/`l`, the
 `<space>` prefix and its which-key popup, splash screen, empty information
 panel, panel create/close/move/jump. No content in the panels yet.
 
-**4. Card list view. — next.** The row delegate: name plus the sort column, and the
+**4. Card list view. — done.** The row delegate: name plus the sort column, and the
 degradation ladder — type line to an initialism (`Legendary Creature - Elf
 Faerie Noble` → `LC-EFN`), then the name (`Dwynen, Gilt-Leaf Daen` → `D,GLD.`).
-Plus `o`/`O`, `/`, `v`/`V`, and the membership marks. Bubbles' default list
-keymap must be stripped — it binds `h` `l` `f` `b` `d` `u` to paging.
+Plus `o`/`O`, `/`, `v`/`V`, and the membership marks.
 
-**5. Find panel.** Search bar, `tab` target cycling, `up`/`down` query
+The list is its own rather than bubbles' — cheaper than fighting a keymap and
+a filter mode that both want the same keys, and it holds `deck.Card`
+directly, which is the merge with `cardItem` that phase 1 deferred to here.
+
+**The ladder is per row, not per list.** A column ends up mixing full names
+with shortened ones, and the trailing full stop is what says which is which —
+`Sol Ring` is a name, `EA.` is an abbreviation. Shortening every row to match
+the longest would cost the names that fit perfectly well and gain only
+tidiness.
+
+**5. Find panel. — next.** Search bar, `tab` target cycling, `up`/`down` query
 history, `ctrl+o` query sort, results feeding a card list view.
 
 **6. Decks panel.** The unified list — local decks, remote links, Moxfield

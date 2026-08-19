@@ -53,10 +53,14 @@ func (m Model) viewPanel(p *panel, index, width, height int) string {
 	}
 
 	lines := []string{head.Render(fit(p.header(inner), inner))}
+	if sub := p.subtitle(); sub != "" {
+		lines = append(lines, lipgloss.NewStyle().
+			Foreground(theme.TextMuted).Render(fit(sub, inner)))
+	}
 	lines = append(lines, lipgloss.NewStyle().
 		Foreground(theme.Border).
 		Render(strings.Repeat("─", inner)))
-	lines = append(lines, m.viewPanelBody(p, inner, height-4)...)
+	lines = append(lines, m.viewPanelBody(p, inner, maxInt(height-2-len(lines), 1))...)
 
 	body := lipgloss.NewStyle().
 		Width(inner).
@@ -70,26 +74,61 @@ func (m Model) viewPanel(p *panel, index, width, height int) string {
 		Render(body)
 }
 
-// viewPanelBody is what a panel holds. Every kind is empty until the phases
-// that fill them, so for now it says what it's waiting for.
+// viewPanelBody is what a panel holds: its cards, or — before anything has
+// filled it — what it's waiting for.
 func (m Model) viewPanelBody(p *panel, width, height int) []string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
-	var lines []string
-	if p.empty() {
-		lines = append(lines,
-			dim.Render(fit("nothing here yet", width)),
-			"",
-			dim.Render(fit("type a "+p.kind.prompt(), width)),
-		)
-	} else {
-		lines = append(lines, dim.Render(fit("— results land here —", width)))
+	if p.cards != nil {
+		if p.cards.count() == 0 {
+			lines := []string{dim.Render(fit("nothing matches", width))}
+			for len(lines) < height {
+				lines = append(lines, strings.Repeat(" ", width))
+			}
+			return lines
+		}
+		focused := m.ws.panels[m.ws.focused] == p
+		return p.cards.render(width, height, m.membersFor(p), focused)
 	}
 
+	lines := []string{
+		dim.Render(fit("nothing here yet", width)),
+		"",
+		dim.Render(fit("type a "+p.kind.prompt(), width)),
+	}
 	for len(lines) < height {
 		lines = append(lines, strings.Repeat(" ", width))
 	}
 	return lines
+}
+
+// membersFor is what a panel should flag as living somewhere else too.
+//
+// The relation runs one way and out from the editing deck: every list marks
+// the cards that are already in the deck you're building, and the deck marks
+// the cards that any list on screen has turned up. With five panels open,
+// "in my deck" is the only comparison that means the same thing in all of
+// them.
+func (m Model) membersFor(p *panel) map[string]bool {
+	editing := m.ws.editingList()
+	if editing == nil {
+		return nil
+	}
+
+	if p.cards == editing {
+		// The deck itself: flag what the other panels are showing.
+		out := map[string]bool{}
+		for _, other := range m.ws.panels {
+			if other.cards == nil || other.cards == editing {
+				continue
+			}
+			for name := range other.cards.names() {
+				out[name] = true
+			}
+		}
+		return out
+	}
+	return editing.names()
 }
 
 // viewInfo draws the information panel.

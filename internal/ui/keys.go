@@ -104,6 +104,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	p := m.ws.current()
 
+	// The filter prompt is a text field too, and takes precedence over the
+	// list's keys while it's open.
+	if p.filtering {
+		return m.handleFilterKey(msg)
+	}
+
 	// A focused search bar is a text field first: it gets the printable
 	// keys, and the leader with them, or you could never type a space.
 	if p.searchOpen && p.search.Focused() {
@@ -122,6 +128,39 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "i":
 		p.searchOpen = true
 		p.search.Focus()
+
+	// ── The list ────────────────────────────────────────────────
+
+	case "j", "down":
+		p.list().move(1)
+	case "k", "up":
+		p.list().move(-1)
+	case "g":
+		p.list().top()
+	case "G":
+		p.list().bottom()
+	case "ctrl+d":
+		p.list().move(m.pageStep())
+	case "ctrl+u":
+		p.list().move(-m.pageStep())
+
+	case "o":
+		p.list().cycleSort(1)
+	case "O":
+		p.list().cycleSort(-1)
+
+	case "v":
+		p.list().toggleMark()
+	case "V":
+		p.list().markAll()
+
+	case "/":
+		if p.cards != nil {
+			p.filtering = true
+			p.filterInput.SetValue(p.cards.filter)
+			p.filterInput.CursorEnd()
+			p.filterInput.Focus()
+		}
 
 	case "e":
 		m.ws.pin()
@@ -142,10 +181,21 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showKeys = true
 
 	case "esc":
-		// The cascade: clear what's clearable, and only then close. With
-		// nothing to clear and nothing left to close, esc means quit.
-		if p.empty() {
+		// The cascade: clear what's clearable, and only then close.
+		switch {
+		case p.cards != nil && p.cards.markCount() > 0:
+			p.cards.clearMarks()
+		case p.cards != nil && p.cards.filter != "":
+			p.cards.setFilter("")
+		case p.empty():
+			// Closing the last panel lands on the splash rather than
+			// quitting: esc *from* the splash is what leaves.
 			m.ws.close()
+		default:
+			p.cards = nil
+			p.title = ""
+			p.searchOpen = true
+			p.search.Focus()
 		}
 
 	case "q":
@@ -206,5 +256,39 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	p.search, cmd = p.search.Update(msg)
+	return m, cmd
+}
+
+// pageStep is half a screen, which is what ctrl+d and ctrl+u move by in vim.
+func (m Model) pageStep() int {
+	return maxInt((m.height-hintHeight-4)/2, 1)
+}
+
+// handleFilterKey is the / prompt. It narrows as you type, so you can see
+// what you're doing rather than committing blind.
+func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	p := m.ws.current()
+
+	switch msg.String() {
+	case "enter":
+		p.filtering = false
+		p.filterInput.Blur()
+		return m, nil
+
+	case "esc":
+		// Abandoning the prompt puts back whatever was filtered before it
+		// opened, rather than leaving a half-typed narrowing in place.
+		p.filtering = false
+		p.filterInput.Blur()
+		p.list().setFilter("")
+		return m, nil
+
+	case "ctrl+c":
+		return m, tea.Quit
+	}
+
+	var cmd tea.Cmd
+	p.filterInput, cmd = p.filterInput.Update(msg)
+	p.list().setFilter(p.filterInput.Value())
 	return m, cmd
 }

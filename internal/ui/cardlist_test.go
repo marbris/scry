@@ -1,0 +1,245 @@
+package ui
+
+import (
+	"strings"
+	"testing"
+
+	"scry/internal/deck"
+	"scry/internal/mtg"
+)
+
+func sample() []deck.Card {
+	return []deck.Card{
+		{Qty: 1, Commander: true, Card: mtg.Card{
+			Name: "Dwynen, Gilt-Leaf Daen", TypeLine: "Legendary Creature — Elf Archer",
+			ManaCost: "{2}{G}{G}", CMC: 4, Colors: []string{"G"}, Rarity: "rare",
+			OracleText: "Other Elves you control get +1/+1.", EDHRECRank: 900,
+		}},
+		{Qty: 1, Card: mtg.Card{
+			Name: "Llanowar Elves", TypeLine: "Creature — Elf Druid",
+			ManaCost: "{G}", CMC: 1, Colors: []string{"G"}, Rarity: "common",
+			OracleText: "{T}: Add {G}.", EDHRECRank: 200,
+		}},
+		{Qty: 1, Card: mtg.Card{
+			Name: "Sol Ring", TypeLine: "Artifact", ManaCost: "{1}", CMC: 1,
+			Rarity: "uncommon", OracleText: "{T}: Add {C}{C}.", EDHRECRank: 1,
+		}},
+		{Qty: 7, Card: mtg.Card{
+			Name: "Forest", TypeLine: "Basic Land — Forest", CMC: 0, Rarity: "common",
+		}},
+	}
+}
+
+func names(l *cardList) []string {
+	var out []string
+	for _, c := range l.rows {
+		out = append(out, c.Card.Name)
+	}
+	return out
+}
+
+func TestArrivalOrderIsLeftAlone(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	got := strings.Join(names(l), ",")
+	want := "Dwynen, Gilt-Leaf Daen,Llanowar Elves,Sol Ring,Forest"
+	if got != want {
+		t.Errorf("got %s, want the order they came in", got)
+	}
+}
+
+func TestSortingByManaValue(t *testing.T) {
+	l := newCardList(sample(), sortMana)
+	if got := names(l)[0]; got != "Forest" {
+		t.Errorf("cheapest is %s, want the zero-cost land", got)
+	}
+	if got := names(l)[3]; got != "Dwynen, Gilt-Leaf Daen" {
+		t.Errorf("dearest is %s", got)
+	}
+}
+
+func TestCommandersSortWithEveryoneElse(t *testing.T) {
+	// They lead a decklist because that's how a decklist is built, not
+	// because anything pins them there.
+	l := newCardList(sample(), sortMana)
+	if names(l)[0] == "Dwynen, Gilt-Leaf Daen" {
+		t.Error("the commander was pinned to the top of a mana-value sort")
+	}
+}
+
+func TestSortingKeepsTheCursorOnTheSameCard(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.move(2) // Sol Ring
+	if c, _ := l.current(); c.Card.Name != "Sol Ring" {
+		t.Fatalf("cursor is on %s", c.Card.Name)
+	}
+
+	l.cycleSort(1)
+	if c, _ := l.current(); c.Card.Name != "Sol Ring" {
+		t.Errorf("after re-sorting the cursor is on %s, want Sol Ring", c.Card.Name)
+	}
+}
+
+func TestFilteringIsLiteralAndSearchesTheRulesText(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+
+	l.setFilter("elf")
+	if got := len(l.rows); got != 2 {
+		t.Errorf("'elf' matched %d cards (%v), want the two Elves", got, names(l))
+	}
+
+	l.setFilter("add")
+	if got := len(l.rows); got != 2 {
+		t.Errorf("'add' matched %d cards (%v), want the two manadorks", got, names(l))
+	}
+}
+
+func TestFilterTermsAllHaveToMatch(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.setFilter("elf druid")
+	if got := names(l); len(got) != 1 || got[0] != "Llanowar Elves" {
+		t.Errorf("got %v, want only the Elf Druid", got)
+	}
+}
+
+func TestAQuotedPhraseStaysTogether(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.setFilter(`"elf archer"`)
+	if got := names(l); len(got) != 1 || got[0] != "Dwynen, Gilt-Leaf Daen" {
+		t.Errorf("got %v, want the one Elf Archer", got)
+	}
+}
+
+func TestClearingAFilterBringsEverythingBack(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.setFilter("elf")
+	l.setFilter("")
+	if got := len(l.rows); got != 4 {
+		t.Errorf("%d cards came back, want all 4", got)
+	}
+}
+
+func TestMarksSurviveFilteringAndSorting(t *testing.T) {
+	// Marks are held by name for exactly this reason: the rows they were
+	// made on get rebuilt underneath them constantly.
+	l := newCardList(sample(), sortArrival)
+	l.toggleMark() // Dwynen
+
+	l.setFilter("forest")
+	l.cycleSort(1)
+	l.setFilter("")
+
+	if !l.marked(sample()[0]) {
+		t.Error("the mark did not survive being filtered and re-sorted")
+	}
+	if l.markCount() != 1 {
+		t.Errorf("%d marks, want 1", l.markCount())
+	}
+}
+
+func TestMarkingStepsDownSoVVVTakesThree(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.toggleMark()
+	l.toggleMark()
+	l.toggleMark()
+	if l.markCount() != 3 {
+		t.Errorf("%d marks after three presses, want 3", l.markCount())
+	}
+}
+
+func TestMarkAllTakesWhatTheFilterLeft(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.setFilter("elf")
+	l.markAll()
+	if l.markCount() != 2 {
+		t.Errorf("%d marks, want just the two the filter left", l.markCount())
+	}
+
+	// And lets them all go again.
+	l.markAll()
+	if l.markCount() != 0 {
+		t.Errorf("%d marks after a second V", l.markCount())
+	}
+}
+
+func TestSelectionFallsBackToTheCursor(t *testing.T) {
+	// Every command that acts on "the selected cards" needs an answer when
+	// nothing is selected, and the answer is the row you're looking at.
+	l := newCardList(sample(), sortArrival)
+	sel := l.selection()
+	if len(sel) != 1 || sel[0].Card.Name != "Dwynen, Gilt-Leaf Daen" {
+		t.Errorf("got %v, want the card under the cursor", sel)
+	}
+
+	l.toggleMark()
+	l.toggleMark()
+	if got := len(l.selection()); got != 2 {
+		t.Errorf("selection is %d cards, want the 2 marked", got)
+	}
+}
+
+func TestSelectionIsInArrivalOrderNotCursorOrder(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.move(2)
+	l.toggleMark() // Sol Ring, third in the list
+	l.top()
+	l.toggleMark() // Dwynen, first
+
+	sel := l.selection()
+	if len(sel) != 2 {
+		t.Fatalf("selection is %d cards, want 2", len(sel))
+	}
+	if sel[0].Card.Name != "Dwynen, Gilt-Leaf Daen" || sel[1].Card.Name != "Sol Ring" {
+		t.Errorf("got %s then %s, want them in the order the deck lists them",
+			sel[0].Card.Name, sel[1].Card.Name)
+	}
+}
+
+func TestTheCursorStaysInsideTheList(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.move(-5)
+	if l.cursor != 0 {
+		t.Errorf("cursor ran off the top to %d", l.cursor)
+	}
+	l.move(99)
+	if l.cursor != 3 {
+		t.Errorf("cursor ran off the bottom to %d", l.cursor)
+	}
+}
+
+func TestScrollingFollowsTheCursorMinimally(t *testing.T) {
+	many := make([]deck.Card, 50)
+	for i := range many {
+		many[i] = deck.Card{Card: mtg.Card{Name: "Card " + itoa(i)}}
+	}
+	l := newCardList(many, sortArrival)
+
+	l.scrollInto(10)
+	if l.offset != 0 {
+		t.Errorf("offset %d at the top of the list", l.offset)
+	}
+
+	l.move(9)
+	l.scrollInto(10)
+	if l.offset != 0 {
+		t.Errorf("offset %d, want the view held still while the cursor is in it", l.offset)
+	}
+
+	l.move(1)
+	l.scrollInto(10)
+	if l.offset != 1 {
+		t.Errorf("offset %d, want one line of scroll and no more", l.offset)
+	}
+}
+
+func TestAnEmptyFilterResultDoesNotBreakTheCursor(t *testing.T) {
+	l := newCardList(sample(), sortArrival)
+	l.setFilter("nonesuch")
+	if l.count() != 0 {
+		t.Fatalf("%d rows matched nonsense", l.count())
+	}
+	if _, ok := l.current(); ok {
+		t.Error("there is a current card in an empty list")
+	}
+	l.move(1)
+	l.render(20, 5, nil, true) // must not panic
+}

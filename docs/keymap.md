@@ -60,6 +60,8 @@ this has to be memorised.
 |---|---|
 | `h` `l` | previous / next panel |
 | `j` `k` | previous / next row |
+| `g` `G` | first / last row |
+| `ctrl+d` `ctrl+u` | half a page |
 | `gg` `G` | first / last row |
 | `ctrl+d` `ctrl+u` | half page |
 | `gd` | jump to the editing deck panel |
@@ -72,13 +74,18 @@ directional rather than ordinal, so you aim rather than count. Card lists are
 one-dimensional, so `h`/`l` have nothing else to do.
 
 **Note:** bubbles' list widget binds `h` `l` `f` `b` `d` `u` to paging by
-default. That keymap must be stripped wholesale.
+default. The panel workspace doesn't use it — the card list is its own, which
+is cheaper than fighting a keymap and a filter mode that both want the same
+keys.
+
+`n`/`N` are gone. With a filter that hides what doesn't match, "next match"
+and "next row" are the same key, and that key is `j`.
 
 ## In a card list — bare
 
 | Key | Action |
 |---|---|
-| `/` | filter · `n` `N` next/prev match · `esc` clear |
+| `/` | filter, narrowing as you type · `esc` abandons it |
 | `o` `O` | cycle sort forward / back |
 | `v` `V` | select row / select all shown |
 | `a` `x` | add / remove selected cards to the editing deck |
@@ -89,7 +96,7 @@ default. That keymap must be stripped wholesale.
 | `gv` | printed-text history of this card |
 | `w` | write this list — see **Writing a list** |
 | `W` | write it, and open the result in a new panel |
-| `esc` | clear selection → clear filter → pop sub-view → close panel |
+| `esc` | clear selection → clear filter → empty the panel → close it |
 | | in a search bar: clear the query → leave the bar → close the panel |
 
 `enter` and `L` are unbound here: individual cards don't open, they're shown

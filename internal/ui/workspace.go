@@ -187,6 +187,15 @@ func (w *workspace) editable(i int) bool {
 	return false
 }
 
+// editingList is the cards of the editing panel, or nil when there is no
+// deck being edited.
+func (w *workspace) editingList() *cardList {
+	if w.editing < 0 || w.editing >= len(w.panels) {
+		return nil
+	}
+	return w.panels[w.editing].cards
+}
+
 // pin fixes the editing deck on the focused panel, or lets go of it.
 func (w *workspace) pin() {
 	if !w.editable(w.focused) {
