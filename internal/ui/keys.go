@@ -95,7 +95,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.quitting = false
 		switch key {
 		case "y":
-			return m, tea.Quit
+			return m, m.quit()
 		case "w":
 			cmd := m.saveEverything()
 			return m, cmd
@@ -332,7 +332,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case "ctrl+c":
-		return m, tea.Quit
+		return m, m.quit()
 	}
 
 	// Anything else is typing, which ends a walk through the history: what
@@ -371,7 +371,7 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "ctrl+c":
-		return m, tea.Quit
+		return m, m.quit()
 	}
 
 	var cmd tea.Cmd
@@ -439,7 +439,7 @@ func (m *Model) versions(p *panel) tea.Cmd {
 // written is only safe if the way out asks about it.
 func (m Model) tryQuit() (tea.Model, tea.Cmd) {
 	if len(m.dirtyDecks()) == 0 {
-		return m, tea.Quit
+		return m, m.quit()
 	}
 	m.quitting = true
 	return m, nil

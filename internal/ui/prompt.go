@@ -87,7 +87,7 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "ctrl+c":
-		return m, tea.Quit
+		return m, m.quit()
 	}
 
 	var cmd tea.Cmd

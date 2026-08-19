@@ -92,6 +92,56 @@ func NewWithQuery(query string) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// NewWithDeck opens straight onto one of your decks.
+func NewWithDeck(slug string) (Model, tea.Cmd) {
+	m := New()
+	p := m.ws.open(KindDecks)
+	p.searchOpen = false
+	p.search.Blur()
+	p.loading = true
+	p.title = slug
+	return m, openLocalDeck(p.id, true, slug)
+}
+
+// NewWithRemote opens straight onto a deck on Moxfield.
+func NewWithRemote(id string) (Model, tea.Cmd) {
+	m := New()
+	p := m.ws.open(KindDecks)
+	p.searchOpen = false
+	p.search.Blur()
+	p.loading = true
+	p.title = id
+	return m, openRemoteDeck(p.id, true, id)
+}
+
+// NewWithRules opens straight onto the rules — over a query, or on an empty
+// panel with the bar waiting.
+func NewWithRules(query string) (Model, tea.Cmd) {
+	m := New()
+	p := m.ws.open(KindRules)
+	if query == "" {
+		return m, nil
+	}
+	cmd := m.searchRules(p, query)
+	return m, cmd
+}
+
+// NewRestored comes back to the workspace you left, or — with nothing to
+// come back to — opens on the splash.
+func NewRestored() (Model, tea.Cmd) {
+	m := New()
+	cmd := m.restore()
+	return m, cmd
+}
+
+// quit saves the session on the way out. Every path that leaves goes
+// through here, so there is one place that remembers to.
+func (m Model) quit() tea.Cmd {
+	m.saveSession()
+	SaveQueryHistory(m.history)
+	return tea.Quit
+}
+
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{tea.EnterAltScreen}
 	// Parsed at the start when it's already downloaded, so a card's text is

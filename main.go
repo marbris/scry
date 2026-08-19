@@ -1,109 +1,24 @@
 package main
 
 import (
-	"scry/internal/paths"
-	"scry/internal/theme"
-
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"scry/internal/deck"
+	"scry/internal/moxfield"
+	"scry/internal/paths"
+	"scry/internal/rules"
+	"scry/internal/theme"
+	"scry/internal/ui"
 )
 
 // The entry point and the non-TUI paths out of it: the one-shot card lookup
 // that prints to stdout, and the `scry rules` / `scry deck` subcommands.
 
 // ── Stdout output ───────────────────────────────────────────────
-
-// printCardStdout renders a single card for the terminal, with the same
-// highlighting the TUI uses. Lipgloss drops the colour automatically when
-// stdout isn't a terminal, so piping still yields plain text.
-func printCardStdout(c ScryfallCard) {
-	rules := loadCachedRules()
-	width := stdoutWidth()
-
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvAqua)
-	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
-
-	front := c.Faces()[0]
-	fmt.Print(faceHeading(front, lipgloss.NewStyle().Bold(true).Foreground(colorForCard(front.Colors))))
-
-	fmt.Println(dimStyle.Render(fmt.Sprintf("%s · %s · CMC %.0f", c.SetName, c.Rarity, c.CMC)))
-	if c.EDHRECRank > 0 {
-		fmt.Println(dimStyle.Render(fmt.Sprintf("EDHREC Rank: #%d", c.EDHRECRank)))
-	}
-
-	if body := oracleBlock(c, width, rules); body != "" {
-		fmt.Println()
-		fmt.Println(headerStyle.Render("Oracle Text"))
-		fmt.Print(body)
-	}
-
-	fmt.Println()
-	printRulingsStdout(c, width, rules)
-
-	if len(c.Legalities) > 0 {
-		fmt.Println()
-		fmt.Println(headerStyle.Render("Legalities"))
-		formats := []string{"standard", "pioneer", "modern", "legacy", "vintage", "commander", "pauper"}
-		for _, f := range formats {
-			v, ok := c.Legalities[f]
-			if !ok {
-				continue
-			}
-			style := lipgloss.NewStyle().Foreground(gruvRed)
-			mark := "✘"
-			if v == "legal" {
-				style = lipgloss.NewStyle().Foreground(gruvGreen)
-				mark = "✔"
-			}
-			fmt.Printf("  %s %s\n", style.Render(mark), style.Render(f))
-		}
-	}
-}
-
-func printRulingsStdout(c ScryfallCard, width int, rules RulesData) {
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvAqua)
-	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
-
-	rulings, err := getRulings(c.RulingsURI)
-	switch {
-	case err != nil:
-		fmt.Println(headerStyle.Render("Rulings"))
-		fmt.Println(lipgloss.NewStyle().Foreground(gruvRed).
-			Render(fmt.Sprintf("  unavailable: %v", err)))
-		return
-	case len(rulings) == 0:
-		fmt.Println(headerStyle.Render("Rulings"))
-		fmt.Println(dimStyle.Render("  none"))
-		return
-	}
-
-	fmt.Println(headerStyle.Render(fmt.Sprintf("Rulings (%d)", len(rulings))))
-	bullet := lipgloss.NewStyle().Foreground(gruvOrange)
-	for _, r := range rulings {
-		body := highlightRuleText(r.Comment, width-4, rules)
-		fmt.Println(indent(hangingBlock("•", bullet, body, 2), 2))
-	}
-}
-
-// loadCachedRules parses the comprehensive rules only when they're already
-// on disk — a one-shot lookup shouldn't stall on a download. Without them
-// the highlighting simply skips keywords.
-func loadCachedRules() RulesData {
-	if _, err := os.Stat(rulesFilePath()); err != nil {
-		return RulesData{}
-	}
-	data, err := loadRules()
-	if err != nil {
-		return RulesData{}
-	}
-	return data
-}
 
 // ── Entry point ─────────────────────────────────────────────────
 
@@ -118,75 +33,45 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Warning:", err)
 	}
 
-	m := initialModel()
-
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "-h", "--help", "help":
-			printUsage()
-			return
-		}
-	}
-
-	// `scry --panels` — the panel workspace, which is replacing the
-	// two-pane screen a phase at a time. Behind a flag until it can do
-	// everything the old one can.
-	if len(os.Args) > 1 && (os.Args[1] == "--panels" || os.Args[1] == "panels") {
-		runPanels(os.Args[2:])
+	args := os.Args[1:]
+	if len(args) == 0 {
+		// Back to the workspace you left, or the splash if there is none.
+		run(ui.NewRestored())
 		return
 	}
 
-	// `scry theme [name | edit name]` — colours.
-	if len(os.Args) > 1 && os.Args[1] == "theme" {
-		runTheme(os.Args[2:])
+	switch args[0] {
+	case "-h", "--help", "help":
+		printUsage()
+		return
+
+	case "theme":
+		runTheme(args[1:])
+		return
+
+	case "rules":
+		runRules(args[1:])
+		return
+
+	case "deck":
+		runDeck(args[1:])
 		return
 	}
 
-	// `scry rules [update | query…]` — the old mtg-rules entry point.
-	if len(os.Args) > 1 && os.Args[1] == "rules" {
-		runRules(m, os.Args[2:])
+	query := strings.Join(args, " ")
+
+	// A Moxfield link passed straight in opens that deck.
+	if id, ok := moxfield.Ref(query); ok {
+		run(ui.NewWithRemote(id))
 		return
 	}
 
-	// `scry deck <id | url>` — the id out of a deck's public URL is enough.
-	if len(os.Args) > 1 && os.Args[1] == "deck" {
-		runDeck(m, os.Args[2:])
+	// A query matching exactly one card almost never wanted an interface:
+	// you asked what the card does.
+	if ui.PrintCardIfSingle(query) {
 		return
 	}
-
-	if len(os.Args) > 1 {
-		query := strings.Join(os.Args[1:], " ")
-
-		// A Moxfield link passed straight in opens that deck.
-		if id, ok := moxfieldURLID(query); ok {
-			runDeck(m, []string{id})
-			return
-		}
-
-		// Check if single result — print to stdout and exit
-		u := fmt.Sprintf("https://api.scryfall.com/cards/search?q=%s&order=%s",
-			url.QueryEscape(query), url.QueryEscape(sortOptions[m.sortIndex]))
-		body, err := doGet(u)
-		if err != nil {
-			if _, ok := err.(notFoundError); ok {
-				fmt.Println("No results found.")
-				return
-			}
-		} else {
-			var sr ScryfallResponse
-			if json.Unmarshal(body, &sr) == nil && sr.TotalCards == 1 {
-				printCardStdout(sr.Data[0])
-				return
-			}
-		}
-
-		m.searchInput.SetValue(query)
-		m.initialQuery = query
-		m.lastQuery = query
-		m.searching = true
-	}
-
-	runTUI(m)
+	run(ui.NewWithQuery(query))
 }
 
 const deckUsage = `Usage:
@@ -207,7 +92,7 @@ the Moxfield deck you're looking at.`
 // runDeck opens a deck, or handles one of the deck subcommands. References
 // are checked here so a typo fails on the terminal; the deck itself loads
 // once the TUI is up, which keeps the "loading deck…" line on screen.
-func runDeck(m model, args []string) {
+func runDeck(args []string) {
 	if len(args) == 0 {
 		fmt.Println(deckUsage)
 		os.Exit(1)
@@ -233,7 +118,7 @@ func runDeck(m model, args []string) {
 		runDeckRestore(args[1:])
 		return
 	case "dir":
-		fmt.Println(decksDir())
+		fmt.Println(deck.Dir())
 		return
 	}
 
@@ -241,53 +126,36 @@ func runDeck(m model, args []string) {
 
 	// One of your own decks wins over reading the same text as a Moxfield
 	// id, so a deck called "ghen" can't be shadowed by anything on Moxfield.
-	if deckExists(arg) {
-		m.searching = true
-		m.deckLoading = true
-		m.initialDeckSlug = arg
-		runTUI(m)
+	if deck.Exists(arg) {
+		run(ui.NewWithDeck(arg))
 		return
 	}
 
-	id, ok := deckRef(arg)
+	id, ok := moxfield.Ref(arg)
 	if !ok {
-		fmt.Printf("No deck called %q, and that isn't a Moxfield id or URL.\n", arg)
+		fmt.Fprintf(os.Stderr, "No deck called %q, and that isn't a Moxfield id or URL.\n", arg)
 		fmt.Println("Your decks:")
 		runDeckList()
 		os.Exit(1)
 	}
-
-	m.searching = true
-	m.deckLoading = true
-	m.initialDeck = id
-	runTUI(m)
-}
-
-func runTUI(m model) {
-	m = m.restore().startWithLastQuery()
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error: %v\n", err)
-	}
+	run(ui.NewWithRemote(id))
 }
 
 func runDeckList() {
-	slugs, err := listDecks()
+	slugs, err := deck.List()
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	notice := legacyNotice()
 	if len(slugs) == 0 {
 		fmt.Println("No decks yet. Copy one in from Moxfield with:")
 		fmt.Println("  scry deck import <moxfield url>")
-		fmt.Print(notice)
 		return
 	}
 
-	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(gruvYellow)
-	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
+	nameStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.Highlight)
+	dimStyle := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	width := 0
 	for _, s := range slugs {
@@ -298,7 +166,7 @@ func runDeckList() {
 
 	for _, slug := range slugs {
 		pad := strings.Repeat(" ", width-len(slug))
-		d, err := readDeck(slug)
+		d, err := deck.Read(slug)
 		if err != nil {
 			fmt.Printf("%s  %s\n", nameStyle.Render(slug+pad), dimStyle.Render(err.Error()))
 			continue
@@ -313,7 +181,6 @@ func runDeckList() {
 		fmt.Printf("%s  %s\n", strings.Repeat(" ", width), dimStyle.Render(detail))
 	}
 
-	fmt.Print(notice)
 }
 
 func runDeckNew(args []string) {
@@ -331,22 +198,22 @@ func runDeckNew(args []string) {
 		name = strings.Join(args[:len(args)-1], " ")
 	}
 
-	slug, d, err := newDeck(name, format)
+	slug, d, err := deck.New(name, format)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-	if _, warning, err := saveDeckVersioned(slug, d); err != nil {
+	if _, warning, err := deck.SaveVersioned(slug, d); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	} else if warning != "" {
-		fmt.Println(lipgloss.NewStyle().Foreground(gruvOrange).Render("  " + warning))
+		fmt.Println(lipgloss.NewStyle().Foreground(theme.Accent).Render("  " + warning))
 	}
 
 	fmt.Printf("Created %q (%s)\n", d.Name, d.Format)
-	fmt.Printf("  %s\n", deckFilePath(slug))
+	fmt.Printf("  %s\n", deck.Path(slug))
 	fmt.Printf("Open it with: scry deck %s\n", slug)
-	fmt.Println(lipgloss.NewStyle().Foreground(gruvGray).
+	fmt.Println(lipgloss.NewStyle().Foreground(theme.TextMuted).
 		Render("Search for a card and press a to add it, or c to make it a commander."))
 }
 
@@ -366,32 +233,32 @@ func runDeckImport(args []string) {
 		os.Exit(1)
 	}
 
-	id, ok := deckRef(args[0])
+	id, ok := moxfield.Ref(args[0])
 	if !ok {
 		fmt.Println("Not a Moxfield deck id or URL:", args[0])
 		os.Exit(1)
 	}
 
 	fmt.Println("Fetching deck…")
-	d, err := importMoxfield(id)
+	d, err := moxfield.Import(id)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	slug := slugify(d.Name)
+	slug := deck.Slugify(d.Name)
 	if len(args) > 1 {
-		slug = slugify(strings.Join(args[1:], " "))
+		slug = deck.Slugify(strings.Join(args[1:], " "))
 	}
 	if slug == "" {
 		slug = id
 	}
 
 	verb := "Imported"
-	if deckExists(slug) {
+	if deck.Exists(slug) {
 		verb = "Updated"
 	}
-	subject, warning, err := saveDeckVersioned(slug, d)
+	subject, warning, err := deck.SaveVersioned(slug, d)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -399,11 +266,11 @@ func runDeckImport(args []string) {
 
 	total, unique := d.Counts()
 	fmt.Printf("%s %q — %d cards, %d distinct\n", verb, d.Name, total, unique)
-	fmt.Printf("  %s\n", deckFilePath(slug))
+	fmt.Printf("  %s\n", deck.Path(slug))
 	if warning != "" {
-		fmt.Printf("  %s\n", lipgloss.NewStyle().Foreground(gruvOrange).Render(warning))
+		fmt.Printf("  %s\n", lipgloss.NewStyle().Foreground(theme.Accent).Render(warning))
 	} else {
-		fmt.Printf("  %s\n", lipgloss.NewStyle().Foreground(gruvGray).Render("committed: "+subject))
+		fmt.Printf("  %s\n", lipgloss.NewStyle().Foreground(theme.TextMuted).Render("committed: "+subject))
 	}
 	fmt.Printf("Open it with: scry deck %s\n", slug)
 }
@@ -416,12 +283,12 @@ func runDeckLog(args []string) {
 		os.Exit(1)
 	}
 	slug := args[0]
-	if !deckExists(slug) {
+	if !deck.Exists(slug) {
 		fmt.Printf("No deck called %q.\n", slug)
 		os.Exit(1)
 	}
 
-	commits, err := deckHistory(slug, deckLogLimit)
+	commits, err := deck.History(slug, deckLogLimit)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -431,13 +298,13 @@ func runDeckLog(args []string) {
 		return
 	}
 
-	hashStyle := lipgloss.NewStyle().Foreground(gruvYellow)
-	dimStyle := lipgloss.NewStyle().Foreground(gruvGray)
+	hashStyle := lipgloss.NewStyle().Foreground(theme.Highlight)
+	dimStyle := lipgloss.NewStyle().Foreground(theme.TextMuted)
 	for _, c := range commits {
 		fmt.Printf("%s  %s\n", hashStyle.Render(c.Short), c.Subject)
 		fmt.Printf("%s  %s\n", strings.Repeat(" ", len(c.Short)), dimStyle.Render(c.When))
 	}
-	fmt.Printf("\n%s\n", dimStyle.Render("scry deck restore "+slug+" <ref>  ·  git -C "+deckRepoPath()+" show <ref>"))
+	fmt.Printf("\n%s\n", dimStyle.Render("scry deck restore "+slug+" <ref>  ·  git -C "+deck.RepoPath()+" show <ref>"))
 }
 
 func runDeckRestore(args []string) {
@@ -446,26 +313,26 @@ func runDeckRestore(args []string) {
 		os.Exit(1)
 	}
 	slug, ref := args[0], args[1]
-	if !deckExists(slug) {
+	if !deck.Exists(slug) {
 		fmt.Printf("No deck called %q.\n", slug)
 		os.Exit(1)
 	}
 
 	// Show what's coming back before it lands, since this overwrites the
 	// deck you have open.
-	old, err := deckAt(slug, ref)
+	old, err := deck.At(slug, ref)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
-	if err := restoreDeck(slug, ref); err != nil {
+	if err := deck.Restore(slug, ref); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	total, unique := old.Counts()
 	fmt.Printf("Restored %s to %s — %d cards, %d distinct\n", slug, ref, total, unique)
-	fmt.Println(lipgloss.NewStyle().Foreground(gruvGray).
+	fmt.Println(lipgloss.NewStyle().Foreground(theme.TextMuted).
 		Render("The version you restored over is still in the history."))
 }
 
@@ -477,8 +344,8 @@ func runDeckRemove(args []string) {
 	name := args[0]
 
 	removed := false
-	if deckExists(name) {
-		if err := deleteDeckCommitted(name); err != nil {
+	if deck.Exists(name) {
+		if err := deck.DeleteCommitted(name); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -492,42 +359,19 @@ func runDeckRemove(args []string) {
 }
 
 // runRules opens the comprehensive-rules browser directly.
-func runRules(m model, args []string) {
+func runRules(args []string) {
 	if len(args) > 0 && args[0] == "update" {
-		fmt.Println("Downloading latest comprehensive rules...")
-		if err := downloadRules(); err != nil {
-			fmt.Printf("Error: %v\n", err)
+		fmt.Println("Downloading the comprehensive rules…")
+		if err := rules.Download(); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(1)
 		}
-		fmt.Println("Done! Saved to", rulesFilePath())
+		fmt.Println("Saved to", rules.FilePath())
 		return
 	}
 
-	if _, err := os.Stat(rulesFilePath()); os.IsNotExist(err) {
-		fmt.Println("Downloading comprehensive rules...")
+	if !rules.Cached() {
+		fmt.Println("Downloading the comprehensive rules…")
 	}
-
-	data, err := loadRules()
-	if err != nil {
-		fmt.Printf("Error loading rules: %v\n", err)
-		os.Exit(1)
-	}
-
-	m.rules = data
-	m.state = stateRules
-	m.backStack = []state{stateResults}
-
-	items := buildRuleItems(data)
-	if len(args) > 0 {
-		items = searchRules(data, strings.Join(args, " "))
-		m.rulesList.Title = fmt.Sprintf("Results (%d)", len(items))
-	} else {
-		m.rulesList.Title = fmt.Sprintf("Rules (%d)", len(items))
-	}
-	m.rulesList.SetItems(items)
-
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error: %v\n", err)
-	}
+	run(ui.NewWithRules(strings.Join(args, " ")))
 }
