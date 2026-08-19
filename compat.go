@@ -4,6 +4,8 @@ import (
 	"scry/internal/fetch"
 	"scry/internal/mtg"
 	"scry/internal/paths"
+	"scry/internal/rules"
+	"scry/internal/scryfall"
 	"scry/internal/theme"
 )
 
@@ -31,6 +33,39 @@ var (
 	isLand         = mtg.IsLand
 	typePrecedence = mtg.TypePrecedence
 	deckSections   = mtg.Sections
+)
+
+// ── Rules ───────────────────────────────────────────────────────
+
+type (
+	RulesData     = rules.Data
+	Rule          = rules.Rule
+	GlossaryEntry = rules.GlossaryEntry
+	Keyword       = rules.Keyword
+	RuleMatch     = rules.RuleMatch
+	matchKind     = rules.MatchKind
+)
+
+const (
+	matchKeyword  = rules.MatchKeyword
+	matchGlossary = rules.MatchGlossary
+	matchType     = rules.MatchType
+)
+
+var (
+	parseRules    = rules.Parse
+	loadRules     = rules.Load
+	downloadRules = rules.Download
+	rulesFilePath = rules.FilePath
+)
+
+// ── Searching ───────────────────────────────────────────────────
+
+var (
+	sortOptions      = scryfall.SortOptions
+	fetchIdentifiers = scryfall.Identifiers
+	fetchCollection  = scryfall.Collection
+	getRulings       = scryfall.Rulings
 )
 
 // ── Network ─────────────────────────────────────────────────────

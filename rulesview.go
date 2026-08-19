@@ -4,6 +4,8 @@ package main
 // and the full comprehensive-rules browser (merged in from mtg-rules).
 
 import (
+	"scry/internal/rules"
+
 	"fmt"
 	"io"
 	"strings"
@@ -168,7 +170,7 @@ func (m model) updateRulesBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) viewRulesBrowse() string {
-	if !m.rules.loaded() {
+	if !m.rules.Loaded() {
 		return lipgloss.NewStyle().Padding(1, 2).Render(m.rulesStatus())
 	}
 
@@ -254,7 +256,7 @@ func (m model) renderGlossaryEntry(g GlossaryEntry, width int) string {
 	b.WriteString(highlightRuleText(g.Definition, width, m.rules) + "\n")
 
 	// Follow the "See rule 702.9" pointer if there is one.
-	if ref := seeRuleRe.FindStringSubmatch(g.Definition); ref != nil {
+	if ref := rules.SeeRuleRe.FindStringSubmatch(g.Definition); ref != nil {
 		if idx, ok := m.rules.Index[ref[1]]; ok {
 			b.WriteString("\n")
 			b.WriteString(m.renderRuleFull(m.rules.Rules[idx], width))
@@ -279,7 +281,7 @@ func (m model) renderCardRules(c ScryfallCard, width int) string {
 	if width < 20 {
 		width = 20
 	}
-	if !m.rules.loaded() {
+	if !m.rules.Loaded() {
 		return m.rulesStatus()
 	}
 
@@ -305,7 +307,7 @@ func (m model) renderCardRules(c ScryfallCard, width int) string {
 	for _, match := range matches {
 		switch match.Kind {
 		case matchKeyword:
-			if match.Kw.Kind == kwWord {
+			if match.Kw.Kind == rules.AbilityWord {
 				b.WriteString(numStyle.Render(match.Rule) + "  " +
 					termStyle.Render(match.Term) + "\n")
 				b.WriteString(dimStyle.Render("ability word — flavour only, no rules meaning") + "\n\n")
@@ -313,7 +315,7 @@ func (m model) renderCardRules(c ScryfallCard, width int) string {
 			}
 
 			kindLabel := "keyword ability"
-			if match.Kw.Kind == kwAction {
+			if match.Kw.Kind == rules.KeywordAction {
 				kindLabel = "keyword action"
 			}
 			b.WriteString(numStyle.Render(match.Rule) + "  " +

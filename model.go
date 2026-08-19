@@ -319,7 +319,7 @@ func (m model) startWithLastQuery() model {
 
 func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{textinput.Blink}
-	if !m.rules.loaded() {
+	if !m.rules.Loaded() {
 		cmds = append(cmds, loadRulesCmd())
 	}
 	if m.initialDeck != "" {

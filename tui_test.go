@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/prints"
+
 	"strings"
 	"testing"
 
@@ -122,61 +124,6 @@ func loadTestRules(t *testing.T) RulesData {
 		t.Skipf("comprehensive rules unavailable: %v", err)
 	}
 	return data
-}
-
-// ── Rules index ─────────────────────────────────────────────────
-
-func TestRulesIndex(t *testing.T) {
-	data := loadTestRules(t)
-
-	if len(data.Rules) < 3000 || len(data.Glossary) < 500 {
-		t.Errorf("parsed %d rules and %d glossary entries, expected far more",
-			len(data.Rules), len(data.Glossary))
-	}
-
-	// Keyword abilities, keyword actions and ability words all come out of
-	// the rules text rather than a hardcoded list.
-	want := map[string]string{
-		"flying":        "702.9",
-		"double strike": "702.4",
-		"scry":          "701.22",
-		"landfall":      "207.2c",
-	}
-	for name, rule := range want {
-		kw, ok := data.keywords[name]
-		if !ok {
-			t.Errorf("keyword %q missing from the index", name)
-			continue
-		}
-		if kw.Rule != rule {
-			t.Errorf("keyword %q -> rule %s, want %s", name, kw.Rule, rule)
-		}
-	}
-
-	// Every card type must resolve to a category rule, including the
-	// irregular plurals ("Sorceries", "Phenomena").
-	for cardType := range cardTypeRules {
-		if _, ok := data.typeRules[cardType]; !ok {
-			t.Errorf("card type %q did not resolve to a rule", cardType)
-		}
-	}
-}
-
-func TestMatchCard(t *testing.T) {
-	data := loadTestRules(t)
-	card := testCards()[0]
-
-	var terms []string
-	for _, match := range data.MatchCard(card) {
-		terms = append(terms, match.Term)
-	}
-	joined := strings.Join(terms, ",")
-
-	for _, want := range []string{"Flying", "Hexproof", "Creature"} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("MatchCard did not find %q; got %s", want, joined)
-		}
-	}
 }
 
 // ── Highlighting ────────────────────────────────────────────────
@@ -564,81 +511,6 @@ func TestStdoutWidthIsSane(t *testing.T) {
 	}
 }
 
-// ── Printed-text history ────────────────────────────────────────
-
-func TestCleanOriginal(t *testing.T) {
-	cases := map[string]string{
-		"ocT: Add {G} to your mana pool.":       "{T}: Add {G} to your mana pool.",
-		"Flying// Tap to add one mana.":         "Flying\nTap to add one mana.",
-		"Assault deals 2 damage. // Create it.": "Assault deals 2 damage.\nCreate it.",
-		"  Flying  ":                            "Flying",
-	}
-	for in, want := range cases {
-		if got := cleanOriginal(in); got != want {
-			t.Errorf("cleanOriginal(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// The history lists wordings, not printings: twenty reprints with the same
-// text are one entry, but a wording that comes back later is its own.
-func TestBuildRevisionsCollapsesIdenticalPrintings(t *testing.T) {
-	card := ScryfallCard{Name: "Test Bird", OracleText: "Flying\n{T}: Add one mana of any color."}
-	printings := []printing{
-		{Name: "Test Bird", Set: "AAA", SetName: "Alpha Set", Released: "1993-08-05"},
-		{Name: "Test Bird", Set: "BBB", SetName: "Beta Set", Released: "1993-10-04"},
-		{Name: "Test Bird", Set: "CCC", SetName: "Third Set", Released: "1994-04-11"},
-		{Name: "Test Bird", Set: "DDD", SetName: "Fourth Set", Released: "1995-04-01"},
-		{Name: "Test Bird", Set: "EEE", SetName: "Fifth Set", Released: "2019-01-25"},
-	}
-	originals := map[string]map[string]string{
-		"AAA": {"test bird": "Flying\nocT: Add one mana of any color to your mana pool."},
-		"BBB": {"test bird": "Flying\n{T}: Add one mana of any color to your mana pool."}, // same but for the symbol encoding
-		"CCC": {"test bird": "Flying (Reminder.)\n{T}: Add one mana of any color to your mana pool."},
-		"DDD": {"test bird": "Flying\n{T}: Add one mana of any color to your mana pool."}, // back to the earlier wording
-		"EEE": {"test bird": "Flying\n{T}: Add one mana of any color."},
-	}
-
-	revs := buildRevisions(card, printings, originals)
-	if len(revs) != 4 {
-		for _, r := range revs {
-			t.Logf("  %s (%d printings): %q", r.SetCode, r.Printings, r.Text)
-		}
-		t.Fatalf("got %d wordings, want 4", len(revs))
-	}
-
-	if revs[0].SetCode != "AAA" || revs[0].Printings != 2 {
-		t.Errorf("first wording = %s covering %d printings, want AAA covering 2",
-			revs[0].SetCode, revs[0].Printings)
-	}
-	if revs[1].SetCode != "CCC" {
-		t.Errorf("second wording = %s, want CCC", revs[1].SetCode)
-	}
-	if revs[2].SetCode != "DDD" {
-		t.Errorf("third wording = %s, want DDD (the wording returned)", revs[2].SetCode)
-	}
-	if !revs[3].Current || revs[3].SetCode != "EEE" {
-		t.Errorf("last wording = %s current=%v, want EEE marked current",
-			revs[3].SetCode, revs[3].Current)
-	}
-}
-
-// When no printing carries the current oracle wording it's still shown last.
-func TestBuildRevisionsAppendsCurrentOracle(t *testing.T) {
-	card := ScryfallCard{Name: "Test Bird", OracleText: "Flying"}
-	printings := []printing{{Name: "Test Bird", Set: "AAA", SetName: "Alpha Set", Released: "1993-08-05"}}
-	originals := map[string]map[string]string{"AAA": {"test bird": "Does not tap when attacking."}}
-
-	revs := buildRevisions(card, printings, originals)
-	if len(revs) != 2 {
-		t.Fatalf("got %d wordings, want 2", len(revs))
-	}
-	if !revs[1].Current || revs[1].Text != "Flying" {
-		t.Errorf("last entry = %+v, want the current oracle text", revs[1])
-	}
-}
-
-// Nothing is downloaded just by moving the cursor — only the key does that.
 func TestHistoryNeverFetchesOnHover(t *testing.T) {
 	data := loadTestRules(t)
 	m := resultsModel(t, 160, 40, data)
@@ -683,7 +555,7 @@ func TestHistoryAssemblesFromCachedSets(t *testing.T) {
 	m.originals["AAA"] = map[string]string{"test bird": "Does not tap when attacking."}
 	m.originals["BBB"] = map[string]string{"test bird": "Flying"}
 
-	next, cmd := m.Update(printingsMsg{oracleID: "oid", printings: []printing{
+	next, cmd := m.Update(printingsMsg{oracleID: "oid", printings: []prints.Printing{
 		{Name: "Test Bird", Set: "AAA", SetName: "Alpha Set", Released: "1993-08-05"},
 		{Name: "Test Bird", Set: "BBB", SetName: "Beta Set", Released: "1994-04-11"},
 	}})

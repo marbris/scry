@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/scryfall"
+
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -68,8 +70,8 @@ func TestResolveEntriesSurvivesAnUnreachableScryfall(t *testing.T) {
 	// the lookup unreachable the cached card must still come back, and the
 	// error must describe the real problem rather than claiming the card
 	// doesn't exist.
-	defer func(u string) { scryfallCollectionURL = u }(scryfallCollectionURL)
-	scryfallCollectionURL = "http://127.0.0.1:1/nothing-listening"
+	defer func(u string) { scryfall.CollectionURL = u }(scryfall.CollectionURL)
+	scryfall.CollectionURL = "http://127.0.0.1:1/nothing-listening"
 
 	cards, err := resolveEntries([]deckEntry{
 		{Qty: 1, Name: "Sol Ring", Section: "mainboard"},

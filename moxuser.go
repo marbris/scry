@@ -1,6 +1,8 @@
 package main
 
 import (
+	"scry/internal/scryfall"
+
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -116,7 +118,7 @@ func fetchMoxUserDecks(user string) (string, []moxUserDeck, error) {
 
 	for page := 1; page <= moxUserMaxPages; page++ {
 		if page > 1 {
-			time.Sleep(collectionDelay)
+			time.Sleep(scryfall.PageDelay)
 		}
 		body, err := doGet(fmt.Sprintf(moxSearchURL, page, moxUserPageSize, url.QueryEscape(user)))
 		if err != nil {

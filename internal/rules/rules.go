@@ -1,4 +1,4 @@
-package main
+package rules
 
 // Comprehensive Rules engine — merged in from the mtg-rules project.
 // Parses the official rules text, indexes keyword abilities/actions and
@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"scry/internal/fetch"
+	"scry/internal/mtg"
+	"scry/internal/paths"
 	"sort"
 	"strings"
 	"unicode"
@@ -31,21 +33,21 @@ type GlossaryEntry struct {
 	Definition string
 }
 
-type kwKind int
+type KeywordKind int
 
 const (
-	kwAbility kwKind = iota // 702.x — keyword abilities (flying, trample…)
-	kwAction                // 701.x — keyword actions (destroy, scry…)
-	kwWord                  // 207.2c — ability words (landfall, metalcraft…)
+	KeywordAbility KeywordKind = iota // 702.x — keyword abilities (flying, trample…)
+	KeywordAction                     // 701.x — keyword actions (destroy, scry…)
+	AbilityWord                       // 207.2c — ability words (landfall, metalcraft…)
 )
 
 type Keyword struct {
 	Name string
 	Rule string
-	Kind kwKind
+	Kind KeywordKind
 }
 
-type RulesData struct {
+type Data struct {
 	Rules    []Rule
 	Glossary []GlossaryEntry
 	Index    map[string]int // rule number -> index
@@ -57,7 +59,7 @@ type RulesData struct {
 	typeRules  map[string]string        // card type -> category rule number
 }
 
-func (d RulesData) loaded() bool { return len(d.Rules) > 0 }
+func (d Data) Loaded() bool { return len(d.Rules) > 0 }
 
 // ── Parsing ─────────────────────────────────────────────────────
 
@@ -69,9 +71,9 @@ var (
 	suffixRe   = regexp.MustCompile(`[a-z]+$`)
 )
 
-func parseRules(text string) RulesData {
+func Parse(text string) Data {
 	lines := strings.Split(text, "\n")
-	data := RulesData{
+	data := Data{
 		Index: make(map[string]int),
 	}
 
@@ -207,7 +209,7 @@ func parseRules(text string) RulesData {
 	return data
 }
 
-func parseGlossaryLine(line string, data *RulesData, currentTerm *string, currentDef *strings.Builder) {
+func parseGlossaryLine(line string, data *Data, currentTerm *string, currentDef *strings.Builder) {
 	if line == "" {
 		if *currentTerm != "" {
 			data.Glossary = append(data.Glossary, GlossaryEntry{
@@ -230,7 +232,7 @@ func parseGlossaryLine(line string, data *RulesData, currentTerm *string, curren
 	}
 }
 
-func findParentSection(catNum string, data *RulesData) int {
+func findParentSection(catNum string, data *Data) int {
 	if len(catNum) >= 1 {
 		if idx, ok := data.Index[string(catNum[0])]; ok {
 			return idx
@@ -239,7 +241,7 @@ func findParentSection(catNum string, data *RulesData) int {
 	return -1
 }
 
-func findParentRule(ruleNum string, data *RulesData) int {
+func findParentRule(ruleNum string, data *Data) int {
 	// "702.9a" -> parent is "702.9"
 	if suffixRe.MatchString(ruleNum) {
 		parent := suffixRe.ReplaceAllString(ruleNum, "")
@@ -267,13 +269,13 @@ var (
 	// Glossary terms worth matching against card text
 	glossTermRe = regexp.MustCompile(`^[A-Za-z][A-Za-z’' -]*$`)
 	// "See rule 702.9" / "See rule 207.2c"
-	seeRuleRe = regexp.MustCompile(`[Ss]ee rule (\d{1,3}(?:\.\d+[a-z]*)?)`)
+	SeeRuleRe = regexp.MustCompile(`[Ss]ee rule (\d{1,3}(?:\.\d+[a-z]*)?)`)
 )
 
-func buildKeywordIndex(d *RulesData) {
+func buildKeywordIndex(d *Data) {
 	d.keywords = make(map[string]Keyword)
 
-	add := func(name, rule string, kind kwKind) {
+	add := func(name, rule string, kind KeywordKind) {
 		name = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(name), "."))
 		if len(name) < 4 || len(name) > 40 || !kwNameRe.MatchString(name) {
 			return
@@ -289,12 +291,12 @@ func buildKeywordIndex(d *RulesData) {
 		if r.Depth != 2 {
 			continue
 		}
-		var kind kwKind
+		var kind KeywordKind
 		switch {
 		case strings.HasPrefix(r.Number, "702."):
-			kind = kwAbility
+			kind = KeywordAbility
 		case strings.HasPrefix(r.Number, "701."):
-			kind = kwAction
+			kind = KeywordAction
 		default:
 			continue
 		}
@@ -310,7 +312,7 @@ func buildKeywordIndex(d *RulesData) {
 	// Ability words are only ever listed inside rule 207.2c
 	if idx, ok := d.Index["207.2c"]; ok {
 		for _, w := range abilityWords(d.Rules[idx].Text) {
-			add(w, "207.2c", kwWord)
+			add(w, "207.2c", AbilityWord)
 		}
 	}
 
@@ -358,7 +360,7 @@ func titleCase(s string) string {
 	return strings.Join(words, " ")
 }
 
-func buildGlossaryIndex(d *RulesData) {
+func buildGlossaryIndex(d *Data) {
 	d.glossary = make(map[string]GlossaryEntry)
 
 	var names []string
@@ -406,7 +408,7 @@ var cardTypeRules = map[string]string{
 
 // buildTypeIndex keeps only the type->rule pairs that the loaded rules
 // actually confirm, so a renumbered future release degrades quietly.
-func buildTypeIndex(d *RulesData) {
+func buildTypeIndex(d *Data) {
 	d.typeRules = make(map[string]string)
 	for cardType, num := range cardTypeRules {
 		idx, ok := d.Index[num]
@@ -458,20 +460,21 @@ func alternation(names []string) *regexp.Regexp {
 
 // ── Scanning ────────────────────────────────────────────────────
 
-type span struct {
-	start, end int
-	text       string
+// Span is where something was found in a piece of text.
+type Span struct {
+	Start, End int
+	Text       string
 }
 
 // scan finds every whole-word occurrence of the alternation in s.
 // Word boundaries are checked here rather than with \b so that names
 // ending in punctuation ("For Mirrodin!") still match.
-func scan(re *regexp.Regexp, s string) []span {
+func Scan(re *regexp.Regexp, s string) []Span {
 	if re == nil || s == "" {
 		return nil
 	}
 
-	var out []span
+	var out []Span
 	pos := 0
 	for pos < len(s) {
 		loc := re.FindStringIndex(s[pos:])
@@ -480,7 +483,7 @@ func scan(re *regexp.Regexp, s string) []span {
 		}
 		start, end := pos+loc[0], pos+loc[1]
 		if boundedAt(s, start, end) {
-			out = append(out, span{start: start, end: end, text: s[start:end]})
+			out = append(out, Span{Start: start, End: end, Text: s[start:end]})
 			pos = end
 		} else {
 			pos = start + 1
@@ -513,16 +516,16 @@ func isWordRune(r rune) bool {
 
 // ── Matching a card against the rules ───────────────────────────
 
-type matchKind int
+type MatchKind int
 
 const (
-	matchKeyword matchKind = iota
-	matchGlossary
-	matchType
+	MatchKeyword MatchKind = iota
+	MatchGlossary
+	MatchType
 )
 
 type RuleMatch struct {
-	Kind  matchKind
+	Kind  MatchKind
 	Term  string // display name, e.g. "Flying"
 	Rule  string // rule number, may be "" for glossary-only hits
 	Kw    Keyword
@@ -534,8 +537,8 @@ const maxGlossaryMatches = 8
 // MatchCard returns the rules relevant to a card, most specific first:
 // keywords in the order they appear in the oracle text, then glossary
 // concepts, then the card's types.
-func (d RulesData) MatchCard(c ScryfallCard) []RuleMatch {
-	if !d.loaded() {
+func (d Data) MatchCard(c mtg.Card) []RuleMatch {
+	if !d.Loaded() {
 		return nil
 	}
 
@@ -546,28 +549,28 @@ func (d RulesData) MatchCard(c ScryfallCard) []RuleMatch {
 	// still turn up in the rules panel.
 	oracle := c.CombinedOracle()
 
-	for _, sp := range scan(d.keywordRe, oracle) {
-		kw, ok := d.keywords[strings.ToLower(sp.text)]
+	for _, sp := range Scan(d.keywordRe, oracle) {
+		kw, ok := d.keywords[strings.ToLower(sp.Text)]
 		if !ok {
 			continue
 		}
 		key := kw.Rule
-		if kw.Kind == kwWord {
+		if kw.Kind == AbilityWord {
 			key = kw.Rule + "/" + kw.Name
 		}
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		out = append(out, RuleMatch{Kind: matchKeyword, Term: kw.Name, Rule: kw.Rule, Kw: kw})
+		out = append(out, RuleMatch{Kind: MatchKeyword, Term: kw.Name, Rule: kw.Rule, Kw: kw})
 	}
 
 	glossaryHits := 0
-	for _, sp := range scan(d.glossaryRe, oracle) {
+	for _, sp := range Scan(d.glossaryRe, oracle) {
 		if glossaryHits >= maxGlossaryMatches {
 			break
 		}
-		entry, ok := d.glossary[strings.ToLower(sp.text)]
+		entry, ok := d.glossary[strings.ToLower(sp.Text)]
 		if !ok {
 			continue
 		}
@@ -579,10 +582,10 @@ func (d RulesData) MatchCard(c ScryfallCard) []RuleMatch {
 		glossaryHits++
 
 		rule := ""
-		if m := seeRuleRe.FindStringSubmatch(entry.Definition); m != nil {
+		if m := SeeRuleRe.FindStringSubmatch(entry.Definition); m != nil {
 			rule = m[1]
 		}
-		out = append(out, RuleMatch{Kind: matchGlossary, Term: entry.Term, Rule: rule, Entry: entry})
+		out = append(out, RuleMatch{Kind: MatchGlossary, Term: entry.Term, Rule: rule, Entry: entry})
 	}
 
 	for _, t := range cardTypes(c.TypeLine) {
@@ -591,7 +594,7 @@ func (d RulesData) MatchCard(c ScryfallCard) []RuleMatch {
 			continue
 		}
 		seen["t:"+num] = true
-		out = append(out, RuleMatch{Kind: matchType, Term: t, Rule: num})
+		out = append(out, RuleMatch{Kind: MatchType, Term: t, Rule: num})
 	}
 
 	return out
@@ -623,34 +626,58 @@ func cardTypes(typeLine string) []string {
 
 const rulesURL = "https://media.wizards.com/2026/downloads/MagicCompRules%2020260417.txt"
 
-func rulesFilePath() string {
-	return filepath.Join(dataDir(), "comprules.txt")
+func FilePath() string {
+	return filepath.Join(paths.Data(), "comprules.txt")
 }
 
-func downloadRules() error {
+func Download() error {
 	body, err := fetch.GetFile(rulesURL)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(rulesFilePath(), body, 0644)
+	return os.WriteFile(FilePath(), body, 0644)
 }
 
-func loadRules() (RulesData, error) {
-	path := rulesFilePath()
+func Load() (Data, error) {
+	path := FilePath()
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := downloadRules(); err != nil {
-			return RulesData{}, err
+		if err := Download(); err != nil {
+			return Data{}, err
 		}
 	}
 
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return RulesData{}, err
+		return Data{}, err
 	}
 
 	text := strings.TrimPrefix(string(content), "\xef\xbb\xbf")
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	text = strings.ReplaceAll(text, "\r", "\n")
 
-	return parseRules(text), nil
+	return Parse(text), nil
+}
+
+// KeywordSpan is a keyword the rules know about, found in a piece of text.
+type KeywordSpan struct {
+	Span
+	Kind KeywordKind
+}
+
+// KeywordSpans finds every keyword ability, keyword action and ability word
+// in text, so a caller can style them without knowing how the index is
+// built. Returns nothing when the rules haven't been loaded.
+func (d Data) KeywordSpans(text string) []KeywordSpan {
+	if !d.Loaded() {
+		return nil
+	}
+	var out []KeywordSpan
+	for _, sp := range Scan(d.keywordRe, text) {
+		kw, ok := d.keywords[strings.ToLower(sp.Text)]
+		if !ok {
+			continue
+		}
+		out = append(out, KeywordSpan{Span: sp, Kind: kw.Kind})
+	}
+	return out
 }

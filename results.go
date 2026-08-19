@@ -419,7 +419,7 @@ func (m model) syncHover() (model, tea.Cmd) {
 // openRulesBrowser switches to the rules browser. With nil items it shows
 // every rule; otherwise it shows just the ones passed in.
 func (m model) openRulesBrowser(items []list.Item, scope string) (tea.Model, tea.Cmd) {
-	if !m.rules.loaded() {
+	if !m.rules.Loaded() {
 		m = m.enterState(stateRules)
 		return m, nil
 	}

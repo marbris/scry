@@ -10,6 +10,8 @@ package main
 // word list to fall behind the next set.
 
 import (
+	"scry/internal/rules"
+
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -45,7 +47,7 @@ var (
 // highlightOracle styles a card's oracle text and wraps it to width.
 // The result is fully styled — no outer Foreground should be applied to
 // it, or the nested resets will strip the colors partway through.
-func highlightOracle(c ScryfallCard, width int, rules RulesData) string {
+func highlightOracle(c ScryfallCard, width int, rd RulesData) string {
 	text := c.OracleText
 	if text == "" {
 		return ""
@@ -54,7 +56,7 @@ func highlightOracle(c ScryfallCard, width int, rules RulesData) string {
 		width = 10
 	}
 
-	mask := buildMask(text, c, rules)
+	mask := buildMask(text, c, rd)
 
 	var b strings.Builder
 	lineStart := 0
@@ -78,11 +80,11 @@ func highlightOracle(c ScryfallCard, width int, rules RulesData) string {
 
 // highlightRuleText applies the same treatment to rules text, which has
 // no card name and no loyalty costs but plenty of symbols and keywords.
-func highlightRuleText(text string, width int, rules RulesData) string {
-	return highlightOracle(ScryfallCard{OracleText: text}, width, rules)
+func highlightRuleText(text string, width int, rd RulesData) string {
+	return highlightOracle(ScryfallCard{OracleText: text}, width, rd)
 }
 
-func buildMask(text string, c ScryfallCard, rules RulesData) []runeStyle {
+func buildMask(text string, c ScryfallCard, rd RulesData) []runeStyle {
 	mask := make([]runeStyle, len(text))
 
 	// fill claims a byte range unless it overlaps something already styled,
@@ -120,8 +122,8 @@ func buildMask(text string, c ScryfallCard, rules RulesData) []runeStyle {
 	// 4. The card's own name, plus its short form ("Dragonlord Ojutai" -> "Ojutai").
 	nameStyle := runeStyle{col: colorForCard(c.Colors), bold: true, set: true}
 	for _, name := range selfNames(c.Name) {
-		for _, sp := range scan(literalRe(name), text) {
-			fill(sp.start, sp.end, nameStyle)
+		for _, sp := range rules.Scan(literalRe(name), text) {
+			fill(sp.Start, sp.End, nameStyle)
 		}
 	}
 
@@ -135,20 +137,14 @@ func buildMask(text string, c ScryfallCard, rules RulesData) []runeStyle {
 	}
 
 	// 6. Keywords straight from the comprehensive rules.
-	if rules.loaded() {
-		for _, sp := range scan(rules.keywordRe, text) {
-			kw, ok := rules.keywords[strings.ToLower(sp.text)]
-			if !ok {
-				continue
-			}
-			switch kw.Kind {
-			case kwAbility:
-				fill(sp.start, sp.end, abilityStyle)
-			case kwAction:
-				fill(sp.start, sp.end, actionStyle)
-			case kwWord:
-				fill(sp.start, sp.end, wordStyle)
-			}
+	for _, sp := range rd.KeywordSpans(text) {
+		switch sp.Kind {
+		case rules.KeywordAbility:
+			fill(sp.Start, sp.End, abilityStyle)
+		case rules.KeywordAction:
+			fill(sp.Start, sp.End, actionStyle)
+		case rules.AbilityWord:
+			fill(sp.Start, sp.End, wordStyle)
 		}
 	}
 

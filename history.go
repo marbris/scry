@@ -13,38 +13,30 @@ package main
 // map and cached on disk, and nothing is fetched until the user asks for it.
 
 import (
-	"compress/gzip"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"scry/internal/prints"
 )
 
-// mtgjsonSem keeps set downloads to a civilised number at a time.
-var mtgjsonSem = make(chan struct{}, 4)
+// fetchPrintings and fetchSetOriginals run the prints package off the main
+// thread; the work itself lives there.
 
-type printing struct {
-	Name     string
-	Set      string // upper-case, as MTGJSON names them
-	SetName  string
-	Released string // YYYY-MM-DD
+func fetchPrintings(oracleID, uri string) tea.Cmd {
+	return func() tea.Msg {
+		list, err := prints.Printings(uri)
+		return printingsMsg{oracleID: oracleID, printings: list, err: err}
+	}
 }
 
-// TextRevision is one distinct wording, and the printing it first appeared on.
-type TextRevision struct {
-	Text      string
-	SetCode   string
-	SetName   string
-	Released  string
-	Printings int  // how many printings shared this wording
-	Current   bool // matches the card's current oracle text
+func fetchSetOriginals(set string) tea.Cmd {
+	return func() tea.Msg {
+		cards, err := prints.SetOriginals(set)
+		return setOriginalsMsg{set: set, cards: cards, err: err}
+	}
 }
 
 type histState int
@@ -59,18 +51,16 @@ const (
 
 type cardHistory struct {
 	state     histState
-	printings []printing
+	printings []prints.Printing
 	sets      []string // every set the card was printed in
 	missing   []string // the ones not cached yet
-	revisions []TextRevision
+	revisions []prints.TextRevision
 	err       error
 }
 
-// ── Messages ────────────────────────────────────────────────────
-
 type printingsMsg struct {
 	oracleID  string
-	printings []printing
+	printings []prints.Printing
 	err       error
 }
 
@@ -78,256 +68,6 @@ type setOriginalsMsg struct {
 	set   string
 	cards map[string]string
 	err   error
-}
-
-// ── Commands ────────────────────────────────────────────────────
-
-// fetchPrintings lists every paper English printing of a card, oldest first.
-func fetchPrintings(oracleID, uri string) tea.Cmd {
-	return func() tea.Msg {
-		if uri == "" {
-			return printingsMsg{oracleID: oracleID, err: fmt.Errorf("no printings link for this card")}
-		}
-
-		var out []printing
-		seen := make(map[string]bool)
-
-		for page, next := 0, uri; next != "" && page < 6; page++ {
-			body, err := doGet(next)
-			if err != nil {
-				if _, ok := err.(notFoundError); ok {
-					break
-				}
-				return printingsMsg{oracleID: oracleID, err: err}
-			}
-
-			var sr ScryfallResponse
-			if err := json.Unmarshal(body, &sr); err != nil {
-				return printingsMsg{oracleID: oracleID, err: err}
-			}
-
-			for _, c := range sr.Data {
-				// Digital-only and translated printings aren't part of the
-				// paper wording history.
-				if c.Digital || (c.Lang != "" && c.Lang != "en") || c.Set == "" {
-					continue
-				}
-				set := strings.ToUpper(c.Set)
-				if seen[set] {
-					continue // one printing per set is enough to read its text
-				}
-				seen[set] = true
-				out = append(out, printing{
-					Name:     c.Name,
-					Set:      set,
-					SetName:  c.SetName,
-					Released: c.ReleasedAt,
-				})
-			}
-
-			if !sr.HasMore {
-				break
-			}
-			next = sr.NextPage
-		}
-
-		sort.SliceStable(out, func(i, j int) bool { return out[i].Released < out[j].Released })
-		return printingsMsg{oracleID: oracleID, printings: out}
-	}
-}
-
-// fetchSetOriginals pulls one set's printed text, from disk if it's already
-// been distilled, otherwise from MTGJSON.
-func fetchSetOriginals(set string) tea.Cmd {
-	return func() tea.Msg {
-		if cards, ok := readSetCache(set); ok {
-			return setOriginalsMsg{set: set, cards: cards}
-		}
-
-		mtgjsonSem <- struct{}{}
-		defer func() { <-mtgjsonSem }()
-
-		// Another card may have fetched it while we waited for a slot.
-		if cards, ok := readSetCache(set); ok {
-			return setOriginalsMsg{set: set, cards: cards}
-		}
-
-		cards, err := downloadSetOriginals(set)
-		if err != nil {
-			return setOriginalsMsg{set: set, err: err}
-		}
-		writeSetCache(set, cards)
-		return setOriginalsMsg{set: set, cards: cards}
-	}
-}
-
-func downloadSetOriginals(set string) (map[string]string, error) {
-	u := fmt.Sprintf("https://mtgjson.com/api/v5/%s.json.gz", set)
-
-	req, err := http.NewRequest("GET", u, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "scry/1.0")
-	req.Header.Set("Accept", "*/*")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Sets Scryfall knows and MTGJSON doesn't are cached as empty so we
-	// don't ask again.
-	if resp.StatusCode == 404 {
-		return map[string]string{}, nil
-	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("mtgjson (%d) for %s", resp.StatusCode, set)
-	}
-
-	zr, err := gzip.NewReader(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	defer zr.Close()
-
-	var payload struct {
-		Data struct {
-			Cards []struct {
-				Name         string `json:"name"`
-				OriginalText string `json:"originalText"`
-			} `json:"cards"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(zr).Decode(&payload); err != nil {
-		return nil, err
-	}
-
-	cards := make(map[string]string)
-	for _, c := range payload.Data.Cards {
-		if c.OriginalText == "" {
-			continue
-		}
-		key := strings.ToLower(c.Name)
-		if _, dup := cards[key]; !dup {
-			cards[key] = c.OriginalText
-		}
-	}
-	return cards, nil
-}
-
-// ── Disk cache ──────────────────────────────────────────────────
-
-func originalsDir() string {
-	dir := filepath.Join(dataDir(), "originals")
-	os.MkdirAll(dir, 0755)
-	return dir
-}
-
-func setCachePath(set string) string {
-	return filepath.Join(originalsDir(), set+".json")
-}
-
-func readSetCache(set string) (map[string]string, bool) {
-	body, err := os.ReadFile(setCachePath(set))
-	if err != nil {
-		return nil, false
-	}
-	var cards map[string]string
-	if err := json.Unmarshal(body, &cards); err != nil {
-		return nil, false
-	}
-	return cards, true
-}
-
-func writeSetCache(set string, cards map[string]string) {
-	body, err := json.Marshal(cards)
-	if err != nil {
-		return
-	}
-	os.WriteFile(setCachePath(set), body, 0644)
-}
-
-func setIsCached(set string) bool {
-	_, err := os.Stat(setCachePath(set))
-	return err == nil
-}
-
-// ── Building the history ────────────────────────────────────────
-
-// buildRevisions collapses the printings into one entry per distinct
-// wording — a card reprinted twenty times with the same text is one entry.
-func buildRevisions(c ScryfallCard, printings []printing, originals map[string]map[string]string) []TextRevision {
-	var revs []TextRevision
-
-	for _, p := range printings {
-		text := cleanOriginal(lookupOriginal(originals[p.Set], p.Name))
-		if text == "" {
-			continue
-		}
-		if n := len(revs); n > 0 && sameText(revs[n-1].Text, text) {
-			revs[n-1].Printings++
-			continue
-		}
-		revs = append(revs, TextRevision{
-			Text:      text,
-			SetCode:   p.Set,
-			SetName:   p.SetName,
-			Released:  p.Released,
-			Printings: 1,
-		})
-	}
-
-	// The current oracle wording is the last revision, whether or not any
-	// printing carries it verbatim.
-	current := c.CombinedOracle()
-	if n := len(revs); n > 0 && sameText(revs[n-1].Text, current) {
-		revs[n-1].Current = true
-	} else if current != "" {
-		revs = append(revs, TextRevision{Text: current, Current: true})
-	}
-
-	return revs
-}
-
-// cleanOriginal converts MTGJSON's Gatherer-derived encoding into the same
-// shape as oracle text. "ocT" is how the old tap symbol comes through, and
-// "//" stands in for a line break. Normalising before comparing keeps a
-// mere change of encoding from looking like a change of wording.
-func cleanOriginal(s string) string {
-	s = strings.ReplaceAll(s, "ocT", "{T}")
-	s = originalBreakRe.ReplaceAllString(s, "\n")
-	return strings.TrimSpace(s)
-}
-
-// "//" stands in for a line break, with or without spaces around it.
-var originalBreakRe = regexp.MustCompile(`[ \t]*//[ \t]*`)
-
-func lookupOriginal(cards map[string]string, name string) string {
-	if cards == nil {
-		return ""
-	}
-	if text, ok := cards[strings.ToLower(name)]; ok {
-		return text
-	}
-	// Split and double-faced cards are sometimes filed under one face.
-	if i := strings.Index(name, " // "); i > 0 {
-		if text, ok := cards[strings.ToLower(name[:i])]; ok {
-			return text
-		}
-	}
-	return ""
-}
-
-// sameText compares wording while ignoring how it was laid out.
-func sameText(a, b string) bool {
-	return normalizeText(a) == normalizeText(b)
-}
-
-func normalizeText(s string) string {
-	s = strings.ReplaceAll(s, "//", "\n")
-	return strings.Join(strings.Fields(s), " ")
 }
 
 // ── Model wiring ────────────────────────────────────────────────
@@ -397,7 +137,7 @@ func (m model) handlePrintings(msg printingsMsg) (tea.Model, tea.Cmd) {
 	h.missing = h.missing[:0]
 	for _, p := range msg.printings {
 		h.sets = append(h.sets, p.Set)
-		if _, inMemory := m.originals[p.Set]; !inMemory && !setIsCached(p.Set) {
+		if _, inMemory := m.originals[p.Set]; !inMemory && !prints.IsCached(p.Set) {
 			h.missing = append(h.missing, p.Set)
 		}
 	}
@@ -457,7 +197,7 @@ func (m model) finishHistory(oracleID string) {
 		return
 	}
 	card := m.cardByOracleID(oracleID)
-	h.revisions = buildRevisions(card, h.printings, m.originals)
+	h.revisions = prints.BuildRevisions(card, h.printings, m.originals)
 	h.state = histReady
 }
 
