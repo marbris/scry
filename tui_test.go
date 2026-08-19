@@ -1101,15 +1101,15 @@ func TestStatCountsMatchWhatFilteringGives(t *testing.T) {
 
 	// Every row's number has to be exactly what you get when you filter to
 	// it — that's the whole point of the rows carrying their own test.
-	for _, row := range flatRows(statGroups(entries, entries)) {
+	for _, row := range flatRows(statGroups(deckCards(entries), deckCards(entries))) {
 		got := 0
 		for _, e := range entries {
-			if row.match(e) {
+			if row.Match(e.deckCard()) {
 				got += e.Qty
 			}
 		}
-		if got != row.count {
-			t.Errorf("%s/%s counts %d but filtering gives %d", row.group, row.label, row.count, got)
+		if got != row.Count {
+			t.Errorf("%s/%s counts %d but filtering gives %d", row.Group, row.Label, row.Count, got)
 		}
 	}
 }
@@ -1134,8 +1134,8 @@ func TestStatNavigationFiltersTheList(t *testing.T) {
 		for m.active().statIndex < i {
 			m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
 		}
-		if !want.same(m.active().statFilter) {
-			t.Fatalf("at index %d the filter is %+v, want %s/%s", i, m.active().statFilter, want.group, want.label)
+		if !want.Same(m.active().statFilter) {
+			t.Fatalf("at index %d the filter is %+v, want %s/%s", i, m.active().statFilter, want.Group, want.Label)
 		}
 
 		onScreen := toEntries(m.active().list.Items())
@@ -1149,29 +1149,29 @@ func TestStatNavigationFiltersTheList(t *testing.T) {
 		panel := flatRows(m.statPanel())
 		if len(panel) != len(rows) {
 			t.Fatalf("at %s/%s the panel has %d rows, want the original %d",
-				want.group, want.label, len(panel), len(rows))
+				want.Group, want.Label, len(panel), len(rows))
 		}
 		for j, got := range panel {
-			if !got.same(&rows[j]) {
+			if !got.Same(&rows[j]) {
 				t.Fatalf("at %s/%s row %d became %s/%s, want %s/%s",
-					want.group, want.label, j, got.group, got.label, rows[j].group, rows[j].label)
+					want.Group, want.Label, j, got.Group, got.Label, rows[j].Group, rows[j].Label)
 			}
 			expect := 0
 			for _, e := range onScreen {
-				if got.match(e) {
+				if got.Match(e.deckCard()) {
 					expect += e.Qty
 				}
 			}
-			if got.count != expect {
+			if got.Count != expect {
 				t.Errorf("filtered to %s/%s, row %s/%s reads %d but %d cards on screen match",
-					want.group, want.label, got.group, got.label, got.count, expect)
+					want.Group, want.Label, got.Group, got.Label, got.Count, expect)
 			}
 		}
 
 		// The category you are on accounts for everything on screen.
-		if panel[i].count != total {
+		if panel[i].Count != total {
 			t.Errorf("%s/%s reads %d but the list holds %d cards",
-				want.group, want.label, panel[i].count, total)
+				want.Group, want.Label, panel[i].Count, total)
 		}
 	}
 
@@ -1340,7 +1340,7 @@ func TestEmptiedCategoriesKeepTheirPlace(t *testing.T) {
 	// are emptied by it.
 	target := -1
 	for i, r := range before {
-		if r.group == "Type" && r.label == "Land" {
+		if r.Group == "Type" && r.Label == "Land" {
 			target = i
 			break
 		}
@@ -1358,11 +1358,11 @@ func TestEmptiedCategoriesKeepTheirPlace(t *testing.T) {
 	after := flatRows(m.statPanel())
 	zeros := 0
 	for i, r := range after {
-		if !r.same(&before[i]) {
+		if !r.Same(&before[i]) {
 			t.Fatalf("row %d moved from %s/%s to %s/%s", i,
-				before[i].group, before[i].label, r.group, r.label)
+				before[i].Group, before[i].Label, r.Group, r.Label)
 		}
-		if r.count == 0 {
+		if r.Count == 0 {
 			zeros++
 		}
 	}
@@ -1383,8 +1383,8 @@ func TestEmptiedCategoriesKeepTheirPlace(t *testing.T) {
 
 	// And the histograms describe the filtered cards, not the whole deck.
 	for _, r := range after {
-		if r.group == "Type" && r.label == "Land" && r.count != 31 {
-			t.Errorf("Land reads %d, want 31 (30 Mountains + Ancient Tomb)", r.count)
+		if r.Group == "Type" && r.Label == "Land" && r.Count != 31 {
+			t.Errorf("Land reads %d, want 31 (30 Mountains + Ancient Tomb)", r.Count)
 		}
 	}
 }
@@ -1406,7 +1406,7 @@ func walkTo(t *testing.T, m model, group, label string) model {
 	t.Helper()
 	rows := flatRows(m.statPanel())
 	for i, r := range rows {
-		if r.group == group && r.label == label {
+		if r.Group == group && r.Label == label {
 			for j := 0; j <= i; j++ {
 				m = drive(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
 			}

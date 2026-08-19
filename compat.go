@@ -8,6 +8,7 @@ import (
 	"scry/internal/paths"
 	"scry/internal/rules"
 	"scry/internal/scryfall"
+	"scry/internal/stats"
 	"scry/internal/theme"
 )
 
@@ -143,6 +144,15 @@ var (
 	moxfieldUserName = moxfield.UserName
 	moxDeckToFile    = moxfield.ToFile
 )
+
+// ── Statistics ──────────────────────────────────────────────────
+
+type (
+	statRow   = stats.Row
+	statGroup = stats.Group
+)
+
+var statGroups = stats.Groups
 
 // ── Files ───────────────────────────────────────────────────────
 

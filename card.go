@@ -1,6 +1,7 @@
 package main
 
 import (
+	"scry/internal/deck"
 	"scry/internal/mtg"
 
 	"fmt"
@@ -190,6 +191,12 @@ type cardItem struct {
 	Qty int
 	// Tags are the deck author's own, and only ever set for deck cards.
 	Tags []string
+}
+
+// deckCard is cardItem as the domain sees it. The two are field for field
+// the same; this is the seam until they're merged.
+func (c cardItem) deckCard() deck.Card {
+	return deck.Card{Card: c.Card, Qty: c.Qty, Tags: c.Tags, Commander: c.Commander}
 }
 
 func (c cardItem) Title() string       { return c.Card.Name }

@@ -1,8 +1,9 @@
 package main
 
 import (
+	"scry/internal/deck"
+
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -11,262 +12,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// The statistics panel is a list you can walk with J/K. Every row carries
-// the test it counted itself with, so filtering the cards to a category and
-// the number printed beside that category can never disagree.
-
-type statRow struct {
-	group string // "Color", "Rarity", …
-	label string // "Blue", "rare", "3", "Creature", "Ramp"
-	count int    // over the cards on screen — what the bar shows
-	base  int    // over the whole result set — whether the row exists at all
-	color lipgloss.Color
-	match func(cardItem) bool
-}
-
-type statGroup struct {
-	title string
-	rows  []statRow
-}
-
-// same reports whether two rows name the same category. The rows carry
-// closures, so they can't be compared directly.
-func (r statRow) same(other *statRow) bool {
-	return other != nil && r.group == other.group && r.label == other.label
-}
-
-// ── Building the rows ───────────────────────────────────────────
-
-// colorRows is the colour spread of the spells. Lands are left out for the
-// same reason they're left out of the curve: nearly all of them are
-// colourless by the card's own reckoning, so counting them says how many
-// lands the deck runs — under a "Colorless" heading, where it reads as if
-// the deck were full of colourless spells.
-func colorRows() []statRow {
-	spec := []struct {
-		label string
-		code  string
-		color lipgloss.Color
-	}{
-		{"White", "W", gruvWhite},
-		{"Blue", "U", gruvBlue},
-		{"Black", "B", gruvGray},
-		{"Red", "R", gruvRed},
-		{"Green", "G", gruvGreen},
-	}
-
-	rows := make([]statRow, 0, len(spec)+2)
-	for _, s := range spec {
-		code := s.code
-		rows = append(rows, statRow{
-			group: "Color", label: s.label, color: s.color,
-			match: func(ci cardItem) bool {
-				if isLand(ci.Card) {
-					return false
-				}
-				for _, c := range ci.Card.DisplayColors() {
-					if c == code {
-						return true
-					}
-				}
-				return false
-			},
-		})
-	}
-	rows = append(rows,
-		statRow{
-			group: "Color", label: "Colorless", color: gruvFgDim,
-			match: func(ci cardItem) bool {
-				return !isLand(ci.Card) && len(ci.Card.DisplayColors()) == 0
-			},
-		},
-		statRow{
-			group: "Color", label: "Multi", color: gruvYellow,
-			match: func(ci cardItem) bool {
-				return !isLand(ci.Card) && len(ci.Card.DisplayColors()) > 1
-			},
-		},
-	)
-	return rows
-}
-
-func rarityRows(entries []cardItem) []statRow {
-	color := map[string]lipgloss.Color{
-		"common": gruvFg, "uncommon": gruvFgDim, "rare": gruvYellow,
-		"mythic": gruvOrange, "special": gruvPurple,
-	}
-
-	// The usual rarities in their usual order, then anything unexpected.
-	order := []string{"common", "uncommon", "rare", "mythic", "special", "bonus"}
-	known := map[string]bool{}
-	for _, r := range order {
-		known[r] = true
-	}
-	var extra []string
-	for _, e := range entries {
-		r := e.Card.Rarity
-		if r == "" {
-			r = "unknown"
-		}
-		if !known[r] {
-			known[r] = true
-			extra = append(extra, r)
-		}
-	}
-	sort.Strings(extra)
-
-	rows := make([]statRow, 0, len(order)+len(extra))
-	for _, r := range append(order, extra...) {
-		rarity := r
-		col, ok := color[rarity]
-		if !ok {
-			col = gruvGray
-		}
-		rows = append(rows, statRow{
-			group: "Rarity", label: rarity, color: col,
-			match: func(ci cardItem) bool {
-				got := ci.Card.Rarity
-				if got == "" {
-					got = "unknown"
-				}
-				return got == rarity
-			},
-		})
-	}
-	return rows
-}
-
-// cmcRows is the mana curve. Lands are left out of it: they nearly all cost
-// nothing, so counting them buries the curve under a column at zero that
-// says only how many lands the deck runs — which the type breakdown below
-// already says, and better.
-func cmcRows() []statRow {
-	rows := make([]statRow, 0, 8)
-	for i := 0; i <= 7; i++ {
-		n := i
-		label := strconv.Itoa(n)
-		if n == 7 {
-			label = "7+"
-		}
-		rows = append(rows, statRow{
-			group: "Mana Value", label: label, color: gruvAqua,
-			match: func(ci cardItem) bool {
-				if isLand(ci.Card) {
-					return false
-				}
-				cmc := int(ci.Card.CMC)
-				if n == 7 {
-					return cmc >= 7
-				}
-				return cmc == n
-			},
-		})
-	}
-	return rows
-}
-
-// isLand reports whether a card's front face is a land, which is what
-// decides where it's counted.
-
-func typeRows() []statRow {
-	types := []string{"Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land"}
-	rows := make([]statRow, 0, len(types))
-	for _, t := range types {
-		cardType := t
-		rows = append(rows, statRow{
-			group: "Type", label: cardType, color: gruvPurple,
-			match: func(ci cardItem) bool {
-				return strings.Contains(ci.Card.TypeLine, cardType)
-			},
-		})
-	}
-	return rows
-}
-
-// tagRows come from the deck itself — only a Moxfield deck whose author
-// tagged their cards has any.
-func tagRows(entries []cardItem) []statRow {
-	seen := map[string]bool{}
-	var labels []string
-	for _, e := range entries {
-		for _, t := range e.Tags {
-			if !seen[t] {
-				seen[t] = true
-				labels = append(labels, t)
-			}
-		}
-	}
-	sort.Strings(labels)
-
-	rows := make([]statRow, 0, len(labels))
-	for _, l := range labels {
-		tag := l
-		rows = append(rows, statRow{
-			group: "Tags", label: tag, color: gruvYellow,
-			match: func(ci cardItem) bool {
-				for _, t := range ci.Tags {
-					if t == tag {
-						return true
-					}
-				}
-				return false
-			},
-		})
-	}
-	return rows
-}
-
-// statGroups builds the category list from rowSource and counts it over
-// counted. The two differ once you're filtering by a category: which rows
-// exist, their order and their positions all come from the whole result set
-// and so hold still, while the numbers beside them describe just the cards
-// on screen — a category with nothing left in it stays put and reads zero.
-func statGroups(rowSource, counted []cardItem) []statGroup {
-	// Most telling first: what the deck's author called their cards, then
-	// what those cards are, and the printing details last.
-	groups := []statGroup{
-		{title: "Tags", rows: tagRows(rowSource)},
-		{title: "Type", rows: typeRows()},
-		{title: "Color (excl. lands)", rows: colorRows()},
-		{title: "Mana Value (excl. lands)", rows: cmcRows()},
-		{title: "Rarity", rows: rarityRows(rowSource)},
-	}
-
-	out := make([]statGroup, 0, len(groups))
-	for _, g := range groups {
-		kept := make([]statRow, 0, len(g.rows))
-		for _, r := range g.rows {
-			for _, e := range rowSource {
-				if r.match(e) {
-					r.base += e.Qty
-				}
-			}
-			// A category nothing in the deck has ever matched is left out
-			// entirely; one the current filter has emptied is not.
-			if r.base == 0 {
-				continue
-			}
-			for _, e := range counted {
-				if r.match(e) {
-					r.count += e.Qty
-				}
-			}
-			kept = append(kept, r)
-		}
-		if len(kept) == 0 {
-			continue
-		}
-		// Tags have no natural order, so the commonest lead — by their
-		// standing in the whole set, so walking the list can't reorder it.
-		if g.title == "Tags" {
-			sort.SliceStable(kept, func(i, j int) bool { return kept[i].base > kept[j].base })
-		}
-		out = append(out, statGroup{title: g.title, rows: kept})
+// statPanel is the category list exactly as the panel draws it.
+// deckCards converts a list's rows for the statistics package, which counts
+// deck cards rather than list items.
+func deckCards(items []cardItem) []deck.Card {
+	out := make([]deck.Card, len(items))
+	for i, it := range items {
+		out[i] = it.deckCard()
 	}
 	return out
 }
 
-// statPanel is the category list exactly as the panel draws it.
 func (m model) statPanel() []statGroup {
 	counted := m.getVisibleEntries()
 
@@ -276,13 +32,13 @@ func (m model) statPanel() []statGroup {
 	if m.active().statFilter != nil {
 		rowSource = toEntries(m.active().baseItems)
 	}
-	return statGroups(rowSource, counted)
+	return statGroups(deckCards(rowSource), deckCards(counted))
 }
 
 // rowIndex finds where a category sits in the list, or -1.
 func rowIndex(rows []statRow, want *statRow) int {
 	for i, r := range rows {
-		if r.same(want) {
+		if r.Same(want) {
 			return i
 		}
 	}
@@ -292,7 +48,7 @@ func rowIndex(rows []statRow, want *statRow) int {
 func flatRows(groups []statGroup) []statRow {
 	var out []statRow
 	for _, g := range groups {
-		out = append(out, g.rows...)
+		out = append(out, g.Rows...)
 	}
 	return out
 }
@@ -304,11 +60,11 @@ func statLine(groups []statGroup, index int) int {
 	line := 2 // the "Statistics (n cards)" heading and the blank under it
 	for _, g := range groups {
 		line++ // the group's own heading
-		if index < len(g.rows) {
+		if index < len(g.Rows) {
 			return line + index
 		}
-		index -= len(g.rows)
-		line += len(g.rows) + 1 // its rows, then the gap to the next group
+		index -= len(g.Rows)
+		line += len(g.Rows) + 1 // its rows, then the gap to the next group
 	}
 	return line
 }
@@ -330,8 +86,8 @@ func (m model) renderStats(maxW int) string {
 	// One label width across every group, so the bars line up down the panel.
 	labelW := 0
 	for _, r := range flatRows(groups) {
-		if len(r.label) > labelW {
-			labelW = len(r.label)
+		if len(r.Label) > labelW {
+			labelW = len(r.Label)
 		}
 	}
 
@@ -353,16 +109,16 @@ func (m model) renderStats(maxW int) string {
 		if gi > 0 {
 			b.WriteString("\n")
 		}
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(gruvAqua).Render(g.title) + "\n")
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(gruvAqua).Render(g.Title) + "\n")
 
 		// Each group scales to its largest bar in the unfiltered set, so a
 		// filtered category's bars shrink to show how much of the whole
 		// they are. Scaling to the filtered maximum instead would refill
 		// the panel at every step and make every selection look alike.
 		maxBase := 0
-		for _, r := range g.rows {
-			if r.base > maxBase {
-				maxBase = r.base
+		for _, r := range g.Rows {
+			if r.Base > maxBase {
+				maxBase = r.Base
 			}
 		}
 		countW := len(strconv.Itoa(maxBase))
@@ -371,25 +127,25 @@ func (m model) renderStats(maxW int) string {
 			barMaxW = 5
 		}
 
-		for _, r := range g.rows {
+		for _, r := range g.Rows {
 			// A category the filter has emptied keeps its place, with no
 			// bar and its label dimmed, so the list holds still.
 			barLen := 0
-			if r.count > 0 && maxBase > 0 {
-				barLen = (r.count * barMaxW) / maxBase
+			if r.Count > 0 && maxBase > 0 {
+				barLen = (r.Count * barMaxW) / maxBase
 				if barLen < 1 {
 					barLen = 1
 				}
 			}
 
-			labelColor, countColor := r.color, gruvFgDim
-			if r.count == 0 {
+			labelColor, countColor := r.Color, gruvFgDim
+			if r.Count == 0 {
 				labelColor, countColor = gruvGray, gruvGray
 			}
 
-			label := lipgloss.NewStyle().Width(labelW).Foreground(labelColor).Render(r.label)
-			bar := lipgloss.NewStyle().Foreground(r.color).Render(strings.Repeat("█", barLen))
-			count := lipgloss.NewStyle().Foreground(countColor).Render(fmt.Sprintf(" %d", r.count))
+			label := lipgloss.NewStyle().Width(labelW).Foreground(labelColor).Render(r.Label)
+			bar := lipgloss.NewStyle().Foreground(r.Color).Render(strings.Repeat("█", barLen))
+			count := lipgloss.NewStyle().Foreground(countColor).Render(fmt.Sprintf(" %d", r.Count))
 
 			row := fmt.Sprintf("%s %s%s", label, bar, count)
 			if index == m.active().statIndex {
@@ -509,5 +265,5 @@ func (m model) statFilterLabel() string {
 	if m.active().statFilter == nil {
 		return ""
 	}
-	return m.active().statFilter.group + ": " + m.active().statFilter.label
+	return m.active().statFilter.Group + ": " + m.active().statFilter.Label
 }

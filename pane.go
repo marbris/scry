@@ -38,7 +38,7 @@ func (p *pane) refresh() {
 			if !ok {
 				continue
 			}
-			if p.statFilter.match(ci) {
+			if p.statFilter.Match(ci.deckCard()) {
 				kept = append(kept, it)
 			}
 		}
