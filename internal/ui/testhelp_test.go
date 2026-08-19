@@ -14,7 +14,7 @@ func splitLines(s string) []string {
 }
 
 func visibleWidth(s string) int {
-	return runeLen(stripANSI(s))
+	return textWidth(stripANSI(s))
 }
 
 func stripANSI(s string) string {

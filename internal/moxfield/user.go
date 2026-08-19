@@ -184,3 +184,28 @@ func plural(word string, n int) string {
 	}
 	return word + "s"
 }
+
+// User accepts either a profile URL or a bare username, since both are
+// things people paste. A name is letters, digits and the few punctuation
+// marks Moxfield allows — anything with a space or a slash in it was meant
+// to be something else and saying so beats following a deck called "not a
+// thing".
+func User(s string) (string, bool) {
+	if name, ok := UserName(s); ok {
+		return name, true
+	}
+
+	s = strings.TrimSpace(s)
+	if s == "" || len(s) > 50 {
+		return "", false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '-', r == '_', r == '.':
+		default:
+			return "", false
+		}
+	}
+	return s, true
+}

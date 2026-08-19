@@ -23,7 +23,12 @@ type Model struct {
 	// what to do with it; showKeys is the full reference, which is a lid
 	// rather than a screen.
 	leader   bool
+	goPrefix bool
 	showKeys bool
+
+	// notice is a one-line result — "copied", "deleted" — shown along the
+	// bottom until the next keypress.
+	notice string
 
 	// history is every query run, shared by every find panel: searches you
 	// ran in one panel are worth recalling in the next.
@@ -64,6 +69,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case searchDoneMsg:
 		return m.handleSearchDone(msg)
+
+	case deckOpenedMsg:
+		return m.handleDeckOpened(msg)
+
+	case userDecksMsg:
+		return m.handleUserDecks(msg)
+
+	case noticeMsg:
+		if msg.err != nil {
+			m.notice = "error: " + msg.err.Error()
+		} else {
+			m.notice = msg.text
+		}
+		return m, reloadDecks
+
+	case versionsMsg:
+		return m.handleVersions(msg)
+
+	case reloadDecksMsg:
+		for _, p := range m.ws.panels {
+			if l, ok := p.top().(*deckList); ok {
+				l.reload()
+			}
+		}
+		return m, nil
 	}
 	return m, nil
 }

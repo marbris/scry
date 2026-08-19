@@ -36,6 +36,11 @@ func drive(m Model, keys ...string) Model {
 // it. Running a search is what turns the bar back into a header.
 func openPanel(m Model, key, query string) Model {
 	m = drive(m, "space", key)
+	// A decks panel opens straight onto your decks, so there is no bar to
+	// type into and nothing to ask for.
+	if !m.ws.current().searchOpen {
+		return m
+	}
 	for _, r := range query {
 		m = drive(m, string(r))
 	}
@@ -196,16 +201,17 @@ func TestTheSearchBarTakesTypingRatherThanCommands(t *testing.T) {
 	}
 }
 
-func TestEscLeavesTheBarThenClosesThePanel(t *testing.T) {
-	m := drive(sized(120, 40), "space", "f")
-	m = drive(m, "a", "n", "g", "e", "l", "enter")
-	if m.ws.current().searchOpen {
-		t.Error("running a search left the bar open over the results")
-	}
+func TestEscClearsBeforeItCloses(t *testing.T) {
+	m := withCards(sized(120, 40), "f", sample(), sortArrival)
+	m = drive(m, "/", "e", "l", "f", "enter")
 
 	m = drive(m, "esc")
 	if m.ws.count() != 1 {
-		t.Error("esc closed a panel that still had something to clear")
+		t.Fatal("esc closed a panel that still had a filter to clear")
+	}
+	m = drive(m, "esc")
+	if m.ws.count() != 0 {
+		t.Error("esc did not close a panel with nothing left to clear")
 	}
 }
 
@@ -290,18 +296,20 @@ func TestOffScreenPanelsAreFlagged(t *testing.T) {
 // phase 5 will run.
 func withCards(m Model, key string, cards []deck.Card, order cardSort) Model {
 	m = openPanel(m, key, "query")
-	m.ws.current().show("query", cards, order, "")
+	l := newCardList(cards, order, "")
+	l.name = "query"
+	m.ws.current().show(l)
 	return m
 }
 
 func TestJAndKMoveTheCursor(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	m = drive(m, "j", "j")
-	if c, _ := m.ws.current().cards.current(); c.Card.Name != "Sol Ring" {
+	if c, _ := m.ws.current().cardsView().current(); c.Card.Name != "Sol Ring" {
 		t.Errorf("two js landed on %s", c.Card.Name)
 	}
 	m = drive(m, "k")
-	if c, _ := m.ws.current().cards.current(); c.Card.Name != "Llanowar Elves" {
+	if c, _ := m.ws.current().cardsView().current(); c.Card.Name != "Llanowar Elves" {
 		t.Errorf("k landed on %s", c.Card.Name)
 	}
 }
@@ -309,11 +317,11 @@ func TestJAndKMoveTheCursor(t *testing.T) {
 func TestGAndShiftGGoToTheEnds(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	m = drive(m, "G")
-	if c, _ := m.ws.current().cards.current(); c.Card.Name != "Forest" {
+	if c, _ := m.ws.current().cardsView().current(); c.Card.Name != "Forest" {
 		t.Errorf("G landed on %s, want the last card", c.Card.Name)
 	}
 	m = drive(m, "g")
-	if m.ws.current().cards.cursor != 0 {
+	if m.ws.current().cardsView().cursor.at != 0 {
 		t.Error("g did not go back to the top")
 	}
 }
@@ -321,14 +329,14 @@ func TestGAndShiftGGoToTheEnds(t *testing.T) {
 func TestOCyclesTheSortAndTheHeaderSaysSo(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	m = drive(m, "o")
-	if got := m.ws.current().cards.order; got != sortMana {
+	if got := m.ws.current().cardsView().order; got != sortMana {
 		t.Errorf("o moved to %v, want mana value", got)
 	}
 	if !strings.Contains(stripANSI(m.View()), "mana value") {
 		t.Error("the panel does not say what it is sorted by")
 	}
 	m = drive(m, "O", "O")
-	if got := m.ws.current().cards.order; got != sortEDHREC {
+	if got := m.ws.current().cardsView().order; got != sortEDHREC {
 		t.Errorf("O wrapped to %v", got)
 	}
 }
@@ -340,7 +348,7 @@ func TestSlashOpensTheFilterAndNarrowsAsYouType(t *testing.T) {
 		t.Fatal("/ did not open the filter")
 	}
 	m = drive(m, "e", "l", "f")
-	if got := m.ws.current().cards.count(); got != 2 {
+	if got := m.ws.current().cardsView().count(); got != 2 {
 		t.Errorf("filtering to 'elf' left %d cards", got)
 	}
 	m = drive(m, "enter")
@@ -352,7 +360,7 @@ func TestSlashOpensTheFilterAndNarrowsAsYouType(t *testing.T) {
 func TestEscAbandonsTheFilterPrompt(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	m = drive(m, "/", "e", "l", "f", "esc")
-	if m.ws.current().cards.count() != 4 {
+	if m.ws.current().cardsView().count() != 4 {
 		t.Error("esc left the half-typed narrowing in place")
 	}
 }
@@ -363,19 +371,16 @@ func TestTheEscCascadeInAList(t *testing.T) {
 	m = drive(m, "v") // pick one out
 
 	m = drive(m, "esc") // marks first
-	if m.ws.current().cards.markCount() != 0 {
+	if m.ws.current().cardsView().markCount() != 0 {
 		t.Error("the first esc did not clear the selection")
 	}
 	m = drive(m, "esc") // then the filter
-	if m.ws.current().cards.filter != "" {
+	if m.ws.current().cardsView().filter != "" {
 		t.Error("the second esc did not clear the filter")
 	}
-	m = drive(m, "esc") // then back to the search bar
-	if m.ws.current().cards != nil {
-		t.Error("the third esc did not empty the panel")
-	}
-	if m.ws.count() != 1 {
-		t.Error("the panel closed before it had been emptied")
+	m = drive(m, "esc") // and then, with nothing left to clear, the panel goes
+	if m.ws.count() != 0 {
+		t.Error("the third esc did not close the panel")
 	}
 }
 
@@ -387,7 +392,7 @@ func TestEveryListFlagsWhatTheEditingDeckHolds(t *testing.T) {
 	// Pretend the second panel is the deck being built.
 	m.ws.editing, m.ws.pinned = 1, true
 
-	members := m.membersFor(m.ws.panels[0])
+	members := m.membersFor(m.ws.panels[0].cardsView())
 	if members["sol ring"] {
 		t.Error("Sol Ring is not in the deck but was flagged")
 	}
@@ -402,7 +407,7 @@ func TestTheEditingDeckFlagsWhatTheListsHaveTurnedUp(t *testing.T) {
 	m = withCards(m, "d", sample(), sortArrival)
 	m.ws.editing, m.ws.pinned = 1, true
 
-	members := m.membersFor(m.ws.panels[1])
+	members := m.membersFor(m.ws.panels[1].cardsView())
 	if !members["sol ring"] {
 		t.Error("the deck should flag the card the search turned up")
 	}

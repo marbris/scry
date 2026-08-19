@@ -70,7 +70,7 @@ func TestTheRowIsExactlyAsWideAsItIsToldToBe(t *testing.T) {
 	}}
 	for _, order := range cardSorts {
 		for width := 6; width <= 60; width++ {
-			if got := runeLen(row(c, order, width)); got > width {
+			if got := textWidth(row(c, order, width)); got > width {
 				t.Errorf("order %v at width %d rendered %d columns", order, width, got)
 			}
 		}
@@ -163,7 +163,13 @@ func TestAVeryNarrowPanelStillShowsSomething(t *testing.T) {
 	if strings.TrimSpace(got) == "" {
 		t.Error("an 8-column row came out blank")
 	}
-	if runeLen(got) > 8 {
+	if textWidth(got) > 8 {
 		t.Errorf("%q is wider than 8", got)
 	}
+}
+
+// deckCardNamed is a card with nothing but a name, for tests about layout
+// rather than about cards.
+func deckCardNamed(name string) deck.Card {
+	return deck.Card{Card: mtg.Card{Name: name}}
 }

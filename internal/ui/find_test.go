@@ -61,8 +61,8 @@ func TestResultsFillThePanel(t *testing.T) {
 	if p.loading {
 		t.Error("still waiting after the answer arrived")
 	}
-	if p.cards == nil || p.cards.count() != 4 {
-		t.Fatalf("the panel holds %v", p.cards)
+	if p.cardsView() == nil || p.cardsView().count() != 4 {
+		t.Fatalf("the panel holds %v", p.cardsView())
 	}
 	if !strings.Contains(stripANSI(m.View()), "Sol Ring") {
 		t.Error("the results are not on screen")
@@ -76,10 +76,10 @@ func TestScryfallsOrderIsKept(t *testing.T) {
 	m = drive(m, "enter")
 	m = answer(m, p, sample(), 4, nil)
 
-	if p.cards.order != sortArrival {
-		t.Errorf("results came in sorted by %v", p.cards.order)
+	if p.cardsView().order != sortArrival {
+		t.Errorf("results came in sorted by %v", p.cardsView().order)
 	}
-	if got := p.cards.rows[0].Card.Name; got != "Dwynen, Gilt-Leaf Daen" {
+	if got := p.cardsView().rows[0].Card.Name; got != "Dwynen, Gilt-Leaf Daen" {
 		t.Errorf("first row is %s, want the first card Scryfall sent", got)
 	}
 	if !strings.Contains(stripANSI(m.View()), "scryfall order") {
@@ -158,7 +158,7 @@ func TestAStaleAnswerIsDropped(t *testing.T) {
 	if !p.loading {
 		t.Error("a stale answer was taken for the one being waited on")
 	}
-	if p.cards != nil && p.cards.count() == 1 {
+	if p.cardsView() != nil && p.cardsView().count() == 1 {
 		t.Error("the stale answer's cards were installed")
 	}
 }
@@ -252,7 +252,7 @@ func TestTheQuerySortAndTheListSortAreDifferentThings(t *testing.T) {
 	if p.queryOrder() != queryBefore {
 		t.Error("o changed the order the request asks for")
 	}
-	if p.cards.order == sortArrival {
+	if p.cardsView().order == sortArrival {
 		t.Error("o did not change the order on screen")
 	}
 }

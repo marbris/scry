@@ -52,7 +52,12 @@ func (m Model) viewPanel(p *panel, index, width, height int) string {
 		head = lipgloss.NewStyle().Foreground(theme.TextDim)
 	}
 
-	lines := []string{head.Render(fit(p.header(inner), inner))}
+	text, styled := p.header(inner)
+	headLine := text
+	if !styled {
+		headLine = head.Render(fit(text, inner))
+	}
+	lines := []string{headLine}
 	if sub := p.subtitle(); sub != "" {
 		lines = append(lines, lipgloss.NewStyle().
 			Foreground(theme.TextMuted).Render(fit(sub, inner)))
@@ -88,16 +93,9 @@ func (m Model) viewPanelBody(p *panel, width, height int) []string {
 		}, width, height)
 	}
 
-	if p.cards != nil {
-		if p.cards.count() == 0 {
-			what := "nothing matches"
-			if p.cards.total() == 0 {
-				what = "no results"
-			}
-			return fillTo([]string{dim.Render(fit(what, width))}, width, height)
-		}
+	if v := p.top(); v != nil {
 		focused := m.ws.panels[m.ws.focused] == p
-		return p.cards.render(width, height, m.membersFor(p), focused)
+		return v.lines(width, height, focused, &m)
 	}
 
 	return fillTo([]string{
@@ -123,20 +121,21 @@ func fillTo(lines []string, width, height int) []string {
 // the cards that any list on screen has turned up. With five panels open,
 // "in my deck" is the only comparison that means the same thing in all of
 // them.
-func (m Model) membersFor(p *panel) map[string]bool {
+func (m Model) membersFor(l *cardList) map[string]bool {
 	editing := m.ws.editingList()
 	if editing == nil {
 		return nil
 	}
 
-	if p.cards == editing {
+	if l == editing {
 		// The deck itself: flag what the other panels are showing.
 		out := map[string]bool{}
 		for _, other := range m.ws.panels {
-			if other.cards == nil || other.cards == editing {
+			l := other.cardsView()
+			if l == nil || l == editing {
 				continue
 			}
-			for name := range other.cards.names() {
+			for name := range l.names() {
 				out[name] = true
 			}
 		}
@@ -232,7 +231,7 @@ func (m Model) viewHint(l layout) string {
 		}
 	}
 
-	gap := maxInt(m.width-runeLen(left)-runeLen(right)-2, 1)
+	gap := maxInt(m.width-textWidth(left)-textWidth(right)-2, 1)
 	return " " + dim.Render(left) + strings.Repeat(" ", gap) + accent.Render(right) + " "
 }
 
@@ -246,4 +245,10 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(b)
+}
+
+// mutedLine is a full-width line of dim text, which every view uses to say
+// it has nothing to show.
+func mutedLine(s string, width int) string {
+	return lipgloss.NewStyle().Foreground(theme.TextMuted).Render(fit(s, width))
 }

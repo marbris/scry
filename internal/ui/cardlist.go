@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"scry/internal/deck"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // A list of cards in a panel: what's in it, how it's ordered, what's been
@@ -22,8 +24,7 @@ type cardList struct {
 	// rows is what's on screen: all, narrowed and sorted.
 	rows []deck.Card
 
-	cursor int // index into rows
-	offset int // first visible row
+	cursor // where you are in rows, and how far it has scrolled
 
 	// filter is a literal narrowing. Terms are substrings, all of them have
 	// to appear, and they're matched against the name and the rules text —
@@ -34,6 +35,15 @@ type cardList struct {
 	// marks are the cards picked out with v, by lowercased name so they
 	// survive the list being filtered or re-sorted underneath them.
 	marks map[string]bool
+
+	// name is what the header calls this list, and matched is how many
+	// cards the query behind it found — usually more than were fetched.
+	name    string
+	matched int
+
+	// deck is set when this list is a deck rather than a search result. A
+	// local one can be edited; a borrowed one can't.
+	deck *deck.Info
 
 	// arrivalName is what to call the order the cards came in — "as found"
 	// says nothing, where "scryfall order" and "decklist" say what you're
@@ -82,51 +92,18 @@ func (l *cardList) empty() bool { return len(l.all) == 0 }
 
 // current is the card under the cursor.
 func (l *cardList) current() (deck.Card, bool) {
-	if l.cursor < 0 || l.cursor >= len(l.rows) {
+	if l.cursor.at < 0 || l.cursor.at >= len(l.rows) {
 		return deck.Card{}, false
 	}
-	return l.rows[l.cursor], true
+	return l.rows[l.cursor.at], true
 }
 
 // ── Moving ──────────────────────────────────────────────────────
 
-func (l *cardList) move(delta int) {
-	l.cursor += delta
-	l.clampCursor()
-}
-
-func (l *cardList) top()    { l.cursor = 0 }
-func (l *cardList) bottom() { l.cursor = len(l.rows) - 1; l.clampCursor() }
-
-func (l *cardList) clampCursor() {
-	if l.cursor >= len(l.rows) {
-		l.cursor = len(l.rows) - 1
-	}
-	if l.cursor < 0 {
-		l.cursor = 0
-	}
-}
-
-// scrollInto brings the cursor into view for a window of the given height,
-// keeping it there with as little movement as possible — a list that
-// recentred on every step would slide under the eye.
-func (l *cardList) scrollInto(height int) {
-	if height < 1 {
-		height = 1
-	}
-	if l.cursor < l.offset {
-		l.offset = l.cursor
-	}
-	if l.cursor >= l.offset+height {
-		l.offset = l.cursor - height + 1
-	}
-	if max := len(l.rows) - height; l.offset > max {
-		l.offset = max
-	}
-	if l.offset < 0 {
-		l.offset = 0
-	}
-}
+func (l *cardList) move(delta int) { l.cursor.move(delta, len(l.rows)) }
+func (l *cardList) top()           { l.cursor.top() }
+func (l *cardList) bottom()        { l.cursor.bottom(len(l.rows)) }
+func (l *cardList) clampCursor()   { l.cursor.clamp(len(l.rows)) }
 
 // ── Ordering and narrowing ──────────────────────────────────────
 
@@ -148,14 +125,14 @@ func (l *cardList) setFilter(s string) {
 	// Stay on the same card if it survived the narrowing; otherwise start
 	// at the top of what's left.
 	if had && !l.selectByName(on.Card.Name) {
-		l.cursor, l.offset = 0, 0
+		l.cursor.at, l.cursor.offset = 0, 0
 	}
 }
 
 func (l *cardList) selectByName(name string) bool {
 	for i, c := range l.rows {
 		if c.Card.Name == name {
-			l.cursor = i
+			l.cursor.at = i
 			return true
 		}
 	}
@@ -279,15 +256,15 @@ func filterTerms(s string) []string {
 // render draws the visible rows. members says which cards to flag as living
 // in the editing deck as well as here.
 func (l *cardList) render(width, height int, members map[string]bool, focused bool) []string {
-	l.scrollInto(height)
+	l.cursor.scrollInto(height, len(l.rows))
 
 	lines := make([]string, 0, height)
-	for i := l.offset; i < len(l.rows) && len(lines) < height; i++ {
+	for i := l.cursor.offset; i < len(l.rows) && len(lines) < height; i++ {
 		c := l.rows[i]
 		lines = append(lines, renderRow(c, l.order, rowState{
 			selected: l.marked(c),
 			member:   members[markKey(c)],
-			cursor:   focused && i == l.cursor,
+			cursor:   focused && i == l.cursor.at,
 		}, width))
 	}
 	for len(lines) < height {
@@ -304,4 +281,69 @@ func (l *cardList) names() map[string]bool {
 		out[markKey(c)] = true
 	}
 	return out
+}
+
+// ── As a view ───────────────────────────────────────────────────
+
+func (l *cardList) title() string { return l.name }
+
+func (l *cardList) subtitle() string {
+	out := itoa(l.count())
+	if l.count() != l.total() {
+		out += "/" + itoa(l.total())
+	} else if l.matched > l.total() {
+		// Scryfall matched more than one page; say so, or 175 looks like
+		// the whole answer.
+		out += "/" + itoa(l.matched)
+	}
+	out += " · " + l.orderName()
+	if n := l.markCount(); n > 0 {
+		out += " · " + itoa(n) + " picked"
+	}
+	return out
+}
+
+func (l *cardList) lines(width, height int, focused bool, m *Model) []string {
+	if l.count() == 0 {
+		what := "nothing matches"
+		if l.total() == 0 {
+			what = "no results"
+		}
+		return fillTo([]string{mutedLine(what, width)}, width, height)
+	}
+	return l.render(width, height, m.membersFor(l), focused)
+}
+
+func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
+	if l.cursor.navKey(k, len(l.rows), m.pageStep()) {
+		return true, nil
+	}
+	switch k {
+	case "o":
+		l.cycleSort(1)
+	case "O":
+		l.cycleSort(-1)
+	case "v":
+		l.toggleMark()
+	case "V":
+		l.markAll()
+	case "/":
+		p.openFilter(l.filter)
+	default:
+		return false, nil
+	}
+	return true, nil
+}
+
+// clear undoes one narrowing: the selection first, then the filter.
+func (l *cardList) clear() bool {
+	switch {
+	case l.markCount() > 0:
+		l.clearMarks()
+	case l.filter != "":
+		l.setFilter("")
+	default:
+		return false
+	}
+	return true
 }

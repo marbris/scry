@@ -197,12 +197,12 @@ func TestSelectionIsInArrivalOrderNotCursorOrder(t *testing.T) {
 func TestTheCursorStaysInsideTheList(t *testing.T) {
 	l := newCardList2(sample(), sortArrival)
 	l.move(-5)
-	if l.cursor != 0 {
-		t.Errorf("cursor ran off the top to %d", l.cursor)
+	if l.cursor.at != 0 {
+		t.Errorf("cursor ran off the top to %d", l.cursor.at)
 	}
 	l.move(99)
-	if l.cursor != 3 {
-		t.Errorf("cursor ran off the bottom to %d", l.cursor)
+	if l.cursor.at != 3 {
+		t.Errorf("cursor ran off the bottom to %d", l.cursor.at)
 	}
 }
 
@@ -213,21 +213,21 @@ func TestScrollingFollowsTheCursorMinimally(t *testing.T) {
 	}
 	l := newCardList(many, sortArrival, "")
 
-	l.scrollInto(10)
-	if l.offset != 0 {
-		t.Errorf("offset %d at the top of the list", l.offset)
+	l.cursor.scrollInto(10, len(l.rows))
+	if l.cursor.offset != 0 {
+		t.Errorf("offset %d at the top of the list", l.cursor.offset)
 	}
 
 	l.move(9)
-	l.scrollInto(10)
-	if l.offset != 0 {
-		t.Errorf("offset %d, want the view held still while the cursor is in it", l.offset)
+	l.cursor.scrollInto(10, len(l.rows))
+	if l.cursor.offset != 0 {
+		t.Errorf("offset %d, want the view held still while the cursor is in it", l.cursor.offset)
 	}
 
 	l.move(1)
-	l.scrollInto(10)
-	if l.offset != 1 {
-		t.Errorf("offset %d, want one line of scroll and no more", l.offset)
+	l.cursor.scrollInto(10, len(l.rows))
+	if l.cursor.offset != 1 {
+		t.Errorf("offset %d, want one line of scroll and no more", l.cursor.offset)
 	}
 }
 

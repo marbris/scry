@@ -37,7 +37,7 @@ type leaderCmd struct {
 // getting rid of them, then moving among them.
 var leaderMenu = []leaderCmd{
 	{"f", "find", func(m *Model) { m.ws.open(KindFind) }},
-	{"d", "decks", func(m *Model) { m.ws.open(KindDecks) }},
+	{"d", "decks", func(m *Model) { m.ws.open(KindDecks).show(newDeckList()) }},
 	{"r", "rules", func(m *Model) { m.ws.open(KindRules) }},
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
 	{"s", "stats", func(m *Model) { m.info.mode = infoStats }},
@@ -74,6 +74,11 @@ func (m *Model) handleLeader(key string) tea.Cmd {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
+	if m.goPrefix {
+		m.goPrefix = false
+		return m.handleGoto(key)
+	}
+
 	if m.leader {
 		// Sequenced rather than returned inline: the command mutates m, and
 		// `return m, m.handleLeader(key)` leaves the compiler free to copy
@@ -104,6 +109,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	p := m.ws.current()
 
+	// A prompt is a text field, and takes the keys while it's open.
+	if p.asking != askNone {
+		return m.handleAskKey(msg)
+	}
+
 	// The filter prompt is a text field too, and takes precedence over the
 	// list's keys while it's open.
 	if p.filtering {
@@ -114,6 +124,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// keys, and the leader with them, or you could never type a space.
 	if p.searchOpen && p.search.Focused() {
 		return m.handleSearchKey(msg)
+	}
+
+	// The view has first refusal on anything that isn't the workspace's.
+	if v := p.top(); v != nil {
+		if handled, cmd := v.key(key, &m, p); handled {
+			return m, cmd
+		}
 	}
 
 	switch key {
@@ -133,41 +150,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.search.Focus()
 		p.search.CursorEnd()
 
-	// ── The list ────────────────────────────────────────────────
-
-	case "j", "down":
-		p.list().move(1)
-	case "k", "up":
-		p.list().move(-1)
-	case "g":
-		p.list().top()
-	case "G":
-		p.list().bottom()
-	case "ctrl+d":
-		p.list().move(m.pageStep())
-	case "ctrl+u":
-		p.list().move(-m.pageStep())
-
-	case "o":
-		p.list().cycleSort(1)
-	case "O":
-		p.list().cycleSort(-1)
-
-	case "v":
-		p.list().toggleMark()
-	case "V":
-		p.list().markAll()
-
-	case "/":
-		if p.cards != nil {
-			p.filtering = true
-			p.filterInput.SetValue(p.cards.filter)
-			p.filterInput.CursorEnd()
-			p.filterInput.Focus()
-		}
-
 	case "e":
 		m.ws.pin()
+
+	case "g":
+		// g is a prefix, never a key on its own: gg to the top, gd to the
+		// editing deck, gv for versions. That is what lets gg and gv live
+		// side by side.
+		m.goPrefix = true
 
 	case "K", "shift+up":
 		m.info.move(-1)
@@ -185,21 +175,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showKeys = true
 
 	case "esc":
-		// The cascade: clear what's clearable, and only then close.
+		// The cascade, outward one step at a time, as the design has it:
+		// clear a narrowing, step back out of a sub-view, close the panel.
+		// Closing the last one lands on the splash rather than quitting —
+		// esc *from* the splash is what leaves.
 		switch {
-		case p.cards != nil && p.cards.markCount() > 0:
-			p.cards.clearMarks()
-		case p.cards != nil && p.cards.filter != "":
-			p.cards.setFilter("")
-		case p.empty():
-			// Closing the last panel lands on the splash rather than
-			// quitting: esc *from* the splash is what leaves.
-			m.ws.close()
+		case p.top() != nil && p.top().clear():
+		case p.pop():
 		default:
-			p.cards = nil
-			p.title = ""
-			p.searchOpen = true
-			p.search.Focus()
+			m.ws.close()
 		}
 
 	case "q":
@@ -247,6 +231,19 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if p.kind == KindFind {
 			cmd := m.search(p)
 			return m, cmd
+		}
+		if p.kind == KindDecks {
+			// The decks panel's bar follows a Moxfield deck or a person
+			// rather than searching: what you can already see is filtered
+			// with /, and what you can't is somewhere else entirely.
+			q := p.search.Value()
+			p.search.SetValue("")
+			p.searchOpen = false
+			p.search.Blur()
+			if p.top() == nil {
+				p.show(newDeckList())
+			}
+			return m, follow(q)
 		}
 		// The other kinds get their own bar in the phases that build them.
 		if q := p.search.Value(); q != "" {
@@ -303,7 +300,7 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// opened, rather than leaving a half-typed narrowing in place.
 		p.filtering = false
 		p.filterInput.Blur()
-		p.list().setFilter("")
+		p.setFilter("")
 		return m, nil
 
 	case "ctrl+c":
@@ -312,6 +309,53 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	p.filterInput, cmd = p.filterInput.Update(msg)
-	p.list().setFilter(p.filterInput.Value())
+	p.setFilter(p.filterInput.Value())
 	return m, cmd
+}
+
+// handleGoto runs the g-prefixed keys.
+func (m Model) handleGoto(key string) (tea.Model, tea.Cmd) {
+	p := m.ws.current()
+	if p == nil {
+		return m, nil
+	}
+
+	switch key {
+	case "g":
+		if v := p.top(); v != nil {
+			v.key("g", &m, p) // the views' own "to the top"
+		}
+
+	case "d":
+		// Straight to the deck being edited, from wherever you are.
+		if m.ws.editing >= 0 {
+			m.ws.focus(m.ws.editing)
+		}
+
+	case "v":
+		return m, m.versions(p)
+	}
+	return m, nil
+}
+
+// versions opens the history of whatever is under the cursor: a deck's
+// commits here, a card's printed wordings when the information panel learns
+// to show them.
+func (m *Model) versions(p *panel) tea.Cmd {
+	switch v := p.top().(type) {
+	case *deckList:
+		e, ok := v.current()
+		if !ok || e.kind != entryLocal {
+			return nil
+		}
+		p.loading = true
+		return loadVersions(p.id, e.slug, e.name)
+
+	case *cardList:
+		if v.deck != nil && v.deck.Local() {
+			p.loading = true
+			return loadVersions(p.id, v.deck.Slug, v.deck.Name)
+		}
+	}
+	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
 	"scry/internal/theme"
 )
 
@@ -105,13 +104,18 @@ type panel struct {
 	// title is what the header says once the bar has closed.
 	title string
 
-	// cards is what the panel holds, once something has filled it. Nil
-	// until then, which is what "empty" means.
-	cards *cardList
+	// stack is what the panel is showing, innermost last. A deck's versions
+	// sit on top of the decks list; esc pops back rather than closing.
+	stack []view
 
 	// filtering is the / prompt, open only while you're typing in it.
 	filtering   bool
 	filterInput textinput.Model
+
+	// asking is the one-line prompt — a new deck's name, a rename, a URL
+	// to follow — open only while you're answering it.
+	asking   askKind
+	askInput textinput.Model
 
 	// loading is a request in flight; err is the last one that failed.
 	loading bool
@@ -151,13 +155,61 @@ func newPanel(kind Kind) *panel {
 	return p
 }
 
-// show puts a list of cards in the panel, which is what turns a search bar
-// into a header.
-func (p *panel) show(title string, cards []deck.Card, order cardSort, arrivalName string) {
-	p.title = title
-	p.cards = newCardList(cards, order, arrivalName)
+// show replaces whatever the panel held with a view, which is what turns a
+// search bar into a header.
+func (p *panel) show(v view) {
+	p.title = v.title()
+	p.stack = []view{v}
 	p.searchOpen = false
 	p.search.Blur()
+}
+
+// push steps into something reached from the current view — a deck's
+// versions, a user's decks — keeping the way back.
+func (p *panel) push(v view) { p.stack = append(p.stack, v) }
+
+// pop steps back out, reporting whether there was anywhere to go.
+func (p *panel) pop() bool {
+	if len(p.stack) < 2 {
+		return false
+	}
+	p.stack = p.stack[:len(p.stack)-1]
+	p.title = p.stack[len(p.stack)-1].title()
+	return true
+}
+
+// top is what the panel is showing now, or nil before anything has filled it.
+func (p *panel) top() view {
+	if len(p.stack) == 0 {
+		return nil
+	}
+	return p.stack[len(p.stack)-1]
+}
+
+// cardsView is the top view when it happens to be a list of cards, which is
+// what the membership marks and the editing deck are about.
+func (p *panel) cardsView() *cardList {
+	l, _ := p.top().(*cardList)
+	return l
+}
+
+// setFilter narrows whatever the panel is showing, for the views that can
+// be narrowed. A view that can't simply ignores it.
+func (p *panel) setFilter(s string) {
+	switch v := p.top().(type) {
+	case *cardList:
+		v.setFilter(s)
+	case *deckList:
+		v.setFilter(s)
+	}
+}
+
+// openFilter raises the / prompt over whatever is showing.
+func (p *panel) openFilter(current string) {
+	p.filtering = true
+	p.filterInput.SetValue(current)
+	p.filterInput.CursorEnd()
+	p.filterInput.Focus()
 }
 
 // restyle repaints the search bar. Colours are read at render time rather
@@ -176,41 +228,42 @@ func (p *panel) setKind(k Kind) {
 	p.search.Placeholder = k.placeholder()
 }
 
-// header is the line at the top of a panel: the search bar while it's open,
-// the filter while you're typing one, otherwise a description of what's
-// below it.
-func (p *panel) header(width int) string {
-	if p.searchOpen {
-		p.search.Width = maxInt(width-4, 4)
-		return p.search.View()
+// header is the line at the top of a panel: whichever text field is open,
+// otherwise a description of what's below.
+//
+// It returns whether the line is already styled, because an input's View
+// carries its own colour — and measuring that with runeLen counts the escape
+// sequences as characters, which pads it to the wrong width and wraps the
+// line. A panel one row taller than its neighbours is the visible symptom.
+func (p *panel) header(width int) (string, bool) {
+	switch {
+	case p.searchOpen:
+		p.search.Width = inputWidth(width, p.search.Prompt)
+		return p.search.View(), true
+	case p.asking != askNone:
+		p.askInput.Width = inputWidth(width, p.askInput.Prompt)
+		return p.askInput.View(), true
+	case p.filtering:
+		p.filterInput.Width = inputWidth(width, p.filterInput.Prompt)
+		return p.filterInput.View(), true
 	}
-	if p.filtering {
-		p.filterInput.Width = maxInt(width-3, 4)
-		return p.filterInput.View()
-	}
+
 	name := p.title
 	if name == "" {
 		name = p.kind.String()
 	}
-	return truncate(name, width)
+	return name, false
+}
+
+// inputWidth is how much room a text field's text has: the panel, less its
+// prompt, less one for the cursor sitting past the end of what you typed.
+func inputWidth(width int, prompt string) int {
+	return maxInt(width-textWidth(prompt)-1, 4)
 }
 
 // empty reports whether a panel has nothing in it yet, which is what makes
 // esc close it rather than clear something.
-func (p *panel) empty() bool { return p.cards == nil && p.title == "" }
-
-// list is the panel's cards, or an empty stand-in. Every list key goes
-// through here so none of them has to check whether the panel has anything
-// in it yet.
-func (p *panel) list() *cardList {
-	if p.cards == nil {
-		return emptyList
-	}
-	return p.cards
-}
-
-// emptyList is shared and never shown; keys land on it and do nothing.
-var emptyList = newCardList(nil, sortArrival, "")
+func (p *panel) empty() bool { return len(p.stack) == 0 && p.title == "" }
 
 // subtitle is the count line under the header: how many cards, and what has
 // been done to narrow or reorder them.
@@ -223,21 +276,8 @@ func (p *panel) subtitle() string {
 		}
 		return ""
 	}
-	if p.cards == nil || p.cards.total() == 0 {
-		return ""
+	if v := p.top(); v != nil {
+		return v.subtitle()
 	}
-
-	out := itoa(p.cards.count())
-	if p.cards.count() != p.cards.total() {
-		out += "/" + itoa(p.cards.total())
-	} else if p.total > p.cards.total() {
-		// Scryfall matched more than one page; say so, or 175 looks like
-		// the whole answer.
-		out += "/" + itoa(p.total)
-	}
-	out += " · " + p.cards.orderName()
-	if n := p.cards.markCount(); n > 0 {
-		out += " · " + itoa(n) + " picked"
-	}
-	return out
+	return ""
 }

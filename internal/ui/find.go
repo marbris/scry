@@ -82,15 +82,17 @@ func (m Model) handleSearchDone(msg searchDoneMsg) (tea.Model, tea.Cmd) {
 	p.loading = false
 	if msg.err != nil {
 		p.err = msg.err
-		p.cards = nil
+		p.stack = nil
 		return m, nil
 	}
 
-	p.total = msg.total
 	// Kept in the order Scryfall sent them. The query asked for an order —
 	// EDHREC rank, by default — and re-sorting on arrival would throw away
 	// the answer to the question just asked.
-	p.show(msg.query, msg.cards, sortArrival, "scryfall order")
+	l := newCardList(msg.cards, sortArrival, "scryfall order")
+	l.name = msg.query
+	l.matched = msg.total
+	p.show(l)
 	return m, nil
 }
 

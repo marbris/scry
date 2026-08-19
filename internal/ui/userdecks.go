@@ -1,0 +1,112 @@
+package ui
+
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"scry/internal/moxfield"
+	"scry/internal/theme"
+)
+
+// Somebody's decks on Moxfield.
+//
+// This is a sub-view, reached by pressing enter on a person in the decks
+// list, so esc goes back to that list rather than closing the panel. It's
+// the one place in the program showing decks that aren't yours and aren't
+// followed — a shelf you're browsing rather than a shelf you own.
+
+type userDeckList struct {
+	cursor
+	user  string
+	decks []moxfield.UserDeck
+}
+
+func newUserDeckList(user string, decks []moxfield.UserDeck) *userDeckList {
+	return &userDeckList{user: user, decks: decks}
+}
+
+func (l *userDeckList) title() string { return l.user }
+
+func (l *userDeckList) subtitle() string {
+	return itoa(len(l.decks)) + " " + plural("deck", len(l.decks))
+}
+
+func (l *userDeckList) lines(width, height int, focused bool, m *Model) []string {
+	if len(l.decks) == 0 {
+		return fillTo([]string{mutedLine("no public decks", width)}, width, height)
+	}
+
+	l.cursor.scrollInto(height, len(l.decks))
+	lines := make([]string, 0, height)
+	for i := l.cursor.offset; i < len(l.decks) && len(lines) < height; i++ {
+		lines = append(lines, renderUserDeck(l.decks[i], width, focused && i == l.cursor.at))
+	}
+	return fillTo(lines, width, height)
+}
+
+func (l *userDeckList) clear() bool { return false }
+
+func renderUserDeck(d moxfield.UserDeck, width int, under bool) string {
+	tail := []string{itoa(d.Cards)}
+	if age := d.Age(); age != "" {
+		tail = append(tail, age)
+	}
+	right := tail[0]
+	if len(tail) > 1 && textWidth(d.Name)+textWidth(tail[0])+textWidth(tail[1])+3 <= width {
+		right = tail[0] + " " + tail[1]
+	}
+
+	name := fit(d.Name, maxInt(width-textWidth(right)-1, 0))
+	style := lipgloss.NewStyle().Foreground(theme.Text)
+	if under {
+		style = style.Foreground(theme.SelectionFg).Bold(true)
+	}
+
+	line := style.Render(name) + " " +
+		lipgloss.NewStyle().Foreground(theme.TextDim).Render(right)
+	if under {
+		return lipgloss.NewStyle().Background(theme.SelectionBg).Width(width).Render(line)
+	}
+	return line
+}
+
+func (l *userDeckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
+	if l.cursor.navKey(k, len(l.decks), m.pageStep()) {
+		return true, nil
+	}
+
+	switch k {
+	case "enter", "L":
+		if l.cursor.at >= len(l.decks) {
+			return true, nil
+		}
+		d := l.decks[l.cursor.at]
+
+		target := p
+		if k == "L" {
+			target = m.ws.open(p.kind)
+			m.ws.focus(m.ws.indexOf(p))
+		}
+		target.loading = true
+		target.err = nil
+		target.title = d.Name
+		return true, openRemoteDeck(target.id, k == "L", d.PublicID)
+
+	case "c":
+		// Take a copy of somebody else's deck, which is the point of
+		// looking through them.
+		if l.cursor.at < len(l.decks) {
+			d := l.decks[l.cursor.at]
+			return true, copyEntry(deckEntry{kind: entryRemote, name: d.Name, id: d.PublicID})
+		}
+	}
+	return false, nil
+}
+
+// plural is the same six lines as in deck and moxfield; see the note there.
+func plural(word string, n int) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
+}

@@ -64,6 +64,24 @@ func (w *workspace) open(kind Kind) *panel {
 	return p
 }
 
+// indexOf is where a panel sits in the row.
+func (w *workspace) indexOf(p *panel) int {
+	for i, other := range w.panels {
+		if other == p {
+			return i
+		}
+	}
+	return w.focused
+}
+
+// deriveEditingIfUnpinned re-derives the editing deck after something has
+// changed what the panels hold, unless it was chosen deliberately.
+func (w *workspace) deriveEditingIfUnpinned() {
+	if !w.pinned {
+		w.deriveEditing()
+	}
+}
+
 // byID finds a panel that a request was started from, or nil if it has since
 // been closed.
 func (w *workspace) byID(id int) *panel {
@@ -199,9 +217,8 @@ func (w *workspace) editable(i int) bool {
 	if i < 0 || i >= len(w.panels) {
 		return false
 	}
-	// Until card lists arrive there is nothing editable; phase 7 makes this
-	// ask the panel's view whether it's a local deck.
-	return false
+	l := w.panels[i].cardsView()
+	return l != nil && l.deck != nil && l.deck.Local()
 }
 
 // editingList is the cards of the editing panel, or nil when there is no
@@ -210,7 +227,7 @@ func (w *workspace) editingList() *cardList {
 	if w.editing < 0 || w.editing >= len(w.panels) {
 		return nil
 	}
-	return w.panels[w.editing].cards
+	return w.panels[w.editing].cardsView()
 }
 
 // pin fixes the editing deck on the focused panel, or lets go of it.

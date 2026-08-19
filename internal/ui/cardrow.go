@@ -81,7 +81,7 @@ func renderRow(c deck.Card, order cardSort, st rowState, width int) string {
 // padded to fill the width between them.
 func layoutRow(name, col string, colAbbreviates bool, width int) (string, string) {
 	fits := func(n, c string) bool {
-		need := runeLen(n) + runeLen(c)
+		need := textWidth(n) + textWidth(c)
 		if c != "" {
 			need += gap
 		}
@@ -109,7 +109,7 @@ func layoutRow(name, col string, colAbbreviates bool, width int) (string, string
 
 	// 4. Give up and cut. The column goes first: you can work out a mana
 	// cost from the card, but not a name you can't read.
-	if runeLen(short) <= width {
+	if textWidth(short) <= width {
 		return padBetween(short, "", width)
 	}
 	return truncate(short, width), ""
@@ -117,7 +117,7 @@ func layoutRow(name, col string, colAbbreviates bool, width int) (string, string
 
 // padBetween puts the two columns at either end of the width.
 func padBetween(left, right string, width int) (string, string) {
-	space := width - runeLen(left) - runeLen(right)
+	space := width - textWidth(left) - textWidth(right)
 	if space < 0 {
 		space = 0
 	}
