@@ -156,22 +156,51 @@ func (m Model) viewInfo(width, height int) string {
 		title,
 		lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)),
 	}
-	if p := m.ws.panels[m.ws.focused]; p != nil {
-		lines = append(lines, dim.Render(fit("focused: "+p.kind.String(), inner)))
-	}
-	lines = append(lines, "", dim.Render(fit("K/J move · ctrl+j/k scroll", inner)))
 
+	body := m.infoBody(inner)
+	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
+	// read, never focused.
+	room := maxInt(height-2-len(lines), 1)
+	if m.info.offset > maxInt(len(body)-room, 0) {
+		m.info.offset = maxInt(len(body)-room, 0)
+	}
+	if m.info.offset < len(body) {
+		body = body[m.info.offset:]
+	} else {
+		body = nil
+	}
+	lines = append(lines, body...)
+
+	if len(body) == 0 {
+		lines = append(lines, dim.Render(fit("nothing highlighted", inner)))
+	}
 	for len(lines) < height-2 {
 		lines = append(lines, strings.Repeat(" ", inner))
 	}
+	if len(lines) > height-2 {
+		lines = lines[:maxInt(height-2, 1)]
+	}
 
-	body := lipgloss.NewStyle().Width(inner).Height(maxInt(height-2, 1)).
+	block := lipgloss.NewStyle().Width(inner).Height(maxInt(height-2, 1)).
 		MaxWidth(inner).Render(strings.Join(lines, "\n"))
 
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(theme.Border).
-		Render(body)
+		Render(block)
+}
+
+// infoBody is what the focused panel has to say about its highlighted row.
+func (m Model) infoBody(width int) []string {
+	p := m.ws.current()
+	if p == nil {
+		return nil
+	}
+	v := p.top()
+	if v == nil {
+		return nil
+	}
+	return v.info(width)
 }
 
 // ── The bottom line ─────────────────────────────────────────────
@@ -289,4 +318,13 @@ func itoa(n int) string {
 // it has nothing to show.
 func mutedLine(s string, width int) string {
 	return lipgloss.NewStyle().Foreground(theme.TextMuted).Render(fit(s, width))
+}
+
+// wrapStyled wraps text and paints each line, for the information panel.
+func wrapStyled(s string, width int, style lipgloss.Style) []string {
+	lines := wrap(s, width)
+	for i, line := range lines {
+		lines[i] = style.Render(fit(line, width))
+	}
+	return lines
 }

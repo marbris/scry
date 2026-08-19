@@ -385,3 +385,35 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	}
 	return true, nil
 }
+
+// info describes the highlighted row: what it is, how big, how old.
+func (l *deckList) info(width int) []string {
+	e, ok := l.current()
+	if !ok {
+		return nil
+	}
+
+	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+
+	out := []string{head.Render(fit(e.name, width)), ""}
+	switch e.kind {
+	case entryLocal:
+		out = append(out, dim.Render(fit("a deck of yours", width)))
+		if e.format != "" {
+			out = append(out, dim.Render(fit(e.format, width)))
+		}
+		out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
+		if age := shortAge(e.modified); age != "" {
+			out = append(out, dim.Render(fit("touched "+age+" ago", width)))
+		}
+		out = append(out, "", mutedLine("enter to open · gv for versions", width))
+	case entryRemote:
+		out = append(out, dim.Render(fit("on Moxfield", width)))
+		out = append(out, "", mutedLine("enter to look · c to take a copy", width))
+	case entryUser:
+		out = append(out, dim.Render(fit("a person on Moxfield", width)))
+		out = append(out, "", mutedLine("enter for their decks", width))
+	}
+	return out
+}

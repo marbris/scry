@@ -681,3 +681,83 @@ func (d Data) KeywordSpans(text string) []KeywordSpan {
 	}
 	return out
 }
+
+// ── Zones ───────────────────────────────────────────────────────
+
+// zones are the seven places a card can be (rule 400.1). They come through
+// MatchCard as glossary terms like anything else, but they are worth
+// separating when a card's rules are listed: "this card cares about the
+// graveyard" is a different kind of fact from "this card has flying".
+var zones = map[string]bool{
+	"hand": true, "library": true, "battlefield": true, "graveyard": true,
+	"stack": true, "exile": true, "command zone": true,
+}
+
+// IsZone reports whether a glossary term names one of the game's zones.
+func IsZone(term string) bool { return zones[strings.ToLower(term)] }
+
+// Search finds the rules whose number or text contains every term, and the
+// glossary entries that do. Substring rather than fuzzy: a rulebook is a
+// million characters, and a fuzzy match over it returns everything.
+//
+// The caller splits the query, because how a query is written is the user
+// interface's business and this package has no opinion about quotes.
+func (d Data) Search(terms []string) ([]Rule, []GlossaryEntry) {
+	if len(terms) == 0 {
+		return nil, nil
+	}
+
+	var hits []Rule
+	for _, r := range d.Rules {
+		// A section or category heading has no text worth listing on its
+		// own; the rules under it are the answer.
+		if r.Depth < 2 {
+			continue
+		}
+		if containsAll(strings.ToLower(r.Number+" "+r.Text), terms) {
+			hits = append(hits, r)
+		}
+	}
+
+	var entries []GlossaryEntry
+	for _, g := range d.Glossary {
+		if containsAll(strings.ToLower(g.Term+" "+g.Definition), terms) {
+			entries = append(entries, g)
+		}
+	}
+	return hits, entries
+}
+
+func containsAll(hay string, terms []string) bool {
+	for _, t := range terms {
+		if !strings.Contains(hay, t) {
+			return false
+		}
+	}
+	return true
+}
+
+// Rule looks a rule up by its number.
+func (d Data) Rule(number string) (Rule, bool) {
+	i, ok := d.Index[number]
+	if !ok || i < 0 || i >= len(d.Rules) {
+		return Rule{}, false
+	}
+	return d.Rules[i], true
+}
+
+// Subrules are the lettered parts under a rule — 702.9a and friends — which
+// is where the actual behaviour usually lives.
+func (d Data) Subrules(number string) []Rule {
+	r, ok := d.Rule(number)
+	if !ok {
+		return nil
+	}
+	out := make([]Rule, 0, len(r.Children))
+	for _, i := range r.Children {
+		if i >= 0 && i < len(d.Rules) {
+			out = append(out, d.Rules[i])
+		}
+	}
+	return out
+}

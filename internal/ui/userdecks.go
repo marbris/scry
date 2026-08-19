@@ -110,3 +110,23 @@ func plural(word string, n int) string {
 	}
 	return word + "s"
 }
+
+func (l *userDeckList) info(width int) []string {
+	if l.cursor.at >= len(l.decks) {
+		return nil
+	}
+	d := l.decks[l.cursor.at]
+
+	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+
+	out := []string{head.Render(fit(d.Name, width)), ""}
+	if d.Format != "" {
+		out = append(out, dim.Render(fit(d.Format, width)))
+	}
+	out = append(out, dim.Render(fit(itoa(d.Cards)+" cards", width)))
+	if age := d.Age(); age != "" {
+		out = append(out, dim.Render(fit("updated "+age, width)))
+	}
+	return append(out, "", mutedLine("enter to open · c to take a copy", width))
+}

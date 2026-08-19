@@ -41,3 +41,36 @@ func pad(s string, width int) string {
 
 // fit does both: exactly this wide, cut or padded.
 func fit(s string, width int) string { return pad(truncate(s, width), width) }
+
+// wrap breaks text to a width, on spaces where it can. Blank lines in the
+// source survive as blank lines, because a rule's paragraphs are how it is
+// meant to be read.
+func wrap(s string, width int) []string {
+	if width < 1 {
+		return nil
+	}
+
+	var out []string
+	for _, para := range strings.Split(s, "\n") {
+		if strings.TrimSpace(para) == "" {
+			out = append(out, "")
+			continue
+		}
+		line := ""
+		for _, word := range strings.Fields(para) {
+			switch {
+			case line == "":
+				line = word
+			case textWidth(line)+1+textWidth(word) <= width:
+				line += " " + word
+			default:
+				out = append(out, line)
+				line = word
+			}
+		}
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
+}

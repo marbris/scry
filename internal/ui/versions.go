@@ -103,3 +103,19 @@ func (l *versionList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	}
 	return false, nil
 }
+
+func (l *versionList) info(width int) []string {
+	if l.cursor.at >= len(l.commits) {
+		return nil
+	}
+	c := l.commits[l.cursor.at]
+
+	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+
+	return []string{
+		head.Render(fit(c.Subject, width)),
+		"",
+		dim.Render(fit(c.Short+" · "+c.When, width)),
+	}
+}

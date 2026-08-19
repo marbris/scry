@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"scry/internal/deck"
+	"scry/internal/rules"
 	"scry/internal/theme"
 )
 
@@ -40,6 +41,13 @@ type Model struct {
 	// notice is a one-line result — "copied", "deleted" — shown along the
 	// bottom until the next keypress.
 	notice string
+
+	// rules is the comprehensive rulebook, parsed once when something first
+	// asks for it. pending are the panels waiting for that to happen.
+	rules        rules.Data
+	rulesLoading bool
+	rulesErr     error
+	pending      []wantRules
 
 	// history is every query run, shared by every find panel: searches you
 	// ran in one panel are worth recalling in the next.
@@ -100,6 +108,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case deckWrittenMsg:
 		return m.handleDeckWritten(msg)
+
+	case rulesLoadedMsg:
+		return m.handleRulesLoaded(msg)
 
 	case versionsMsg:
 		return m.handleVersions(msg)

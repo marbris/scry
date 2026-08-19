@@ -38,7 +38,7 @@ type leaderCmd struct {
 var leaderMenu = []leaderCmd{
 	{"f", "find", func(m *Model) { m.ws.open(KindFind) }},
 	{"d", "decks", func(m *Model) { m.ws.open(KindDecks).show(newDeckList()) }},
-	{"r", "rules", func(m *Model) { m.ws.open(KindRules) }},
+	{"r", "rules", nil}, // needs a command, so it is run below
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
 	{"s", "stats", func(m *Model) { m.info.mode = infoStats }},
 	{"c", "close", func(m *Model) { m.ws.close() }},
@@ -60,8 +60,14 @@ func (m *Model) handleLeader(key string) tea.Cmd {
 		return nil
 	}
 
+	// The rules panel is the one entry that may have to fetch something,
+	// so it hands back a command rather than just changing the workspace.
+	if key == "r" {
+		return m.openRules()
+	}
+
 	for _, c := range leaderMenu {
-		if c.key == key {
+		if c.key == key && c.run != nil {
 			c.run(m)
 			return nil
 		}
@@ -239,6 +245,14 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if p.kind == KindFind {
 			cmd := m.search(p)
+			return m, cmd
+		}
+		if p.kind == KindRules {
+			q := p.search.Value()
+			if q == "" {
+				return m, nil
+			}
+			cmd := m.searchRules(p, q)
 			return m, cmd
 		}
 		if p.kind == KindDecks {

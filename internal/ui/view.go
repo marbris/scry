@@ -23,6 +23,10 @@ type view interface {
 	lines(width, height int, focused bool, m *Model) []string
 	// key offers a keypress. Returning false lets the workspace have it.
 	key(k string, m *Model, p *panel) (bool, tea.Cmd)
+	// info is what the information panel shows for the highlighted row,
+	// already wrapped to width. A rule is a paragraph and a panel column is
+	// not, which is why the rules panel needs this more than anything else.
+	info(width int) []string
 	// clear undoes one level of narrowing for esc — a selection, then a
 	// filter. Returning false means there is nothing left to clear and esc
 	// should move on to popping the stack.

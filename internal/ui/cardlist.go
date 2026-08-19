@@ -4,8 +4,11 @@ import (
 	"strings"
 
 	"scry/internal/deck"
+	"scry/internal/mtg"
+	"scry/internal/theme"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // A list of cards in a panel: what's in it, how it's ordered, what's been
@@ -387,4 +390,44 @@ func (l *cardList) clear() bool {
 		return false
 	}
 	return true
+}
+
+// info describes the card under the cursor. The full rendering — mana
+// symbols, rulings, printed-text history — is the information panel's own
+// phase; this is what a row needs said about it in the meantime.
+func (l *cardList) info(width int) []string {
+	c, ok := l.current()
+	if !ok {
+		return nil
+	}
+
+	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+	body := lipgloss.NewStyle().Foreground(theme.Text)
+
+	out := []string{head.Render(fit(c.Card.Name, width))}
+	if cost := manaCost(c.Card); cost != "" {
+		out = append(out, dim.Render(fit(cost, width)))
+	}
+	out = append(out, dim.Render(fit(c.Card.TypeLine, width)), "")
+	out = append(out, wrapStyled(c.Card.CombinedOracle(), width, body)...)
+
+	if pt := powerToughness(c.Card); pt != "" {
+		out = append(out, "", dim.Render(fit(pt, width)))
+	}
+	if len(c.Tags) > 0 {
+		out = append(out, "", lipgloss.NewStyle().Foreground(theme.Highlight).
+			Render(fit(strings.Join(c.Tags, " "), width)))
+	}
+	return out
+}
+
+func powerToughness(c mtg.Card) string {
+	if c.Power == "" && c.Toughness == "" {
+		if c.Loyalty != "" {
+			return "loyalty " + c.Loyalty
+		}
+		return ""
+	}
+	return c.Power + "/" + c.Toughness
 }
