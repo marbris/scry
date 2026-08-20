@@ -21,4 +21,8 @@ scry
 .DS_Store
 Thumbs.db
 
+# Build output (binaries go to GitHub Releases, not the repo)
 dist/
+
+# Development notes and AI-discussion docs — kept locally, not published
+docs/
