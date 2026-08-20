@@ -99,7 +99,7 @@ and "next row" are the same key, and that key is `j`.
 | `t` `T` | tag (`ramp -draw` does both) · add and tag with the last tag |
 | `c` | set as commander |
 | `s` | statistics for this list |
-| `gv` | printed-text history of this card — `y` fetches uncached sets |
+| `gv` | printed-text history of this card — `y` fetches uncached sets, `esc` closes |
 | `w` | write this list — see **Writing a list** |
 | `W` | write it, and open the result in a new panel |
 | `esc` | clear selection → clear filter → empty the panel → close it |
@@ -144,6 +144,11 @@ program has a thing with a history:
 
 - on a **deck** row — its git versions
 - on a **card** row — how its printed oracle text changed across printings
+
+A card's printed text belongs to that card, so it lasts exactly as long as
+the cursor stays on it: `esc` puts the information panel back, and so does
+moving to another card. A deck's versions are a sub-view of the decks panel
+instead, and `esc` pops them like any other.
 
 This replaces the old `t` binding, which now means tag. `g` is a pure prefix
 (`gg`, `gd`, `gv`) — it never acts on its own, which is what lets `gg` and

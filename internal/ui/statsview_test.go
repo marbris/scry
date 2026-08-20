@@ -6,6 +6,7 @@ import (
 
 	"scry/internal/deck"
 	"scry/internal/mtg"
+	"scry/internal/stats"
 )
 
 func deckSample() []deck.Card {
@@ -320,4 +321,61 @@ func TestStatLineCountsHeadingsAndGaps(t *testing.T) {
 				row, rows[row].Label, at, stripANSI(lines[at]))
 		}
 	}
+}
+
+// searchSample is what a Scryfall search puts in a list: cards with no
+// quantity, because nobody has chosen how many.
+func searchSample() []deck.Card {
+	var out []deck.Card
+	for _, c := range deckSample() {
+		c.Qty, c.Tags = 0, nil
+		out = append(out, c)
+	}
+	return out
+}
+
+func TestSearchResultsHaveStatisticsToo(t *testing.T) {
+	// They counted to nothing, because a search result has no quantity and
+	// the bars summed quantities — so every row's base was zero, every row
+	// was dropped, and the panel said "nothing to count" over a full screen.
+	m := withCards(sized(120, 30), "f", searchSample(), sortArrival)
+	m = drive(m, "s")
+
+	groups := m.statGroups()
+	if len(groups) == 0 {
+		t.Fatal("a search of six cards produced no statistics at all")
+	}
+	body := strings.Join(m.renderStats(60), "\n")
+	if strings.Contains(stripANSI(body), "nothing to count") {
+		t.Error(`the panel still says "nothing to count"`)
+	}
+
+	// Three creatures among the six, counted one apiece.
+	var creatures *stats.Row
+	for i, r := range statRows(groups) {
+		if r.Group == "Type" && r.Label == "Creature" {
+			creatures = &statRows(groups)[i]
+		}
+	}
+	if creatures == nil {
+		t.Fatal("no Creature row")
+	}
+	if creatures.Base != 3 || creatures.Count != 3 {
+		t.Errorf("Creature counted %d of %d, want 3 of 3", creatures.Count, creatures.Base)
+	}
+}
+
+func TestADeckStillCountsItsCopies(t *testing.T) {
+	// The floor at one must not flatten a real deck's twelve Forests.
+	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	for _, r := range statRows(m.statGroups()) {
+		if r.Group == "Type" && r.Label == "Land" {
+			if r.Base != 12 {
+				t.Errorf("twelve Forests counted as %d", r.Base)
+			}
+			return
+		}
+	}
+	t.Fatal("no Land row")
 }

@@ -224,6 +224,22 @@ func tagRows(entries []deck.Card) []Row {
 	return rows
 }
 
+// copies is how many cards an entry stands for.
+//
+// A search result carries no quantity, because it isn't in a deck and nobody
+// has chosen how many — but it is still one card. Counting it as none is why
+// a search had no statistics at all: every row's base came to zero, and a row
+// nothing has ever matched is dropped, so every group was dropped and the
+// panel said "nothing to count" over a screen full of cards. Both ways into a
+// deck floor the quantity at one, so a quantity below one can only mean an
+// entry that was never in a deck.
+func copies(e deck.Card) int {
+	if e.Qty < 1 {
+		return 1
+	}
+	return e.Qty
+}
+
 // Groups builds the category list from rowSource and counts it over
 // counted. The two differ once you're filtering by a category: which rows
 // exist, their order and their positions all come from the whole result set
@@ -246,7 +262,7 @@ func Groups(rowSource, counted []deck.Card) []Group {
 		for _, r := range g.Rows {
 			for _, e := range rowSource {
 				if r.Match(e) {
-					r.Base += e.Qty
+					r.Base += copies(e)
 				}
 			}
 			// A category nothing in the deck has ever matched is left out
@@ -256,7 +272,7 @@ func Groups(rowSource, counted []deck.Card) []Group {
 			}
 			for _, e := range counted {
 				if r.Match(e) {
-					r.Count += e.Qty
+					r.Count += copies(e)
 				}
 			}
 			kept = append(kept, r)

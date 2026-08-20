@@ -24,10 +24,38 @@ clothes.
 | 14 | `s` said "nothing to count" over a search still filling | `ce737a9` |
 | 15 | sorting by colour didn't sink the lands | `ce737a9` |
 | 17 | the editing deck followed the cursor instead of `e`/`E` | `ce737a9` |
-| 18 | statistics didn't scroll when the selection went past the bottom | below |
-| 19 | no way to move through statistics a group at a time | below |
+| 18 | statistics didn't scroll when the selection went past the bottom | `ab0a5b5` |
+| 19 | no way to move through statistics a group at a time | `ab0a5b5` |
+
+Two more from the next session's use, one of them a note reopened:
+
+| # | What was wrong | Fixed in |
+|---|---|---|
+| 14b | `s` on a **search** still said "nothing to count" | below |
+| 20 | no way out of the printed-text history `gv` opens | below |
 
 ## What the last two changed
+
+Note 14 was only half fixed. Deriving the bars each frame stopped them going
+stale, which was the reported symptom on a deck; a search had never had any.
+The bars sum quantities, a search result has none — it isn't in a deck and
+nobody has chosen how many — so every row's base came to zero, and a row
+nothing has ever matched is dropped. Every group was dropped, and the panel
+said "nothing to count" over a screen full of cards. A card with no quantity
+counts as one card. Both ways into a deck floor the quantity at one, so a
+quantity below one can only mean an entry that was never in a deck.
+
+`gv` was the only key into the printed-text history and there was no key out.
+`esc` fell straight through to taking the panel apart, and moving to another
+card left the history standing over it — showing "gv for how its text has
+changed", which is the prompt to press the key you had just pressed. The view
+belongs to the card it was opened on, so it lasts as long as the cursor stays
+there: `esc` leaves it, and so does moving off. That is checked in one place,
+after every keypress, rather than in each key that can move the cursor —
+`j`, `k`, `gg`, `G`, `ctrl+d`, a filter narrowing the list out from under it
+— because that list is exactly the one somebody adds to and forgets.
+
+## What 18 and 19 changed
 
 The statistics panel scrolls to wherever the highlighted category is rather
 than keeping an offset of its own. The category *is* the position, so

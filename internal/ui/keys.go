@@ -252,6 +252,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.applyStatFilter()
 		case m.info.mode == infoStats:
 			m.toggleStats(m.stats.global)
+		// A printed history was put on the information panel from here, so
+		// it comes off from here too, before esc starts taking the panel
+		// itself apart.
+		case m.info.mode == infoVersions:
+			m.info.mode = infoCard
+			m.info.cursor, m.info.offset = 0, 0
 		case p.top() != nil && p.top().clear():
 		case p.pop():
 		default:

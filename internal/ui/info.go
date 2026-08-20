@@ -40,6 +40,27 @@ type infoPanel struct {
 	// revision — and offset is how far the view is scrolled.
 	cursor int
 	offset int
+	// oracle is the card infoVersions was opened on. The printed-text
+	// history is about one card, so it lasts exactly as long as the cursor
+	// stays on that card; see leaveVersions.
+	oracle string
+}
+
+// leaveVersions puts the panel back to describing the card under the cursor
+// once the cursor is no longer on the card the history was opened for.
+//
+// gv is the only key into that view and there was no key out, so a printed
+// history stood over every card you moved to afterwards — each of them
+// showing "gv for how its text has changed", which is the prompt to press
+// the key you had just pressed. Checked from one place rather than at every
+// key that can move the cursor, because that list — j, k, gg, G, ctrl+d, a
+// filter narrowing the list out from under it — is exactly the list somebody
+// adds to and forgets.
+func (p *infoPanel) leaveVersions(oracle string) {
+	if p.mode == infoVersions && oracle != p.oracle {
+		p.mode = infoCard
+		p.cursor, p.offset = 0, 0
+	}
 }
 
 // toggle switches to a mode, or back to the card if already there. One key

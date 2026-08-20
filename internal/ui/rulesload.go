@@ -73,6 +73,15 @@ func (m Model) focusedCard() *mtg.Card {
 // drawing side, which only ever reads.
 func (m Model) focusedCardValue() *mtg.Card { return m.focusedCard() }
 
+// focusedOracle names the card under the cursor, or nothing when the cursor
+// is not on a card at all — a deck, a rule, an empty panel.
+func (m Model) focusedOracle() string {
+	if c := m.focusedCard(); c != nil {
+		return c.OracleID
+	}
+	return ""
+}
+
 // ensureRules starts the parse if it hasn't happened, and marks the panel as
 // waiting for it.
 func (m *Model) ensureRules(p *panel) tea.Cmd {

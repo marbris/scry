@@ -177,3 +177,75 @@ func TestTheDiffLeavesOutGitsOwnBookkeeping(t *testing.T) {
 		t.Errorf("the changes were lost:\n%s", got)
 	}
 }
+
+// twoCards is a list you can move the cursor within, both with a printings
+// link so gv means something on either.
+func twoCards() []deck.Card {
+	first := historyCard()
+	second := historyCard()
+	second.ID, second.OracleID, second.Name = "y", "oid2", "Test Beast"
+	return []deck.Card{{Card: first}, {Card: second}}
+}
+
+func TestEscLeavesThePrintedText(t *testing.T) {
+	// gv was the only key in and there was no key out.
+	m := withCards(sized(140, 30), "f", twoCards(), sortArrival)
+	m = drive(m, "g", "v")
+	if m.info.mode != infoVersions {
+		t.Fatal("gv did not open the printed text")
+	}
+
+	m = drive(m, "esc")
+	if m.info.mode != infoCard {
+		t.Errorf("esc left the panel in mode %v", m.info.mode)
+	}
+	// And it took nothing else with it on the way out.
+	if m.ws.count() != 1 {
+		t.Errorf("esc closed the panel as well; %d left", m.ws.count())
+	}
+}
+
+func TestMovingToAnotherCardLeavesThePrintedText(t *testing.T) {
+	// A history stood over every card you moved to afterwards, each of them
+	// showing "gv for how its text has changed" — the prompt to press the
+	// key you had just pressed.
+	m := withCards(sized(140, 30), "f", twoCards(), sortArrival)
+	m = drive(m, "g", "v", "j")
+
+	if m.info.mode != infoCard {
+		t.Fatalf("moving to another card left the panel in mode %v", m.info.mode)
+	}
+	body := stripANSI(m.View())
+	if strings.Contains(body, "gv for how its text has changed") {
+		t.Error("still offering the key that was just pressed")
+	}
+	if !strings.Contains(body, "Test Beast") {
+		t.Error("the panel does not describe the card under the cursor")
+	}
+}
+
+func TestComingBackToTheCardKeepsItsHistory(t *testing.T) {
+	// Leaving the view is not forgetting what was fetched for it.
+	m := withCards(sized(140, 30), "f", twoCards(), sortArrival)
+	m = drive(m, "g", "v", "j", "k")
+	if m.info.mode != infoCard {
+		t.Error("coming back re-opened the history by itself")
+	}
+	if _, ok := m.histories["oid"]; !ok {
+		t.Error("the fetched history was thrown away")
+	}
+	m = drive(m, "g", "v")
+	if m.info.mode != infoVersions {
+		t.Error("gv on the same card again did not re-open it")
+	}
+}
+
+func TestThePrintedTextStaysWhileTheCursorDoes(t *testing.T) {
+	// Only *leaving* the card closes it — a keypress that doesn't move must
+	// not.
+	m := withCards(sized(140, 30), "f", twoCards(), sortArrival)
+	m = drive(m, "g", "v", "k") // k at the top of the list moves nowhere
+	if m.info.mode != infoVersions {
+		t.Errorf("a key that moved nothing closed the view; mode %v", m.info.mode)
+	}
+}

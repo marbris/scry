@@ -167,7 +167,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		return m.handleKey(msg)
+		next, cmd := m.handleKey(msg)
+		// One place to notice the cursor has left the card a printed
+		// history belongs to, rather than a check in every key that moves.
+		if updated, ok := next.(Model); ok {
+			updated.info.leaveVersions(updated.focusedOracle())
+			return updated, cmd
+		}
+		return next, cmd
 
 	case searchDoneMsg:
 		return m.handleSearchDone(msg)
