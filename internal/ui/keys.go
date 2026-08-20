@@ -367,8 +367,13 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // pageStep is half a screen, which is what ctrl+d and ctrl+u move by in vim.
+//
+// Half of what is actually left after the hint bar, which is as tall as the
+// contextual keymap needs rather than the one line it used to be. Half a
+// screen that counts rows the panel doesn't have overshoots by exactly the
+// rows it got wrong.
 func (m Model) pageStep() int {
-	return maxInt((m.height-hintHeight-4)/2, 1)
+	return maxInt((m.height-m.footerHeight()-4)/2, 1)
 }
 
 // handleFilterKey is the / prompt. It narrows as you type, so you can see

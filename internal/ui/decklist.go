@@ -557,7 +557,6 @@ func (l *deckList) keys() [][2]string {
 		{"L", "open it beside"},
 		{"/", "filter"},
 		{"o O", "sort"},
-		{"i", "follow a deck or a person"},
 		{"n", "new deck"},
 		{"r", "rename"},
 		{"c", "copy, or sync a remote"},

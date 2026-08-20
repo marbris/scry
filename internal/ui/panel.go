@@ -64,6 +64,21 @@ func (k Kind) prompt() string {
 	return "tab to choose"
 }
 
+// barLabel is what opening the bar with i offers to do. prompt names the
+// thing, which reads right after enter; this names the act, which reads
+// right beside a key you press to get there.
+func (k Kind) barLabel() string {
+	switch k {
+	case KindFind:
+		return "search scryfall"
+	case KindDecks:
+		return "follow a deck or a person"
+	case KindRules:
+		return "search the rules"
+	}
+	return "the search bar"
+}
+
 func (k Kind) placeholder() string {
 	switch k {
 	case KindFind:

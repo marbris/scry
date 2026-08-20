@@ -52,6 +52,34 @@ answered.
 | `<space>1`…`<space>9` | focus panel N |
 | `<space>?` | key reference |
 
+## Hints and the reference
+
+The bar along the bottom is the whole contextual keymap — every key that does
+something where you are, wrapped over as many lines as it needs. Nothing is
+kept back for `?`; `?` lays the same list out to be read rather than skimmed,
+and adds the `<space>` table, which pressing `<space>` shows anyway.
+
+There is one list behind both (`contextKeys`, `internal/ui/hints.go`). There
+used to be two — the reference asked each view for its keys, and the bar had
+three hardcoded strings picked by a three-way switch — and the bar lied in
+three separate ways because of it: it offered `s` in a decks panel where
+there is nothing to count, offered `a`/`x`/`t` on a deck borrowed from
+Moxfield where all three refuse, and said nothing about `a`, `y`, `w` or `gv`
+on a search result, which fell through to the default branch.
+
+The editing keys are listed against the deck they change, by name: `a x add,
+remove a copy — Ghen, Arcanum Weaver`. They act on the **editing deck** from
+whatever panel you are in, so the deck they change is routinely not the list
+under the cursor. With no deck being edited they aren't offered at all — they
+would do nothing but explain themselves — and `e E choose a deck to edit`
+takes their place.
+
+`p` is the exception in that group: it puts into the list in front of you,
+which is why it only appears when that list is one of yours.
+
+The result of the last thing you did sits to the **right** of the keys rather
+than on top of them, and the next keypress clears it.
+
 Every `<space>` press raises the which-key popup (`leaderBar`), so none of
 this has to be memorised.
 

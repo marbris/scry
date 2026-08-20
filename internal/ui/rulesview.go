@@ -520,11 +520,10 @@ func repeatsTerm(text, term string) bool {
 func (v *rulesView) keys() [][2]string {
 	out := [][2]string{
 		{"j k", "up and down"},
-		{"i", "search the rules"},
 		{"/", "filter"},
 	}
 	if !v.grouped {
 		out = append(out, [2]string{"o O", "rule number, relevance"})
 	}
-	return append(out, [2]string{"K J", "read it in the panel beside"})
+	return append(out, [2]string{"K J", "read the rule beside this list"})
 }

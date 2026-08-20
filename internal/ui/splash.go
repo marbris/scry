@@ -85,8 +85,10 @@ type keySection struct {
 	rows  [][2]string
 }
 
-// keySections is the reference, in the order it reads: how to make and move
-// panels, how to get about, and what works right here.
+// keySections is the reference: the leader's own table, which is the one
+// thing the hint bar along the bottom doesn't already carry, and then the
+// contextual keymap — the same list the bar shows, laid out to be read
+// rather than skimmed.
 func (m Model) keySections() []keySection {
 	return []keySection{
 		{"Panels — space", [][2]string{
@@ -100,29 +102,7 @@ func (m Model) keySections() []keySection {
 			{"space s", "statistics, everything"},
 			{"space 1-9", "go to panel N"},
 		}},
-		{"Moving", append([][2]string{
-			{"h l", "previous / next panel"},
-			{"j k", "previous / next row"},
-			{"gd", "the deck you're editing"},
-		}, m.infoKeys()...)},
-		{m.hereTitle(), m.hereKeys()},
-	}
-}
-
-// infoKeys describes the four information-panel keys as they behave right
-// now. They are the same keys whatever the panel holds, but in statistics
-// they walk categories rather than lines, and "scroll" there sends you
-// looking for a scrollbar when the category *is* the position.
-func (m Model) infoKeys() [][2]string {
-	if m.info.mode == infoStats {
-		return [][2]string{
-			{"K J", "previous / next category"},
-			{"ctrl+k/j", "previous / next group"},
-		}
-	}
-	return [][2]string{
-		{"K J", "move in the info panel"},
-		{"ctrl+k/j", "scroll the info panel"},
+		{m.hereTitle(), m.contextKeys()},
 	}
 }
 
@@ -214,28 +194,4 @@ func (m Model) hereTitle() string {
 		return "These cards"
 	}
 	return "This panel"
-}
-
-// hereKeys is what actually works where you are. Asking the view beats a
-// list kept somewhere else, which is the list that goes stale.
-func (m Model) hereKeys() [][2]string {
-	p := m.ws.current()
-	if p == nil {
-		return [][2]string{
-			{"space", "the menu"},
-			{"?", "these keys"},
-			{"q", "quit"},
-		}
-	}
-	// No branch for a focused search bar: ? is a printable key, so it types
-	// rather than opening this, and the bar's keys are on the hint line
-	// where you can see them while you type.
-	if v := p.top(); v != nil {
-		return append(v.keys(),
-			[2]string{"i", "the search bar"},
-			[2]string{"esc", "clear, then close"},
-			[2]string{"q", "quit"},
-		)
-	}
-	return [][2]string{{"i", "the search bar"}, {"esc", "close"}, {"q", "quit"}}
 }

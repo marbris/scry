@@ -451,31 +451,22 @@ func (l *cardList) info(width int) []string {
 	return cardInfo(c, width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
 }
 
+// keys is what this list offers. The editing keys are not here: a, x, t, T,
+// c and u act on the editing deck rather than on the list under the cursor,
+// so they are listed against that deck by editKeys, which knows its name.
 func (l *cardList) keys() [][2]string {
 	out := [][2]string{
 		{"j k", "up and down"},
 		{"gg G", "first, last"},
+		{"ctrl+d/u", "half a page"},
 		{"/", "filter"},
 		{"o O", "sort"},
 		{"v V", "pick out one, all"},
-		{"s", "statistics"},
 		{"gv", "how its text has changed"},
 	}
-	if l.deck == nil {
-		return append(out,
-			[2]string{"a", "add to the deck you're editing"},
-			[2]string{"y", "yank"},
-			[2]string{"w W", "save as a deck of yours"},
-			[2]string{"c", "make it a commander"},
-		)
+	if l.deck != nil && l.deck.Local() {
+		return append(out, [2]string{"w", "save this deck"})
 	}
-	return append(out,
-		[2]string{"a x", "add, remove a copy"},
-		[2]string{"y p", "yank, put"},
-		[2]string{"t T", "tag, add and tag"},
-		[2]string{"c", "commander"},
-		[2]string{"u", "undo"},
-		[2]string{"w", "save"},
-		[2]string{"e", "pin as the editing deck"},
-	)
+	// Not yours, so writing it asks for a name and makes it yours.
+	return append(out, [2]string{"w W", "save as a deck of yours"})
 }

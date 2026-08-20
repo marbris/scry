@@ -285,21 +285,11 @@ func (m Model) viewFooter(l layout) string {
 		return m.viewQuitQuestion()
 	case m.leader:
 		return m.viewLeaderBar()
-	case m.notice != "":
-		return m.viewNotice()
 	}
+	// The notice used to replace this line rather than sit beside it, so
+	// the result of what you had just done stood on top of the keys for
+	// what to do next — and nothing cleared it, so it stood there for good.
 	return m.viewHint(l)
-}
-
-// viewNotice is the result of the last thing you did, along the bottom until
-// the next keypress. A line rather than a dialogue: "+1 Sol Ring" is worth
-// saying and not worth interrupting anyone for.
-func (m Model) viewNotice() string {
-	style := lipgloss.NewStyle().Foreground(theme.Success)
-	if strings.HasPrefix(m.notice, "error:") {
-		style = lipgloss.NewStyle().Foreground(theme.Error)
-	}
-	return " " + style.Render(truncate(m.notice, maxInt(m.width-2, 1)))
 }
 
 // viewQuitQuestion is what stands between an unsaved deck and losing it.
@@ -363,37 +353,80 @@ func (m Model) footerHeight() int {
 	if m.leader {
 		return maxInt(len(m.leaderBarLines()), 1)
 	}
-	return 1
+	if m.quitting {
+		return 1
+	}
+	// The hint bar is the whole contextual keymap now, so it is as tall as
+	// that keymap needs. The panels give up the room, the way they do for
+	// the leader menu — being pushed off the top of the screen instead is a
+	// bug this project has already had once.
+	return maxInt(len(m.hintLines(maxInt(m.width-textWidth(m.viewStatus(m.ws.layout()))-6, 1))), 1)
 }
 
-// viewHint is one line describing where you are and what works here.
+// viewHint is the keys that work where you are, wrapped over as many lines
+// as they need, with the last thing you did and the panel count kept out to
+// the right of them.
 func (m Model) viewHint(l layout) string {
-	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
-	accent := lipgloss.NewStyle().Foreground(theme.Accent)
+	right := m.viewStatus(l)
+	rightWidth := textWidth(right)
 
-	var left string
-	if p := m.ws.current(); p != nil {
-		switch {
-		case p.searchOpen && p.search.Focused():
-			left = "tab target · ↑↓ history · ctrl+o order · enter run"
-		case p.cardsView() != nil && p.cardsView().deck != nil:
-			left = "a/x add · y/p move · t tag · w save · space menu · ? keys"
-		default:
-			left = "h/l panel · i search · s stats · space menu · ? keys"
+	// Every hint line is packed to what is left over, so the status can
+	// never land on top of one. Two spaces of margin each side, and two
+	// between the two columns.
+	room := maxInt(m.width-rightWidth-6, 1)
+	lines := m.hintLines(room)
+
+	for i, line := range lines {
+		pad := maxInt(m.width-textWidth(line)-rightWidth-2, 1)
+		if i == 0 && right != "" {
+			lines[i] = " " + line + strings.Repeat(" ", pad) + right + " "
+			continue
 		}
+		lines[i] = " " + line
 	}
+	return strings.Join(lines, "\n")
+}
 
-	// Which panel of how many, and whether any are off screen.
-	right := ""
+// hintLines is the contextual keymap, packed into lines of the given width.
+func (m Model) hintLines(width int) []string {
+	key := lipgloss.NewStyle().Foreground(theme.Accent)
+	what := lipgloss.NewStyle().Foreground(theme.TextMuted)
+	sep := what.Render(" · ")
+
+	var parts []string
+	for _, r := range m.contextKeys() {
+		parts = append(parts, key.Render(r[0])+" "+what.Render(r[1]))
+	}
+	lines := packStyled(parts, sep, width)
+	if len(lines) == 0 {
+		return []string{""}
+	}
+	return lines
+}
+
+// viewStatus is the right-hand column: what the last thing you did produced,
+// then which panel of how many and whether any are off screen.
+func (m Model) viewStatus(l layout) string {
+	var parts []string
+	if m.notice != "" {
+		style := lipgloss.NewStyle().Foreground(theme.Success)
+		if strings.HasPrefix(m.notice, "error:") {
+			style = lipgloss.NewStyle().Foreground(theme.Error)
+		}
+		// Half the screen at most. The keys wrap onto another line rather
+		// than being crowded out, so the notice can afford to be readable —
+		// and a notice cut short is one you have to guess at, which is what
+		// "that deck isn't yours — p nee…" reads like.
+		parts = append(parts, style.Render(truncate(m.notice, maxInt(m.width/2, 24))))
+	}
 	if n := m.ws.count(); n > 0 {
-		right = itoa(m.ws.focused+1) + "/" + itoa(n)
+		count := itoa(m.ws.focused+1) + "/" + itoa(n)
 		if l.visible() < n {
-			right += " ↔"
+			count += " ↔"
 		}
+		parts = append(parts, lipgloss.NewStyle().Foreground(theme.Accent).Render(count))
 	}
-
-	gap := maxInt(m.width-textWidth(left)-textWidth(right)-2, 1)
-	return " " + dim.Render(left) + strings.Repeat(" ", gap) + accent.Render(right) + " "
+	return strings.Join(parts, "  ")
 }
 
 func itoa(n int) string {
