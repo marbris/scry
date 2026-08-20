@@ -450,3 +450,32 @@ func (l *cardList) info(width int) []string {
 	}
 	return cardInfo(c, width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
 }
+
+func (l *cardList) keys() [][2]string {
+	out := [][2]string{
+		{"j k", "up and down"},
+		{"gg G", "first, last"},
+		{"/", "filter"},
+		{"o O", "sort"},
+		{"v V", "pick out one, all"},
+		{"s", "statistics"},
+		{"gv", "how its text has changed"},
+	}
+	if l.deck == nil {
+		return append(out,
+			[2]string{"a", "add to the deck you're editing"},
+			[2]string{"y", "yank"},
+			[2]string{"w W", "save as a deck of yours"},
+			[2]string{"c", "make it a commander"},
+		)
+	}
+	return append(out,
+		[2]string{"a x", "add, remove a copy"},
+		[2]string{"y p", "yank, put"},
+		[2]string{"t T", "tag, add and tag"},
+		[2]string{"c", "commander"},
+		[2]string{"u", "undo"},
+		[2]string{"w", "save"},
+		[2]string{"e", "pin as the editing deck"},
+	)
+}

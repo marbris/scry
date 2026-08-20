@@ -27,6 +27,11 @@ type view interface {
 	// already wrapped to width. A rule is a paragraph and a panel column is
 	// not, which is why the rules panel needs this more than anything else.
 	info(width int) []string
+	// keys are the bindings this view answers to, for the reference. An
+	// interface method rather than a table somewhere central, because a
+	// table is what gets forgotten when a view is added — and a reference
+	// listing keys that do nothing here is worse than no reference.
+	keys() [][2]string
 	// clear undoes one level of narrowing for esc — a selection, then a
 	// filter. Returning false means there is nothing left to clear and esc
 	// should move on to popping the stack.

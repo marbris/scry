@@ -14,7 +14,7 @@ import (
 // viewWorkspace lays the whole frame out.
 func (m Model) viewWorkspace() string {
 	ws := m.ws // a copy: layout records the scroll position, and View is a
-	l := ws.layout()
+	l := ws.layoutWithFooter(m.footerHeight())
 
 	var columns []string
 	for i, width := range l.panels {
@@ -301,6 +301,24 @@ func (m Model) viewQuitQuestion() string {
 // memorised. Being able to see the menu is what makes a two-key binding
 // cheaper in practice than a one-key chord you can't remember.
 func (m Model) viewLeaderBar() string {
+	lines := m.leaderBarLines()
+	painted := make([]string, len(lines))
+	for i, line := range lines {
+		painted[i] = lipgloss.NewStyle().
+			Background(theme.SurfaceAlt).Width(m.width).MaxWidth(m.width).
+			Render(" " + line)
+	}
+	return strings.Join(painted, "\n")
+}
+
+// leaderBarLines is the menu, wrapped onto as many lines as it needs.
+//
+// It used to be cut off at the width, which is the wrong thing to do to a
+// menu: the entries you can't see are exactly the ones you opened it to
+// read, and the cut lands mid-entry where it looks like a rendering fault.
+// The layout asks how tall this is, so growing it takes room from the panels
+// rather than pushing them off the screen.
+func (m Model) leaderBarLines() []string {
 	key := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	what := lipgloss.NewStyle().Foreground(theme.Text)
 	sep := lipgloss.NewStyle().Foreground(theme.TextMuted).Render(" · ")
@@ -312,12 +330,16 @@ func (m Model) viewLeaderBar() string {
 	if m.ws.count() > 1 {
 		parts = append(parts, key.Render("1-9")+" "+what.Render("go to"))
 	}
+	return packStyled(parts, sep, maxInt(m.width-2, 1))
+}
 
-	return lipgloss.NewStyle().
-		Background(theme.SurfaceAlt).
-		Width(m.width).
-		MaxWidth(m.width).
-		Render(" " + truncate(strings.Join(parts, sep), maxInt(m.width-2, 1)))
+// footerHeight is how many rows the bottom of the screen needs. The leader
+// menu is the only thing down there that can want more than one.
+func (m Model) footerHeight() int {
+	if m.leader {
+		return maxInt(len(m.leaderBarLines()), 1)
+	}
+	return 1
 }
 
 // viewHint is one line describing where you are and what works here.

@@ -549,3 +549,19 @@ func isPips(s string) bool {
 	}
 	return true
 }
+
+func (l *deckList) keys() [][2]string {
+	return [][2]string{
+		{"j k", "up and down"},
+		{"enter", "open it here"},
+		{"L", "open it beside"},
+		{"/", "filter"},
+		{"o O", "sort"},
+		{"i", "follow a deck or a person"},
+		{"n", "new deck"},
+		{"r", "rename"},
+		{"c", "copy, or sync a remote"},
+		{"x", "delete, unfollow"},
+		{"gv", "versions of this deck"},
+	}
+}

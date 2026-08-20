@@ -247,8 +247,13 @@ func (w *workspace) pin() {
 
 // layout works out this frame's widths and remembers where the row was
 // scrolled to, so the next frame starts from the same place.
-func (w *workspace) layout() layout {
-	l := computeLayout(w.width, w.height, w.count(), w.focused, w.scroll)
+func (w *workspace) layout() layout { return w.layoutWithFooter(1) }
+
+// layoutWithFooter is the same, told how many rows the bottom of the screen
+// is taking. The leader menu can want several, and the panels have to give
+// up the room rather than being pushed off the top.
+func (w *workspace) layoutWithFooter(footer int) layout {
+	l := computeLayout(w.width, w.height-(footer-1), w.count(), w.focused, w.scroll)
 	w.scroll = l.first
 	return l
 }

@@ -239,3 +239,11 @@ func renderDiff(diff string, width int) []string {
 	}
 	return out
 }
+
+func (l *versionList) keys() [][2]string {
+	return [][2]string{
+		{"j k", "up and down"},
+		{"/", "filter"},
+		{"esc", "back to the deck"},
+	}
+}

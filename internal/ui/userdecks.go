@@ -183,3 +183,14 @@ func (l *userDeckList) info(width int) []string {
 	}
 	return append(out, "", mutedLine("enter to open · c to take a copy", width))
 }
+
+func (l *userDeckList) keys() [][2]string {
+	return [][2]string{
+		{"j k", "up and down"},
+		{"enter", "open it here"},
+		{"L", "open it beside"},
+		{"c", "take a copy"},
+		{"/", "filter"},
+		{"esc", "back to your decks"},
+	}
+}
