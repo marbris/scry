@@ -98,7 +98,7 @@ Each deck is a file in a git repository, so `scry` keeps every version. Press `g
 Download the right file for your machine from the [latest release](https://github.com/marbris/scry/releases):
 
 | Platform | File |
-|---|---|
+| --- | --- |
 | Linux (x86-64) | `scry-linux-amd64` |
 | Linux (ARM64) | `scry-linux-arm64` |
 | macOS (Apple Silicon) | `scry-darwin-arm64` |
@@ -167,7 +167,7 @@ The screen is a **row of panels** with an **information panel** pinned to the ri
 Open panels straight to what you want:
 
 | Keys | Opens |
-|---|---|
+| --- | --- |
 | `space f` | a **Scryfall search** |
 | `space d` | your **decks** (and Moxfield) |
 | `space r` | the **comprehensive rules** |
@@ -189,9 +189,9 @@ Open panels straight to what you want:
 `scry` is useful without opening the interface at all:
 
 ```bash
-scry                       # come back to the panels you left
-scry 't:creature c:rw cmc<=3'   # run a Scryfall query
-scry Isshin                # one exact match prints straight to the terminal
+scry                                  # come back to the panels you left
+scry 't:creature c:rw cmc<=3'         # run a Scryfall query
+scry Isshin                           # one exact match prints straight to the terminal
 scry https://moxfield.com/decks/...   # open a deck on Moxfield
 ```
 
@@ -226,7 +226,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 **Getting around**
 
 | Key | Does |
-|---|---|
+| --- | --- |
 | `h` `l` / `←` `→` | previous / next panel |
 | `ctrl+h` `ctrl+l` | move the focused panel along the row |
 | `j` `k` | up / down in the list |
@@ -238,7 +238,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 **In a list of cards**
 
 | Key | Does |
-|---|---|
+| --- | --- |
 | `/` | filter as you type |
 | `o` `O` | cycle the sort order |
 | `i` | edit the search |
@@ -255,7 +255,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 **In the decks panel**
 
 | Key | Does |
-|---|---|
+| --- | --- |
 | `enter` `L` | open the deck (here / beside) |
 | `i` | follow a Moxfield deck URL or a username |
 | `n` `r` `x` `c` | new · rename · delete · copy or sync |
@@ -264,7 +264,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 **The editing deck**
 
 | Key | Does |
-|---|---|
+| --- | --- |
 | `e` `E` | choose which deck to edit |
 | `gd` | jump to the editing deck |
 | `space w` | save the editing deck from anywhere |
@@ -272,7 +272,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 **Panels**
 
 | Key | Does |
-|---|---|
+| --- | --- |
 | `space f` `space d` `space r` | new search / decks / rules panel |
 | `space n` | new blank panel (`tab` picks its target) |
 | `space s` | statistics across every visible list |
@@ -286,7 +286,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 `scry` follows the standard per-user directories for your OS. Four kinds of file live in four places, which is what tells a backup what to keep and an uninstall what's safe to delete:
 
 | | Holds | Linux | macOS | Windows |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | **Data** | your decks (back this up!) | `~/.local/share/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
 | **Config** | settings and themes | `~/.config/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
 | **State** | session, query history | `~/.local/state/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
