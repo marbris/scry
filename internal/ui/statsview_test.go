@@ -207,3 +207,117 @@ func TestOneCardNeverReadsAsNone(t *testing.T) {
 		}
 	}
 }
+
+func TestThePanelScrollsToKeepTheCategoryInView(t *testing.T) {
+	// J past the bottom used to move a cursor you could no longer see.
+	m := withCards(sized(90, 16), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+
+	const room = 8
+	if m.statOffset(room) != 0 {
+		t.Fatalf("started scrolled to %d", m.statOffset(room))
+	}
+	for i := 0; i < 12; i++ {
+		m = drive(m, "J")
+	}
+	if m.statOffset(room) == 0 {
+		t.Error("walking down twelve categories never scrolled")
+	}
+
+	// And the highlighted category is inside the window.
+	line := statLine(m.statGroups(), m.stats.row)
+	at := m.statOffset(room)
+	if line < at || line >= at+room {
+		t.Errorf("category on line %d, showing %d..%d", line, at, at+room)
+	}
+}
+
+func TestScrollingComesBackUpAgain(t *testing.T) {
+	m := withCards(sized(90, 16), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	for i := 0; i < 12; i++ {
+		m = drive(m, "J")
+	}
+	for i := 0; i < 12; i++ {
+		m = drive(m, "K")
+	}
+	if got := m.statOffset(8); got != 0 {
+		t.Errorf("came back to the top still scrolled to %d", got)
+	}
+}
+
+func TestCtrlJMovesAWholeGroup(t *testing.T) {
+	// Five groups of a dozen rows is a lot of J to reach the curve.
+	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+
+	starts := groupStarts(m.statGroups())
+	if len(starts) < 3 {
+		t.Skipf("only %d groups", len(starts))
+	}
+
+	m = drive(m, "ctrl+j")
+	if m.stats.row != starts[0] {
+		t.Errorf("landed on row %d, want the first group at %d", m.stats.row, starts[0])
+	}
+	m = drive(m, "ctrl+j")
+	if m.stats.row != starts[1] {
+		t.Errorf("landed on row %d, want the second group at %d", m.stats.row, starts[1])
+	}
+}
+
+func TestCtrlKComesBackAGroupAtATime(t *testing.T) {
+	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	starts := groupStarts(m.statGroups())
+	if len(starts) < 2 {
+		t.Skip("not enough groups")
+	}
+
+	m = drive(m, "ctrl+j", "ctrl+j")
+	m = drive(m, "ctrl+k")
+	if m.stats.row != starts[0] {
+		t.Errorf("landed on row %d, want %d", m.stats.row, starts[0])
+	}
+
+	// Past the first group is the whole list, the same place K off the top
+	// lands.
+	m = drive(m, "ctrl+k")
+	if m.stats.row != -1 {
+		t.Errorf("row is %d, want the narrowing cleared", m.stats.row)
+	}
+}
+
+func TestJumpingByGroupNarrowsTheListToo(t *testing.T) {
+	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
+	l := m.ws.current().cardsView()
+	m = drive(m, "s")
+
+	before := l.count()
+	m = drive(m, "ctrl+j")
+	if l.count() == before {
+		t.Error("jumping to a category did not narrow the list")
+	}
+}
+
+func TestStatLineCountsHeadingsAndGaps(t *testing.T) {
+	// The panel scrolls by rendered lines, not by category, so this has to
+	// agree with what renderStats draws.
+	m := withCards(sized(120, 40), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+
+	groups := m.statGroups()
+	lines := m.renderStats(30)
+	rows := statRows(groups)
+
+	for row := 0; row < len(rows); row++ {
+		at := statLine(groups, row)
+		if at >= len(lines) {
+			t.Fatalf("category %d maps to line %d of %d", row, at, len(lines))
+		}
+		if !strings.Contains(stripANSI(lines[at]), rows[row].Label) {
+			t.Errorf("category %d (%s) maps to line %d, which says %q",
+				row, rows[row].Label, at, stripANSI(lines[at]))
+		}
+	}
+}

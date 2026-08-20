@@ -6,6 +6,10 @@ package ui
 // from wherever you happen to be — which is what keeps it a panel you read
 // rather than a place you have to go and come back from. The cost is four
 // keys in the shift and control spaces; the saving is a whole mode.
+//
+// In statistics the same four keys walk the breakdown: a category at a time,
+// then a group at a time. Same keys, same axis, one level coarser — which is
+// what ctrl means everywhere else here too.
 
 type infoMode int
 

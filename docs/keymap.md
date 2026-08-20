@@ -60,14 +60,19 @@ this has to be memorised.
 |---|---|
 | `h` `l` | previous / next panel |
 | `j` `k` | previous / next row |
-| `g` `G` | first / last row |
-| `ctrl+d` `ctrl+u` | half a page |
 | `gg` `G` | first / last row — `g` alone is a prefix, never a key |
-| `ctrl+d` `ctrl+u` | half page |
+| `ctrl+d` `ctrl+u` | half a page |
 | `gd` | jump to the editing deck panel |
 | `gv` | **versions** of the highlighted row — see below |
 | `K` `J` | move the selection in the **information** panel |
 | `ctrl+k` `ctrl+j` | scroll the information panel |
+
+In **statistics** the same four keys walk the breakdown instead: `K`/`J` step
+a category at a time and narrow the list to it, `ctrl+k`/`ctrl+j` jump a whole
+group — tags, types, colours, the curve — because five groups of a dozen rows
+is a lot of `J` to reach the curve. The panel scrolls to wherever the
+highlighted category is rather than keeping a position of its own, so the
+selection can't wander off the bottom out of sight.
 
 `h`/`l` for panels follows the Miller-column convention (ranger, lf, nnn) —
 directional rather than ordinal, so you aim rather than count. Card lists are

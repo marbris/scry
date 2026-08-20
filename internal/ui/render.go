@@ -158,9 +158,16 @@ func (m Model) viewInfo(width, height int) string {
 	}
 
 	var body []string
+	offset := m.info.offset
 	switch {
 	case m.info.mode == infoStats:
 		body = m.renderStats(inner)
+		// The statistics scroll to wherever the highlighted category is,
+		// rather than remembering a position: the category *is* the
+		// position, so deriving it can't drift out of step with it. J past
+		// the bottom used to move a cursor you could no longer see.
+		offset = scrollTo(statLine(m.statGroups(), m.stats.row),
+			offset, maxInt(height-4, 1), len(body))
 	case m.info.mode == infoVersions:
 		body = m.infoVersions(inner)
 	default:
@@ -169,11 +176,11 @@ func (m Model) viewInfo(width, height int) string {
 	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
 	// read, never focused.
 	room := maxInt(height-2-len(lines), 1)
-	if m.info.offset > maxInt(len(body)-room, 0) {
-		m.info.offset = maxInt(len(body)-room, 0)
+	if offset > maxInt(len(body)-room, 0) {
+		offset = maxInt(len(body)-room, 0)
 	}
-	if m.info.offset < len(body) {
-		body = body[m.info.offset:]
+	if offset < len(body) {
+		body = body[offset:]
 	} else {
 		body = nil
 	}
@@ -227,6 +234,23 @@ func (m Model) infoTitle() string {
 		return "deck"
 	}
 	return "card"
+}
+
+// scrollTo brings a line into view with as little movement as possible.
+func scrollTo(line, offset, height, total int) int {
+	if line < offset {
+		offset = line
+	}
+	if line >= offset+height {
+		offset = line - height + 1
+	}
+	if max := total - height; offset > max {
+		offset = maxInt(max, 0)
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return offset
 }
 
 // infoBody is what the focused panel has to say about its highlighted row.

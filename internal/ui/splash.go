@@ -100,14 +100,29 @@ func (m Model) keySections() []keySection {
 			{"space s", "statistics, everything"},
 			{"space 1-9", "go to panel N"},
 		}},
-		{"Moving", [][2]string{
+		{"Moving", append([][2]string{
 			{"h l", "previous / next panel"},
 			{"j k", "previous / next row"},
 			{"gd", "the deck you're editing"},
-			{"K J", "move in the info panel"},
-			{"ctrl+k/j", "scroll the info panel"},
-		}},
+		}, m.infoKeys()...)},
 		{m.hereTitle(), m.hereKeys()},
+	}
+}
+
+// infoKeys describes the four information-panel keys as they behave right
+// now. They are the same keys whatever the panel holds, but in statistics
+// they walk categories rather than lines, and "scroll" there sends you
+// looking for a scrollbar when the category *is* the position.
+func (m Model) infoKeys() [][2]string {
+	if m.info.mode == infoStats {
+		return [][2]string{
+			{"K J", "previous / next category"},
+			{"ctrl+k/j", "previous / next group"},
+		}
+	}
+	return [][2]string{
+		{"K J", "move in the info panel"},
+		{"ctrl+k/j", "scroll the info panel"},
 	}
 }
 

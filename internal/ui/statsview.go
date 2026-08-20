@@ -132,7 +132,84 @@ func (m *Model) moveStat(delta int) {
 	m.applyStatFilter()
 }
 
+// jumpStat moves to the first category of the next group, or the previous
+// one. Tags, then types, then colours, then the curve: with five groups of a
+// dozen rows, walking row by row to reach the curve is a lot of J.
+func (m *Model) jumpStat(delta int) {
+	groups := m.statGroups()
+	starts := groupStarts(groups)
+	if len(starts) == 0 {
+		return
+	}
+
+	switch {
+	case delta > 0:
+		for _, at := range starts {
+			if at > m.stats.row {
+				m.stats.row = at
+				m.applyStatFilter()
+				return
+			}
+		}
+		// Past the last group: on to the last row, so J always moves.
+		m.stats.row = len(statRows(groups)) - 1
+	default:
+		for i := len(starts) - 1; i >= 0; i-- {
+			if starts[i] < m.stats.row {
+				m.stats.row = starts[i]
+				m.applyStatFilter()
+				return
+			}
+		}
+		// Past the first group: back to no category, which is the whole
+		// list — the same place stepping off the top lands.
+		m.stats.row = -1
+	}
+	m.applyStatFilter()
+}
+
+// groupStarts is the flattened index of each group's first row.
+func groupStarts(groups []stats.Group) []int {
+	var out []int
+	at := 0
+	for _, g := range groups {
+		if len(g.Rows) == 0 {
+			continue
+		}
+		out = append(out, at)
+		at += len(g.Rows)
+	}
+	return out
+}
+
 // ── Drawing ─────────────────────────────────────────────────────
+
+// statLine is which rendered line a category sits on, counting the group
+// headings and the blank lines between them — which is what the panel has to
+// scroll by.
+func statLine(groups []stats.Group, row int) int {
+	if row < 0 {
+		return 0
+	}
+	line, at := 0, 0
+	for _, g := range groups {
+		if len(g.Rows) == 0 {
+			continue
+		}
+		if line > 0 {
+			line++ // the blank line between groups
+		}
+		line++ // the heading
+		for range g.Rows {
+			if at == row {
+				return line
+			}
+			at++
+			line++
+		}
+	}
+	return line
+}
 
 // renderStats draws the groups as horizontal bars.
 func (m Model) renderStats(width int) []string {
@@ -209,4 +286,13 @@ func statBar(r stats.Row, under bool, labelWidth, barWidth, countWidth, scale in
 		return lipgloss.NewStyle().Background(theme.SelectionBg).Render(line)
 	}
 	return line
+}
+
+// statOffset is how far the panel is scrolled for the highlighted category,
+// which is the same arithmetic the render does. Exposed so a test can ask
+// without drawing.
+func (m Model) statOffset(height int) int {
+	groups := m.statGroups()
+	return scrollTo(statLine(groups, m.stats.row), 0,
+		maxInt(height, 1), len(m.renderStats(30)))
 }

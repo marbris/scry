@@ -1,34 +1,55 @@
-1. in card lists, the mana cost should be colored according to the mana symbol
-2. when sorting by color, the name should be colored by color
-3. when sorting by card type, the name and type should be colored according to the card type
+# Post-implementation notes
 
-in the deck panel:
-4. when viewing the decks of a moxfield user, the filter / does not work.
-5. when a deck has zero cards, the number of cards should say 0. currently its empty.
-6. the panel should have a column for the mana colors in the deck.
-7. pressing enter on a remote deck opens it. it should also cache the deck as a remote deck, so that it shows up in the deck search list with an R instead of L.
+Nineteen things found by using the program after the twelve phases landed.
+All of them are fixed; this is kept as the record of what was wrong and where
+it was put right, because several were the same mistake wearing different
+clothes.
 
-8. in the hints when you press ?, the 'Here' section does not take into account which panel is active.
+| # | What was wrong | Fixed in |
+|---|---|---|
+| 1 | mana cost not coloured by symbol in card lists | `147adbe` |
+| 2 | sorting by colour didn't colour the name | `147adbe` |
+| 3 | sorting by type didn't colour the name or type line | `147adbe` |
+| 16 | split-card cost read `2U // {2R` — a stray brace | `147adbe` |
+| 4 | `/` did nothing when browsing somebody's decks | `b689534` |
+| 5 | a deck with no cards showed a blank, not `0` | `b689534` |
+| 6 | the decks panel had no column for a deck's colours | `b689534` |
+| 7 | opening a remote deck didn't follow it, so it never appeared as `R` | `b689534` |
+| 8 | `?` — the "Here" section ignored which panel was active | `6b1d8bf` |
+| 9 | the leader menu's `r` showed two question-mark glyphs | `6b1d8bf` |
+| 10 | no leader hint for `s` or `c` | `6b1d8bf` |
+| 11 | the leader menu pushed the panels off the top of the screen | `6b1d8bf` |
+| 12 | the leader menu stayed up after `space s` | `6b1d8bf` |
+| 13 | `gv` on a card in a deck showed the *deck's* history | `ce737a9` |
+| 14 | `s` said "nothing to count" over a search still filling | `ce737a9` |
+| 15 | sorting by colour didn't sink the lands | `ce737a9` |
+| 17 | the editing deck followed the cursor instead of `e`/`E` | `ce737a9` |
+| 18 | statistics didn't scroll when the selection went past the bottom | below |
+| 19 | no way to move through statistics a group at a time | below |
 
-space to bring up the hint bar
-9. the label next to 'r' is broken, it shows two question mark glyphs. it should say rules
-10. there is no hint for s statistics. there is no hint for c close panel. make sure all the leader key maps are shown there.
-11. the hint bar pushes the panels upward, pushing them out of view such that they lose the top edge.
-12. the hint bar doesn't go away after pressing space s.
+## What the last two changed
 
+The statistics panel scrolls to wherever the highlighted category is rather
+than keeping an offset of its own. The category *is* the position, so
+deriving it can't drift out of step with it — which is exactly how `J` past
+the bottom came to be moving a cursor you could no longer see.
 
+`ctrl+k` and `ctrl+j` move a whole group — tags, types, colours, the curve.
+They already scroll the information panel elsewhere, and this is the same
+axis one level coarser, which is what `ctrl` means throughout. Five groups of
+a dozen rows is a great deal of `J` to reach the curve.
 
-13. when pressing gv on a card row it should bring up the card printing history. currently that only happens for scryfall searches. when pressing gv on a card in a local list it shows the deck version history, that is incorrect. the deck version history should only show when highlighting a deck in the list of decks.
+## The patterns worth remembering
 
-14. the stats 's' says 'nothing to count' when on a scryfall search. the statistics should work on those too.
+Three of these were one bug. A filter that matches everything looks exactly
+like a filter that was never applied, so a view that forgot to implement the
+filter interface failed silently — first in the rules panel, then in
+somebody's decks, then in a deck's versions. It is an interface now, so a
+view that can be narrowed says so in its own file.
 
-15. when sorting by color, it should sort by descending mana cost second, so that the lands end up at the bottom.
+Two were the value-receiver trap this project keeps meeting: a method on a
+`Model` value mutates a copy, so the fix is always to derive rather than to
+store and update.
 
-16. the mana cost is rendered incorrectly for split cards. Reduce // Rubble is showing a manacost 2U // {2R . that bracket shouldnt be there.
-
-17. the editable deck is currently assigned to the last visited local deck. this is a bad idea. it should be assigned by cycling through them with 'e/E'. I'm changing my mind back to my original idea.
-
-18. the statistics panel should scroll down when the selection goes past the bottom.
-19. there should be some keybinding to scroll down the statistics panel by category rather than row.
-
-
+Two more were width measured in runes over text carrying ANSI escapes, which
+wraps a row and grows a panel. Measure with the escapes stripped.

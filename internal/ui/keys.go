@@ -221,9 +221,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.info.move(1)
 		}
 	case "ctrl+k":
-		m.info.scroll(-1)
+		if m.info.mode == infoStats {
+			m.jumpStat(-1)
+		} else {
+			m.info.scroll(-1)
+		}
 	case "ctrl+j":
-		m.info.scroll(1)
+		if m.info.mode == infoStats {
+			m.jumpStat(1)
+		} else {
+			m.info.scroll(1)
+		}
 
 	case "s":
 		m.toggleStats(false)
