@@ -21,7 +21,9 @@ type versionList struct {
 	cursor
 	slug    string
 	name    string
+	all     []deck.Commit
 	commits []deck.Commit
+	filter  string
 	// diffs are what each commit did, fetched as the cursor reaches it.
 	// Local git, so this is fast enough not to need the debouncing a
 	// network request does.
@@ -32,7 +34,9 @@ type versionsMsg struct {
 	panel   int
 	slug    string
 	name    string
+	all     []deck.Commit
 	commits []deck.Commit
+	filter  string
 	err     error
 }
 
@@ -59,7 +63,7 @@ func (m Model) handleVersions(msg versionsMsg) (tea.Model, tea.Cmd) {
 	}
 
 	v := &versionList{
-		slug: msg.slug, name: msg.name, commits: msg.commits,
+		slug: msg.slug, name: msg.name, all: msg.commits, commits: msg.commits,
 		diffs: map[string]string{},
 	}
 	p.push(v)
@@ -104,11 +108,44 @@ func (l *versionList) lines(width, height int, focused bool, m *Model) []string 
 	return fillTo(lines, width, height)
 }
 
-func (l *versionList) clear() bool { return false }
+func (l *versionList) setFilter(s string) {
+	l.filter = s
+	l.commits = l.all
+	if terms := filterTerms(s); len(terms) > 0 {
+		kept := make([]deck.Commit, 0, len(l.all))
+		for _, c := range l.all {
+			hay := strings.ToLower(c.Subject + " " + c.When)
+			keep := true
+			for _, t := range terms {
+				if !strings.Contains(hay, t) {
+					keep = false
+					break
+				}
+			}
+			if keep {
+				kept = append(kept, c)
+			}
+		}
+		l.commits = kept
+	}
+	l.cursor.clamp(len(l.commits))
+}
+
+func (l *versionList) clear() bool {
+	if l.filter != "" {
+		l.setFilter("")
+		return true
+	}
+	return false
+}
 
 func (l *versionList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	if l.cursor.navKey(k, len(l.commits), m.pageStep()) {
 		return true, l.wantDiff()
+	}
+	if k == "/" {
+		p.openFilter(l.filter)
+		return true, nil
 	}
 	return false, nil
 }

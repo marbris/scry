@@ -364,3 +364,60 @@ func TestTheInfoPanelSaysWhyADeckIsIllegal(t *testing.T) {
 		}
 	}
 }
+
+func TestAnEmptyDeckSaysZeroRatherThanNothing(t *testing.T) {
+	// Blank reads as "we haven't looked"; an empty deck is a fact.
+	got := stripANSI(renderEntry(deckEntry{kind: entryLocal, name: "Elf Ball", count: 0}, 30, false))
+	if !strings.Contains(got, "0") {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestADecksColoursAreShownAsPips(t *testing.T) {
+	// "Is this the Mardu deck or the Simic one" is the question a column of
+	// deck names can't answer.
+	got := stripANSI(renderEntry(deckEntry{
+		kind: entryLocal, name: "Ghen", count: 100,
+		colours: []string{"R", "W", "B"},
+	}, 40, false))
+	if !strings.Contains(got, "WBR") {
+		t.Errorf("got %q, want the colours in WUBRG order", got)
+	}
+}
+
+func TestPipsAreAlwaysInWUBRGOrder(t *testing.T) {
+	// So two Mardu decks read the same, whatever order their cards happened
+	// to be resolved in.
+	if got := manaPips([]string{"G", "W", "U"}); got != "WUG" {
+		t.Errorf("got %q", got)
+	}
+	if got := manaPips(nil); got != "" {
+		t.Errorf("got %q for a colourless deck", got)
+	}
+}
+
+func TestAColourlessOrRemoteRowShowsNoPips(t *testing.T) {
+	got := stripANSI(renderEntry(deckEntry{kind: entryRemote, name: "Someone's"}, 30, false))
+	if strings.ContainsAny(got, "WUBRG") && !strings.Contains(got, "Someone") {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestTheRowStaysExactlyAsWideWithPipsAndColour(t *testing.T) {
+	// The tail is assembled from styled parts now, so its width has to be
+	// measured with the escapes stripped out.
+	e := deckEntry{
+		kind: entryLocal, name: "Isshin, One Pillow Fort as One", count: 100,
+		colours: []string{"W", "B", "R"},
+		legal:   deck.Legality{Known: true, Legal: true},
+	}
+	for width := 10; width <= 60; width++ {
+		got := stripANSI(renderEntry(e, width, false))
+		if strings.Contains(got, "\n") {
+			t.Fatalf("width %d wrapped: %q", width, got)
+		}
+		if textWidth(got) > width {
+			t.Errorf("width %d rendered %d columns: %q", width, textWidth(got), got)
+		}
+	}
+}

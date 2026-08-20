@@ -263,3 +263,59 @@ func TestSaveEverythingWritesEveryDeckWithOutstandingEdits(t *testing.T) {
 		}
 	}
 }
+
+func TestAPersonsDecksCanBeNarrowed(t *testing.T) {
+	// Somebody with two hundred decks is exactly who / is for.
+	m := sized(160, 30)
+	p := m.ws.open(KindDecks)
+	p.show(newDeckList())
+
+	next, _ := m.Update(userDecksMsg{
+		panel: p.id, user: "MarBri",
+		decks: []moxfield.UserDeck{
+			{Name: "Elf Ball", PublicID: "a", Cards: 100},
+			{Name: "Goblin Rush", PublicID: "b", Cards: 100},
+			{Name: "Elfball Redux", PublicID: "c", Cards: 100},
+		},
+	})
+	m = next.(Model)
+
+	m = drive(m, "/", "e", "l", "f", "enter")
+	v := p.top().(*userDeckList)
+	if len(v.decks) != 2 {
+		t.Errorf("filtering to 'elf' left %d decks", len(v.decks))
+	}
+
+	m = drive(m, "esc")
+	if len(v.decks) != 3 {
+		t.Errorf("esc left %d decks", len(v.decks))
+	}
+}
+
+func TestOpeningARemoteDeckFollowsIt(t *testing.T) {
+	// Looking at somebody's deck is how you decide to follow it, and the
+	// alternative is finding your way back to a deck you saw once and can't
+	// name.
+	t.Cleanup(func() { deck.SaveBookmarks(deck.Bookmarks{}) })
+
+	var b deck.Bookmarks
+	b.AddRemote(deck.Remote{Name: "Hinata", ID: "abc"})
+	if err := deck.SaveBookmarks(b); err != nil {
+		t.Fatal(err)
+	}
+
+	// A remote in the bookmarks appears in the decks list as R.
+	l := newDeckList()
+	found := false
+	for _, e := range l.all {
+		if e.kind == entryRemote && e.id == "abc" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the followed deck is not listed: %v", l.all)
+	}
+	if got := stripANSI(renderEntry(deckEntry{kind: entryRemote, name: "Hinata", id: "abc"}, 30, false)); !strings.Contains(got, "R") {
+		t.Errorf("it is not marked as remote: %q", got)
+	}
+}

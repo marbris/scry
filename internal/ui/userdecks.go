@@ -4,6 +4,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"strings"
+
 	"scry/internal/moxfield"
 	"scry/internal/theme"
 )
@@ -17,23 +19,64 @@ import (
 
 type userDeckList struct {
 	cursor
-	user  string
-	decks []moxfield.UserDeck
+	user string
+	all  []moxfield.UserDeck
+	// decks is what's on screen: all, narrowed by the filter. Somebody with
+	// two hundred decks is exactly who you need / for.
+	decks  []moxfield.UserDeck
+	filter string
 }
 
 func newUserDeckList(user string, decks []moxfield.UserDeck) *userDeckList {
-	return &userDeckList{user: user, decks: decks}
+	l := &userDeckList{user: user, all: decks}
+	l.refresh()
+	return l
+}
+
+func (l *userDeckList) refresh() {
+	l.decks = l.all
+	if terms := filterTerms(l.filter); len(terms) > 0 {
+		kept := make([]moxfield.UserDeck, 0, len(l.all))
+		for _, d := range l.all {
+			hay := strings.ToLower(d.Name + " " + d.Format)
+			keep := true
+			for _, t := range terms {
+				if !strings.Contains(hay, t) {
+					keep = false
+					break
+				}
+			}
+			if keep {
+				kept = append(kept, d)
+			}
+		}
+		l.decks = kept
+	}
+	l.cursor.clamp(len(l.decks))
+}
+
+func (l *userDeckList) setFilter(s string) {
+	l.filter = s
+	l.refresh()
 }
 
 func (l *userDeckList) title() string { return l.user }
 
 func (l *userDeckList) subtitle() string {
-	return itoa(len(l.decks)) + " " + plural("deck", len(l.decks))
+	out := itoa(len(l.decks))
+	if len(l.decks) != len(l.all) {
+		out += "/" + itoa(len(l.all))
+	}
+	return out + " " + plural("deck", len(l.decks))
 }
 
 func (l *userDeckList) lines(width, height int, focused bool, m *Model) []string {
 	if len(l.decks) == 0 {
-		return fillTo([]string{mutedLine("no public decks", width)}, width, height)
+		what := "no public decks"
+		if l.filter != "" {
+			what = "nothing matches"
+		}
+		return fillTo([]string{mutedLine(what, width)}, width, height)
 	}
 
 	l.cursor.scrollInto(height, len(l.decks))
@@ -44,7 +87,13 @@ func (l *userDeckList) lines(width, height int, focused bool, m *Model) []string
 	return fillTo(lines, width, height)
 }
 
-func (l *userDeckList) clear() bool { return false }
+func (l *userDeckList) clear() bool {
+	if l.filter != "" {
+		l.setFilter("")
+		return true
+	}
+	return false
+}
 
 func renderUserDeck(d moxfield.UserDeck, width int, under bool) string {
 	tail := []string{itoa(d.Cards)}
@@ -76,6 +125,10 @@ func (l *userDeckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	}
 
 	switch k {
+	case "/":
+		p.openFilter(l.filter)
+		return true, nil
+
 	case "enter", "L":
 		if l.cursor.at >= len(l.decks) {
 			return true, nil

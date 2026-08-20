@@ -116,3 +116,25 @@ func wrap(s string, width int) []string {
 	}
 	return out
 }
+
+// stripStyles removes colour, for measuring text that has already been
+// painted. Needed where a line is assembled from styled parts and then has
+// to be padded to a width — measuring the escape sequences as characters is
+// what wraps a row and grows a panel.
+func stripStyles(s string) string {
+	var b strings.Builder
+	inEscape := false
+	for _, r := range s {
+		switch {
+		case r == 0x1b:
+			inEscape = true
+		case inEscape:
+			if r == 'm' {
+				inEscape = false
+			}
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}

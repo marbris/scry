@@ -55,8 +55,11 @@ type deckEntry struct {
 	id   string
 	user string
 
-	format   string
-	count    int // cards for a deck, decks for a user
+	format string
+	count  int // cards for a deck, decks for a user
+	// colours is the deck's colour identity, in WUBRG order. Empty for a
+	// remote, whose cards we haven't looked at, and for a person.
+	colours  []string
 	modified time.Time
 	// legal is the verdict, which stays unknown until the background pass
 	// gets to this deck.
@@ -97,6 +100,7 @@ type deckList struct {
 	// across reloads so the flags don't blink off every time a deck is
 	// written.
 	legality map[string]deck.Legality
+	colours  map[string][]string
 
 	// confirming is a deletion waiting for a yes, and holds the row it
 	// would delete so that moving the cursor can't redirect it.
@@ -105,7 +109,11 @@ type deckList struct {
 
 // newDeckList reads what's on disk and what's bookmarked.
 func newDeckList() *deckList {
-	l := &deckList{order: byModified, legality: map[string]deck.Legality{}}
+	l := &deckList{
+		order:    byModified,
+		legality: map[string]deck.Legality{},
+		colours:  map[string][]string{},
+	}
 	l.reload()
 	return l
 }
@@ -121,15 +129,21 @@ func (l *deckList) localSlugs() []string {
 	return out
 }
 
-// setLegality files a verdict and puts it on the row it belongs to.
-func (l *deckList) setLegality(slug string, verdict deck.Legality) {
+// setLegality files what the background pass worked out and puts it on the
+// row it belongs to.
+func (l *deckList) setLegality(slug string, verdict deck.Legality, colours []string) {
 	if l.legality == nil {
 		l.legality = map[string]deck.Legality{}
 	}
+	if l.colours == nil {
+		l.colours = map[string][]string{}
+	}
 	l.legality[slug] = verdict
+	l.colours[slug] = colours
 	for i := range l.all {
 		if l.all[i].kind == entryLocal && l.all[i].slug == slug {
 			l.all[i].legal = verdict
+			l.all[i].colours = colours
 		}
 	}
 	l.refresh()
@@ -145,7 +159,7 @@ func (l *deckList) reload() {
 		all = append(all, deckEntry{
 			kind: entryLocal, name: s.Name, slug: s.Slug, format: s.Format,
 			count: s.Total, modified: s.Modified, broken: s.Broken,
-			legal: l.legality[s.Slug],
+			legal: l.legality[s.Slug], colours: l.colours[s.Slug],
 		})
 	}
 
@@ -289,7 +303,14 @@ func renderEntry(e deckEntry, width int, under bool) string {
 	legal := e.legal.Flag()
 
 	tail := []string{kind + legal}
-	if e.count > 0 {
+	if pips := manaPips(e.colours); pips != "" {
+		tail = append(tail, pips)
+	}
+	// A deck with no cards says 0 rather than nothing: blank reads as "we
+	// haven't looked", and an empty deck is a fact.
+	if e.kind == entryLocal {
+		tail = append(tail, itoa(e.count))
+	} else if e.count > 0 {
 		tail = append(tail, itoa(e.count))
 	}
 	if age := shortAge(e.modified); age != "" {
@@ -308,8 +329,8 @@ func renderEntry(e deckEntry, width int, under bool) string {
 		tail = tail[:len(tail)-1]
 	}
 
-	right := strings.Join(tail, " ")
-	space := width - textWidth(right)
+	right := paintTail(tail, e)
+	space := width - textWidth(stripStyles(right))
 	left := fit(name, maxInt(space-1, 0))
 
 	nameStyle := lipgloss.NewStyle().Foreground(theme.Text)
@@ -466,4 +487,65 @@ func legalityLines(verdict deck.Legality, width int) []string {
 		}
 	}
 	return out
+}
+
+// manaPips is a deck's colours as the letters people say them in. Five
+// characters at most, which is worth the room: "is this the Mardu deck or
+// the Simic one" is the question a list of deck names can't answer.
+func manaPips(colours []string) string {
+	if len(colours) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, c := range []string{"W", "U", "B", "R", "G"} {
+		for _, have := range colours {
+			if have == c {
+				b.WriteString(c)
+				break
+			}
+		}
+	}
+	return b.String()
+}
+
+// paintTail colours the row's tail: the pips in their mana colours, the
+// legality mark by whether it passed, the rest dim.
+func paintTail(parts []string, e deckEntry) string {
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+
+	out := make([]string, 0, len(parts))
+	for i, part := range parts {
+		switch {
+		case i == 0:
+			out = append(out, dim.Render(part[:1])+legalMark(e, part[1:]))
+		case isPips(part):
+			out = append(out, paintMana(part))
+		default:
+			out = append(out, dim.Render(part))
+		}
+	}
+	return strings.Join(out, " ")
+}
+
+func legalMark(e deckEntry, mark string) string {
+	switch {
+	case !e.legal.Known:
+		return mark
+	case e.legal.Legal:
+		return lipgloss.NewStyle().Foreground(theme.Success).Render(mark)
+	}
+	return lipgloss.NewStyle().Foreground(theme.Error).Render(mark)
+}
+
+// isPips reports whether a tail part is a colour string rather than a count.
+func isPips(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !strings.ContainsRune("WUBRG", r) {
+			return false
+		}
+	}
+	return true
 }

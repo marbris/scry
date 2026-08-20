@@ -88,6 +88,15 @@ func openLocalDeck(panelID int, newPane bool, slug string) tea.Cmd {
 func openRemoteDeck(panelID int, newPane bool, id string) tea.Cmd {
 	return func() tea.Msg {
 		info, cards, err := moxfield.Load(id)
+		if err == nil {
+			// Looking at somebody's deck is how you decide to follow it, so
+			// following happens by looking. It costs a line in a file, and
+			// the alternative is finding your way back to a deck you saw
+			// once and can't name.
+			follow := deck.LoadBookmarks()
+			follow.AddRemote(deck.Remote{Name: info.Name, ID: id, URL: info.URL})
+			deck.SaveBookmarks(follow)
+		}
 		return deckOpenedMsg{panel: panelID, newPane: newPane, info: info, cards: cards, err: err}
 	}
 }
@@ -134,7 +143,8 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 		p.title = l.name
 	}
 	m.ws.deriveEditingIfUnpinned()
-	return m, nil
+	// A remote just followed should appear in any decks list on screen.
+	return m, reloadDecks
 }
 
 func (m Model) handleUserDecks(msg userDecksMsg) (tea.Model, tea.Cmd) {
@@ -328,10 +338,12 @@ func reloadDecks() tea.Msg { return reloadDecksMsg{} }
 
 // ── Legality ────────────────────────────────────────────────────
 
-// legalityMsg carries the verdict on one deck back to the lists showing it.
+// legalityMsg carries the verdict on one deck back to the lists showing it,
+// and its colours, which come out of the same resolution.
 type legalityMsg struct {
 	slug     string
 	legality deck.Legality
+	colours  []string
 }
 
 // checkLegality works out whether each local deck is legal, from the card
@@ -342,7 +354,8 @@ func checkLegality(slugs []string) tea.Cmd {
 	for _, slug := range slugs {
 		s := slug
 		cmds = append(cmds, func() tea.Msg {
-			return legalityMsg{slug: s, legality: deck.CheckCached(s)}
+			verdict, colours := deck.CheckCached(s)
+			return legalityMsg{slug: s, legality: verdict, colours: colours}
 		})
 	}
 	return tea.Batch(cmds...)
@@ -351,7 +364,7 @@ func checkLegality(slugs []string) tea.Cmd {
 func (m Model) handleLegality(msg legalityMsg) (tea.Model, tea.Cmd) {
 	for _, p := range m.ws.panels {
 		if l, ok := p.top().(*deckList); ok {
-			l.setLegality(msg.slug, msg.legality)
+			l.setLegality(msg.slug, msg.legality, msg.colours)
 		}
 		if l := p.cardsView(); l != nil && l.deck != nil && l.deck.Slug == msg.slug {
 			legality := msg.legality

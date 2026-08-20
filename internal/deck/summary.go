@@ -59,12 +59,32 @@ func Summaries() ([]Summary, error) {
 }
 
 // CheckCached works out a deck's legality from what is already in the card
-// cache. A deck whose cards aren't all known comes back unknown.
-func CheckCached(slug string) Legality {
+// cache, and its colours while it is there — both want the same resolution
+// and doing it twice would double the work for nothing.
+//
+// A deck whose cards aren't all known comes back unknown.
+func CheckCached(slug string) (Legality, []string) {
 	d, err := Read(slug)
 	if err != nil {
-		return Legality{}
+		return Legality{}, nil
 	}
 	cards, complete := ResolveCached(d.MainEntries())
-	return Check(d.Format, cards, complete)
+	return Check(d.Format, cards, complete), Colours(cards)
+}
+
+// Colours is a deck's colour identity: every colour any card in it brings.
+func Colours(cards []Card) []string {
+	seen := map[string]bool{}
+	for _, c := range cards {
+		for _, colour := range c.Card.ColorIdentity {
+			seen[colour] = true
+		}
+	}
+	var out []string
+	for _, c := range []string{"W", "U", "B", "R", "G"} {
+		if seen[c] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
