@@ -78,11 +78,22 @@ func RememberQuery(h []string, query string) []string {
 // showing what you typed rather than something recalled.
 const historyIdle = -1
 
+// queryHistory is what this panel's bar can recall. Only a find panel has
+// anything: the list is card queries, and offering them to the bar that
+// follows a Moxfield user or searches the rules would be recalling answers
+// to a different question.
+func (m Model) queryHistory(p *panel) []string {
+	if p == nil || p.kind != KindFind {
+		return nil
+	}
+	return m.history
+}
+
 // recall moves through the history and returns what the bar should show.
 // Walking back from the end keeps your draft, so pressing up out of
 // curiosity doesn't cost you the query you were in the middle of writing.
-func (p *panel) recall(delta int) {
-	if len(p.history) == 0 {
+func (p *panel) recall(delta int, history []string) {
+	if len(history) == 0 {
 		return
 	}
 
@@ -91,14 +102,14 @@ func (p *panel) recall(delta int) {
 			return // already at the end; there is nothing newer
 		}
 		p.draft = p.search.Value()
-		p.historyAt = len(p.history)
+		p.historyAt = len(history)
 	}
 
 	at := p.historyAt + delta
 	switch {
 	case at < 0:
 		at = 0
-	case at >= len(p.history):
+	case at >= len(history):
 		// Off the newest end: back to whatever you were writing.
 		p.historyAt = historyIdle
 		p.search.SetValue(p.draft)
@@ -107,7 +118,7 @@ func (p *panel) recall(delta int) {
 	}
 
 	p.historyAt = at
-	p.search.SetValue(p.history[at])
+	p.search.SetValue(history[at])
 	p.search.CursorEnd()
 }
 

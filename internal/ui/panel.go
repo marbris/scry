@@ -131,9 +131,11 @@ type panel struct {
 	// — as an index into scryfall.SortOptions.
 	querySort int
 
-	// history is the queries run before this one, with where up and down
-	// have walked to and what was in the bar before the walk started.
-	history   []string
+	// historyAt is where up and down have walked to, and draft is what was
+	// in the bar before the walk started. The queries themselves belong to
+	// the Model — one list, shared by every find panel — and are passed in
+	// when the walk asks for them. A panel holding its own copy is how a
+	// panel came to be opened with an empty one.
 	historyAt int
 	draft     string
 }

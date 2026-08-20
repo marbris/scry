@@ -127,7 +127,6 @@ func (m *Model) restore() tea.Cmd {
 		switch ps.Kind {
 		case "find":
 			p := m.ws.open(KindFind)
-			p.history = m.history
 			if ps.Query != "" {
 				p.search.SetValue(ps.Query)
 				cmds = append(cmds, m.search(p))

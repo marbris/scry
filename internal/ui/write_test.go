@@ -146,3 +146,68 @@ func TestWritingAnUnchangedDeckSaysSoRatherThanCommitting(t *testing.T) {
 		t.Errorf("got:\n%s", stripANSI(m.View()))
 	}
 }
+
+func TestSpaceWSavesTheEditingDeckFromAnotherPanel(t *testing.T) {
+	if !deck.GitAvailable() {
+		t.Skip("git not installed")
+	}
+	seedDeck(t, "elf-ball", "name: Elf Ball\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.Delete("elf-ball") })
+
+	m, l := openDeckPanel(t, sized(160, 24), "elf-ball", "Elf Ball", []deck.Card{
+		{Qty: 1, Card: mtg.Card{Name: "Sol Ring", TypeLine: "Artifact"}},
+	})
+	m.add([]deck.Card{{Card: mtg.Card{Name: "Llanowar Elves"}}})
+
+	// Go somewhere else. Bare w would save whatever is here; <space>w has to
+	// reach past it to the deck a/x/t have been writing to — which is the
+	// whole point, since that deck is routinely not the one on screen.
+	m = drive(m, "space", "f")
+	if m.ws.focused == m.ws.editing {
+		t.Fatal("still in the deck panel")
+	}
+
+	cmd := m.writeEditing()
+	if cmd == nil {
+		t.Fatal("space w produced nothing to do")
+	}
+	msg, ok := cmd().(deckSavedMsg)
+	if !ok {
+		t.Fatalf("space w produced %T", cmd())
+	}
+	if msg.err != nil {
+		t.Fatalf("saving failed: %v", msg.err)
+	}
+	if msg.panel != m.ws.editingPanel().id {
+		t.Errorf("the result is addressed to panel %d, not the deck's", msg.panel)
+	}
+
+	body, err := deck.Read("elf-ball")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(body.String(), "Llanowar Elves") {
+		t.Errorf("the file says:\n%s", body.String())
+	}
+
+	// And the deck stops being marked unsaved once the result lands, even
+	// though the cursor is in another panel.
+	next, _ := m.Update(msg)
+	m = next.(Model)
+	if l.dirty {
+		t.Error("the deck is still marked unsaved")
+	}
+	if !strings.Contains(m.notice, "Elf Ball") && !strings.Contains(m.notice, "Llanowar") {
+		t.Errorf("nothing said it was saved; the notice is %q", m.notice)
+	}
+}
+
+func TestSpaceWWithNoEditingDeckSaysSo(t *testing.T) {
+	m := drive(sized(120, 30), "space", "f")
+	if cmd := m.writeEditing(); cmd != nil {
+		t.Error("something was saved with no deck being edited")
+	}
+	if !strings.Contains(m.notice, "no deck is being edited") {
+		t.Errorf("the notice says %q", m.notice)
+	}
+}

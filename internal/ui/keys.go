@@ -41,6 +41,7 @@ var leaderMenu = []leaderCmd{
 	{"r", "rules", nil}, // needs a command, so it is run below
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
 	{"s", "stats (everything)", func(m *Model) { m.toggleStats(true) }},
+	{"w", "save the editing deck", nil}, // hands back a command, so it is run below
 	{"c", "close", func(m *Model) { m.ws.close() }},
 	{"o", "only", func(m *Model) { m.ws.only() }},
 	{"h", "move left", func(m *Model) { m.ws.movePanel(-1) }},
@@ -69,6 +70,9 @@ func (m *Model) handleLeader(key string) tea.Cmd {
 		l := newDeckList()
 		m.ws.open(KindDecks).show(l)
 		return checkLegality(l.localSlugs())
+	}
+	if key == "w" {
+		return m.writeEditing()
 	}
 
 	for _, c := range leaderMenu {
@@ -337,10 +341,10 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "up":
-		p.recall(-1)
+		p.recall(-1, m.queryHistory(p))
 		return m, nil
 	case "down":
-		p.recall(1)
+		p.recall(1, m.queryHistory(p))
 		return m, nil
 
 	case "ctrl+o":

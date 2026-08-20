@@ -267,10 +267,20 @@ func (w *workspace) editable(i int) bool {
 // editingList is the cards of the editing panel, or nil when there is no
 // deck being edited.
 func (w *workspace) editingList() *cardList {
+	p := w.editingPanel()
+	if p == nil {
+		return nil
+	}
+	return p.cardsView()
+}
+
+// editingPanel is the panel that list is in, which is what saving needs: the
+// result comes back addressed to a panel.
+func (w *workspace) editingPanel() *panel {
 	if w.editing < 0 || w.editing >= len(w.panels) {
 		return nil
 	}
-	return w.panels[w.editing].cardsView()
+	return w.panels[w.editing]
 }
 
 // ── Layout ──────────────────────────────────────────────────────

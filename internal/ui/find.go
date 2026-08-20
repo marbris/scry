@@ -57,7 +57,6 @@ func (m *Model) search(p *panel) tea.Cmd {
 
 	m.history = RememberQuery(m.history, query)
 	SaveQueryHistory(m.history)
-	p.history = m.history
 	p.leaveHistory()
 
 	p.loading = true

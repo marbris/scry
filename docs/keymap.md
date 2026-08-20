@@ -45,6 +45,7 @@ answered.
 | `<space>r` | new **rules** panel |
 | `<space>n` | new blank panel — `tab` picks its target |
 | `<space>s` | global **statistics** (every visible list) |
+| `<space>w` | **write** the editing deck, from wherever you are |
 | `<space>c` | close this panel |
 | `<space>o` | close every other panel ("only") |
 | `<space>h` `<space>l` | move this panel left / right in the row |
@@ -191,6 +192,18 @@ shifted form.
 
 The name prompt defaults to something useful — the remote deck's title, or
 the query string for search results.
+
+### `<space>w` saves the deck you're editing
+
+Bare `w` saves the list you are looking at, which is the right default and
+also makes the one list you most want saved the hardest to reach: `a`, `x`
+and `t` write to the **editing deck** from any panel, so the deck with
+unsaved changes in it is routinely not the one under the cursor. `<space>w`
+is the same key in the panel space, meaning the panel-level thing — exactly
+the relationship `<space>s` has to `s`.
+
+It never asks for a name. `e` can only land on a deck of yours, so "this
+isn't yours yet" can't arise here; that is what `w` on the list is for.
 
 ### `w` and `c` are not the same operation
 

@@ -85,7 +85,6 @@ func New() Model {
 func NewWithQuery(query string) (Model, tea.Cmd) {
 	m := New()
 	p := m.ws.open(KindFind)
-	p.history = m.history
 	p.search.SetValue(query)
 	p.search.CursorEnd()
 	cmd := m.search(p)

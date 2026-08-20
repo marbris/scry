@@ -169,7 +169,6 @@ func TestQueryHistoryWalksBackAndForward(t *testing.T) {
 
 	m = drive(m, "space", "f")
 	p := m.ws.current()
-	p.history = m.history
 
 	m = drive(m, "up")
 	if got := p.search.Value(); got != "c:r cmc<=2" {
@@ -196,7 +195,6 @@ func TestWalkingBackKeepsWhatYouWereTyping(t *testing.T) {
 	m.history = []string{"t:elf"}
 	m = drive(m, "space", "f")
 	p := m.ws.current()
-	p.history = m.history
 
 	for _, r := range "half a qu" {
 		m = drive(m, string(r))
@@ -292,5 +290,36 @@ func TestReopeningTheBarKeepsTheQueryForEditing(t *testing.T) {
 	}
 	if got := p.search.Value(); got != "t:elf c:g" {
 		t.Errorf("typing appended to %q", got)
+	}
+}
+
+func TestASecondPanelRecallsTheFirstPanelsQueries(t *testing.T) {
+	// The list is the Model's, not the panel's. Each panel used to be handed
+	// a copy, and only two of the ways a panel can open ever handed one
+	// over — so a find panel opened with <space>f had no history at all,
+	// which is every find panel opened during a session.
+	m, _ := typed(sized(120, 30), "t:elf")
+	m = drive(m, "enter") // running it is what remembers it, and blurs the bar
+	m = drive(m, "space", "f")
+
+	if got := m.ws.count(); got != 2 {
+		t.Fatalf("%d panels, want 2", got)
+	}
+	m = drive(m, "up")
+	if got := m.ws.current().search.Value(); got != "t:elf" {
+		t.Errorf("up in the new panel gave %q, want the query run in the first", got)
+	}
+}
+
+func TestOtherBarsDoNotRecallCardQueries(t *testing.T) {
+	// The rules bar asks a different question, so the card queries are not
+	// answers it should be offering.
+	m := sized(120, 30)
+	m.history = []string{"t:elf"}
+	m = drive(m, "space", "r")
+
+	m = drive(m, "up")
+	if got := m.ws.current().search.Value(); got != "" {
+		t.Errorf("the rules bar recalled %q", got)
 	}
 }
