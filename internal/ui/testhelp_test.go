@@ -3,6 +3,8 @@ package ui
 import (
 	"strings"
 
+	"scry/internal/mtg"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -105,3 +107,5 @@ func messages(cmd tea.Cmd) []tea.Msg {
 }
 
 func mkReader(s string) *strings.Reader { return strings.NewReader(s) }
+
+func mtgCard(cost string) mtg.Card { return mtg.Card{ManaCost: cost} }

@@ -2,6 +2,10 @@ package ui
 
 import (
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+
+	"scry/internal/theme"
 	"testing"
 
 	"scry/internal/deck"
@@ -200,6 +204,95 @@ func TestTruncateAgreesWithTextWidth(t *testing.T) {
 		for width := 1; width <= 40; width++ {
 			if got := textWidth(truncate(s, width)); got > width {
 				t.Errorf("truncate(%q, %d) measures %d", s, width, got)
+			}
+		}
+	}
+}
+
+func TestSplitCardManaKeepsBothHalvesApart(t *testing.T) {
+	// "2U // {2R" was the symptom: splitting on the closing brace left the
+	// separator glued to the next symbol.
+	for cost, want := range map[string]string{
+		"{2}{U} // {2}{R}": "2U // 2R",
+		"{3}{B}{G}":        "3BG",
+		"{2}{W/U}":         "2W/U",
+		"{X}{R}":           "XR",
+		"":                 "",
+	} {
+		if got := manaCost(mtg.Card{ManaCost: cost}); got != want {
+			t.Errorf("manaCost(%q) = %q, want %q", cost, got, want)
+		}
+	}
+}
+
+func TestTheNameTakesItsColourFromWhatYouSortedBy(t *testing.T) {
+	// The order you chose is the question you are asking.
+	green := mtg.Card{Name: "Llanowar Elves", TypeLine: "Creature — Elf", Colors: []string{"G"}}
+
+	if got := nameColour(green, sortColor); got != theme.ManaG {
+		t.Errorf("sorting by colour painted the name %v, want green", got)
+	}
+	if got := nameColour(green, sortType); got != typeColour("Creature — Elf") {
+		t.Errorf("sorting by type painted the name %v", got)
+	}
+	if got := nameColour(green, sortMana); got != theme.Text {
+		t.Errorf("sorting by mana painted the name %v, want plain", got)
+	}
+}
+
+func TestEachCardTypeGetsItsOwnColour(t *testing.T) {
+	// So a list ordered by type reads as bands rather than a grey column.
+	seen := map[lipgloss.Color]string{}
+	for _, line := range []string{
+		"Creature — Elf", "Instant", "Sorcery", "Enchantment",
+		"Legendary Planeswalker — Jace", "Basic Land — Forest",
+	} {
+		c := typeColour(line)
+		if other, dup := seen[c]; dup {
+			t.Errorf("%q and %q are the same colour", line, other)
+		}
+		seen[c] = line
+	}
+}
+
+func TestManaIsPaintedSymbolBySymbol(t *testing.T) {
+	// Which is how a curve is read at a glance; one colour for the whole
+	// cost would say nothing a number doesn't.
+	//
+	// Asserted on the colours rather than the output, because lipgloss drops
+	// styling entirely when nothing is attached to a terminal.
+	if stripANSI(paintMana("2GG")) != "2GG" {
+		t.Errorf("painting changed the text: %q", stripANSI(paintMana("2GG")))
+	}
+
+	generic, green := symbolColour("2"), symbolColour("G")
+	if generic == green {
+		t.Error("a generic cost and a green pip are the same colour")
+	}
+	for _, pair := range [][2]string{{"W", "U"}, {"U", "B"}, {"B", "R"}, {"R", "G"}} {
+		if symbolColour(pair[0]) == symbolColour(pair[1]) {
+			t.Errorf("%s and %s are the same colour", pair[0], pair[1])
+		}
+	}
+	// A hybrid is neither of its halves, since picking one would be wrong
+	// half the time.
+	if h := symbolColour("W/U"); h == symbolColour("W") || h == symbolColour("U") {
+		t.Error("a hybrid symbol took one of its halves' colours")
+	}
+}
+
+func TestPaintingNeverChangesAColumnsWidth(t *testing.T) {
+	// The ladder has already decided the widths; painting must not disturb
+	// them or the row wraps.
+	c := deck.Card{Card: mtg.Card{
+		Name: "Dwynen, Gilt-Leaf Daen", TypeLine: "Legendary Creature — Elf Archer",
+		ManaCost: "{2}{G}{G}", Colors: []string{"G"},
+	}}
+	for _, order := range cardSorts {
+		for width := 8; width <= 50; width++ {
+			got := stripANSI(renderRow(c, order, rowState{}, width))
+			if textWidth(got) > width {
+				t.Errorf("order %v at width %d rendered %d columns", order, width, textWidth(got))
 			}
 		}
 	}

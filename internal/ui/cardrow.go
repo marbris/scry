@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"scry/internal/deck"
+	"scry/internal/mtg"
 	"scry/internal/theme"
 )
 
@@ -58,23 +59,105 @@ func renderRow(c deck.Card, order cardSort, st rowState, width int) string {
 	col := order.column(c.Card)
 	text, colText := layoutRow(name, col, order.abbreviates(), body)
 
-	nameStyle := lipgloss.NewStyle().Foreground(theme.Text)
+	// The sort decides what the row is about, so it decides what is worth
+	// colouring. Sorting by colour and reading a column of grey names tells
+	// you nothing the order didn't already.
+	nameStyle := lipgloss.NewStyle().Foreground(nameColour(c.Card, order))
 	if st.cursor {
-		nameStyle = nameStyle.Foreground(theme.SelectionFg).Bold(true)
+		nameStyle = lipgloss.NewStyle().Foreground(theme.SelectionFg).Bold(true)
 	}
-	colStyle := lipgloss.NewStyle().Foreground(theme.TextDim)
 
-	line := markStyle.Render(pad(mark, gutter)) +
-		nameStyle.Render(text) +
-		colStyle.Render(colText)
+	painted := paintColumn(colText, c.Card, order, st.cursor)
 
+	line := markStyle.Render(pad(mark, gutter)) + nameStyle.Render(text) + painted
 	if st.cursor {
 		// The cursor is a background so it reads at a glance across four
 		// panels, where a colour change alone gets lost.
-		return lipgloss.NewStyle().Background(theme.SelectionBg).Width(width).Render(
-			markStyle.Render(pad(mark, gutter)) + nameStyle.Render(text) + colStyle.Render(colText))
+		return lipgloss.NewStyle().Background(theme.SelectionBg).Width(width).Render(line)
 	}
 	return line
+}
+
+// nameColour is what the card's name is written in.
+//
+// Plain text unless the list is ordered by something the name can carry: by
+// colour, the name takes the card's colour; by type, its type's. The order
+// you chose is the question you are asking, and the answer is worth being
+// able to see down the column.
+func nameColour(c mtg.Card, order cardSort) lipgloss.Color {
+	switch order {
+	case sortColor:
+		return colourForCard(c.DisplayColors())
+	case sortType:
+		return typeColour(c.TypeLine)
+	}
+	return theme.Text
+}
+
+// paintColumn renders the second column. A mana cost gets a colour per
+// symbol, which is how you read a curve at a glance; a type line takes its
+// type's colour; anything else is dim, being a number rather than a fact
+// about the card.
+func paintColumn(text string, c mtg.Card, order cardSort, under bool) string {
+	if text == "" {
+		return ""
+	}
+	if under {
+		return lipgloss.NewStyle().Foreground(theme.SelectionFg).Render(text)
+	}
+
+	switch {
+	case order.showsMana():
+		return paintMana(text)
+	case order == sortType:
+		return lipgloss.NewStyle().Foreground(typeColour(c.TypeLine)).Render(text)
+	}
+	return lipgloss.NewStyle().Foreground(theme.TextDim).Render(text)
+}
+
+// paintMana colours a rendered cost symbol by symbol. It works from the text
+// rather than the symbol list because the ladder may have padded it, and the
+// padding has to keep its place.
+func paintMana(text string) string {
+	var b strings.Builder
+	for _, r := range text {
+		switch r {
+		case ' ', '/':
+			b.WriteString(lipgloss.NewStyle().Foreground(theme.TextMuted).Render(string(r)))
+		default:
+			b.WriteString(lipgloss.NewStyle().
+				Foreground(symbolColour(string(r))).Render(string(r)))
+		}
+	}
+	return b.String()
+}
+
+// typeColour gives each card type its own colour, so a list ordered by type
+// reads as bands rather than as a column of identical grey.
+//
+// A mapping onto the existing roles rather than eight new ones: a theme
+// that changes its greens changes creatures with them, which is the
+// behaviour you would want anyway.
+func typeColour(typeLine string) lipgloss.Color {
+	switch mtg.PrimaryType(typeLine) {
+	case "Creature":
+		return theme.Success
+	case "Instant":
+		return theme.ManaU
+	case "Sorcery":
+		return theme.ManaR
+	case "Artifact":
+		return theme.TextDim
+	case "Enchantment":
+		return theme.ManaW
+	case "Planeswalker":
+		return theme.ManaMulti
+	case "Battle":
+		return theme.Accent
+	case "Land":
+		return theme.Member
+	}
+	return theme.TextMuted
 }
 
 // layoutRow works the ladder, returning the name and the column already

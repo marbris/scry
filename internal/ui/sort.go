@@ -58,6 +58,16 @@ func (s cardSort) next(delta int) cardSort {
 	return cardSort((int(s) + delta%n + n) % n)
 }
 
+// showsMana reports whether the second column is a mana cost, which decides
+// whether it gets painted symbol by symbol.
+func (s cardSort) showsMana() bool {
+	switch s {
+	case sortType, sortRarity, sortEDHREC:
+		return false
+	}
+	return true
+}
+
 // column is what the second column shows under this order. Sorting by name
 // or by arrival leaves nothing worth repeating, so both fall back to the
 // mana cost — the one property you scan a list for regardless.
@@ -81,24 +91,47 @@ func (s cardSort) column(c mtg.Card) string {
 // goes, and a rank abbreviated is a wrong number.
 func (s cardSort) abbreviates() bool { return s == sortType }
 
-// manaCost renders a cost the way the design asks for it: 3BG, no braces.
-// Hybrid and phyrexian symbols keep their innards, since {W/U} shortened to
-// anything is a different card.
-func manaCost(c mtg.Card) string {
-	cost := c.DisplayManaCost()
+// manaSymbols pulls a cost apart into the symbols it is made of, with "//"
+// standing between the halves of a split card.
+//
+// Kept as a list rather than flattened to a string, because the two things
+// that want it want different shapes: the ladder needs its width, and the
+// row needs to paint each symbol its own colour. Flattening first loses
+// where one symbol ends and the next begins, which for a hybrid like {W/U}
+// is the whole question.
+func manaSymbols(cost string) []string {
 	if cost == "" {
-		return ""
+		return nil
 	}
+	var out []string
+	for _, face := range strings.Split(cost, "//") {
+		if len(out) > 0 {
+			out = append(out, "//")
+		}
+		for _, loc := range symbolRe.FindAllStringIndex(face, -1) {
+			out = append(out, face[loc[0]+1:loc[1]-1])
+		}
+	}
+	return out
+}
+
+// manaText is the cost as the design asks for it: 3BG, no braces, and
+// "2U // 2R" for a split card. Hybrid and phyrexian symbols keep their
+// innards, since {W/U} shortened to anything is a different card.
+func manaText(symbols []string) string {
 	var b strings.Builder
-	for _, sym := range strings.Split(cost, "}") {
-		sym = strings.TrimPrefix(sym, "{")
-		if sym == "" {
+	for _, s := range symbols {
+		if s == "//" {
+			b.WriteString(" // ")
 			continue
 		}
-		b.WriteString(sym)
+		b.WriteString(s)
 	}
 	return b.String()
 }
+
+// manaCost is the whole job for callers that only want the text.
+func manaCost(c mtg.Card) string { return manaText(manaSymbols(c.DisplayManaCost())) }
 
 // sortCards returns the cards in the given order. Arrival order is the
 // tiebreak throughout — a stable sort over the list as it came in — so cards
