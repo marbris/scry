@@ -22,7 +22,7 @@ func editing(t *testing.T) (Model, *cardList, *cardList) {
 	}, sortArrival)
 	target := m.ws.current().cardsView()
 	target.deck = &deck.Info{Name: "Elf Ball", Slug: "elf-ball", Format: "commander"}
-	m.ws.editing, m.ws.pinned = 1, true
+	m.ws.editing = 1
 
 	return m, search, target
 }
@@ -98,7 +98,7 @@ func TestSomebodyElsesDeckCannotBeEdited(t *testing.T) {
 	m := withCards(sized(120, 30), "d", sample(), sortArrival)
 	l := m.ws.current().cardsView()
 	l.deck = &deck.Info{Name: "Borrowed", ID: "Y8dZ7"} // no slug: not yours
-	m.ws.editing, m.ws.pinned = 0, true
+	m.ws.editing = 0
 
 	m = drive(m, "a")
 	if !strings.Contains(stripANSI(m.View()), "isn't yours") {

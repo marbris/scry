@@ -66,9 +66,9 @@ func TestTheBarsCountWhatTheListShows(t *testing.T) {
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	m = drive(m, "s")
 
-	before := len(statRows(m.stats.groups))
+	before := len(statRows(m.statGroups()))
 	m = drive(m, "J", "J", "J") // narrow to a small category
-	after := len(statRows(m.stats.groups))
+	after := len(statRows(m.statGroups()))
 
 	if before != after {
 		t.Errorf("the rows moved under the cursor: %d then %d", before, after)

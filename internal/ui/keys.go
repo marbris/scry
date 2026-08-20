@@ -204,7 +204,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.search.CursorEnd()
 
 	case "e":
-		m.ws.pin()
+		m.ws.cycleEditing(1)
+	case "E":
+		m.ws.cycleEditing(-1)
 
 	case "K", "shift+up":
 		if m.info.mode == infoStats {
@@ -420,12 +422,9 @@ func (m *Model) versions(p *panel) tea.Cmd {
 		return loadVersions(p.id, e.slug, e.name)
 
 	case *cardList:
-		// A deck's versions are its commits; a card's are the wordings it
-		// has been printed with. Same question, two kinds of thing.
-		if v.deck != nil && v.deck.Local() {
-			p.loading = true
-			return loadVersions(p.id, v.deck.Slug, v.deck.Name)
-		}
+		// A card row is a card, whatever list it is in. The cursor is on a
+		// card, so gv is about that card — a deck's own versions belong to
+		// the deck's row in the decks panel, where the cursor is on a deck.
 		if c, ok := v.current(); ok {
 			return m.openHistory(c.Card)
 		}
@@ -473,5 +472,4 @@ func (m *Model) toggleStats(global bool) {
 	m.stats.row = -1
 	m.info.offset = 0
 	m.clearStatFilter()
-	m.buildStats()
 }

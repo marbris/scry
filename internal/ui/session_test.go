@@ -130,7 +130,4 @@ func TestTheEditingDeckComesBack(t *testing.T) {
 	if back.ws.editing != 1 {
 		t.Errorf("the editing deck came back as panel %d", back.ws.editing)
 	}
-	if !back.ws.pinned {
-		t.Error("the pin did not come back")
-	}
 }

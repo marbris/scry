@@ -180,8 +180,11 @@ func lessFor(s cardSort) func(a, b mtg.Card) bool {
 			if ca != cb {
 				return ca < cb
 			}
+			// Dearest first within a colour, so the lands — which cost
+			// nothing and are colourless — end up at the very bottom
+			// instead of heading the last group.
 			if a.CMC != b.CMC {
-				return a.CMC < b.CMC
+				return a.CMC > b.CMC
 			}
 			return byName(a, b)
 		}

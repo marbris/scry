@@ -391,7 +391,7 @@ func TestEveryListFlagsWhatTheEditingDeckHolds(t *testing.T) {
 	m = withCards(m, "d", sample()[:2], sortArrival)
 
 	// Pretend the second panel is the deck being built.
-	m.ws.editing, m.ws.pinned = 1, true
+	m.ws.editing = 1
 
 	members := m.membersFor(m.ws.panels[0].cardsView())
 	if members["sol ring"] {
@@ -406,7 +406,7 @@ func TestTheEditingDeckFlagsWhatTheListsHaveTurnedUp(t *testing.T) {
 	m := sized(160, 30)
 	m = withCards(m, "f", sample()[2:], sortArrival) // Sol Ring, Forest
 	m = withCards(m, "d", sample(), sortArrival)
-	m.ws.editing, m.ws.pinned = 1, true
+	m.ws.editing = 1
 
 	members := m.membersFor(m.ws.panels[1].cardsView())
 	if !members["sol ring"] {

@@ -15,7 +15,7 @@ func openDeckPanel(t *testing.T, m Model, slug, name string, cards []deck.Card) 
 	m = withCards(m, "d", cards, sortArrival)
 	l := m.ws.current().cardsView()
 	l.deck = &deck.Info{Name: name, Slug: slug, Format: "commander"}
-	m.ws.editing, m.ws.pinned = m.ws.focused, true
+	m.ws.editing = m.ws.focused
 	return m, l
 }
 

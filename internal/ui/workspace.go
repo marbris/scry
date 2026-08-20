@@ -14,9 +14,6 @@ type workspace struct {
 	// editing is the panel whose deck is the target of a/x/t. Derived
 	// rather than chosen: see editingPanel.
 	editing int
-	// pinned says the editing panel was chosen deliberately, and shouldn't
-	// move when focus does.
-	pinned bool
 
 	// scroll is the leftmost visible panel when they don't all fit.
 	scroll int
@@ -74,13 +71,9 @@ func (w *workspace) indexOf(p *panel) int {
 	return w.focused
 }
 
-// deriveEditingIfUnpinned re-derives the editing deck after something has
-// changed what the panels hold, unless it was chosen deliberately.
-func (w *workspace) deriveEditingIfUnpinned() {
-	if !w.pinned {
-		w.deriveEditing()
-	}
-}
+// deriveEditingIfUnpinned re-checks the target after something has changed
+// what the panels hold.
+func (w *workspace) deriveEditingIfUnpinned() { w.deriveEditing() }
 
 // byID finds a panel that a request was started from, or nil if it has since
 // been closed.
@@ -103,7 +96,7 @@ func (w *workspace) close() {
 	w.panels = append(w.panels[:at], w.panels[at+1:]...)
 
 	if w.editing == at {
-		w.editing, w.pinned = -1, false
+		w.editing = -1
 	} else if w.editing > at {
 		w.editing--
 	}
@@ -126,7 +119,7 @@ func (w *workspace) only() {
 	if wasEditing {
 		w.editing = 0
 	} else {
-		w.editing, w.pinned = -1, false
+		w.editing = -1
 	}
 }
 
@@ -146,9 +139,8 @@ func (w *workspace) focus(at int) {
 		}
 	}
 	w.focused = at
-	if !w.pinned {
-		w.deriveEditing()
-	}
+	// Focus no longer chooses the editing deck; it only fills a hole.
+	w.deriveEditing()
 }
 
 // step moves focus along the row. It stops at the ends rather than wrapping:
@@ -188,27 +180,78 @@ func (w *workspace) movePanel(delta int) {
 
 // ── The editing deck ────────────────────────────────────────────
 
-// deriveEditing picks the target for a/x/t without being asked. With one
-// deck panel open it is obviously that one; with several it is the one you
-// were last in, which is where you were about to work anyway. Pinning with
-// e overrides this, and is the only time the concept needs a keystroke.
+// deriveEditing keeps the target valid without choosing it for you.
+//
+// It was originally the other way round: the editing deck followed whichever
+// local deck you last looked at. That turns out to be wrong, and obviously so
+// once you use it — moving the cursor to read a deck silently redirects
+// a/x/t at it, and the one thing this target must be is predictable. So it
+// only ever fills a hole: nothing is editing, and exactly one deck is open.
+// Anything else is e's business.
 func (w *workspace) deriveEditing() {
-	if w.editable(w.focused) {
-		w.editing = w.focused
+	if w.editable(w.editing) || w.awaitingDeck(w.editing) {
+		// Already have one — or one is on its way, which is what a restored
+		// session looks like for the moment before the cards arrive.
 		return
 	}
-	// Focus is somewhere else — a search, the rules. Keep the deck we had,
-	// unless it has stopped being one.
-	if w.editable(w.editing) {
-		return
-	}
+
 	w.editing = -1
+	found := -1
+	for i := range w.panels {
+		if !w.editable(i) {
+			continue
+		}
+		if found >= 0 {
+			return // several to choose from; e chooses
+		}
+		found = i
+	}
+	w.editing = found
+}
+
+// cycleEditing moves the target to the next open deck of yours. e and E walk
+// it in either direction, and the row it lands on is the one a/x/t write to.
+func (w *workspace) cycleEditing(delta int) {
+	var decks []int
 	for i := range w.panels {
 		if w.editable(i) {
-			w.editing = i
-			return
+			decks = append(decks, i)
 		}
 	}
+	if len(decks) == 0 {
+		w.editing = -1
+		return
+	}
+
+	at := -1
+	for i, p := range decks {
+		if p == w.editing {
+			at = i
+			break
+		}
+	}
+	// Not currently on one: e goes to the first, E to the last, so a single
+	// press always lands somewhere rather than needing two.
+	if at < 0 {
+		if delta > 0 {
+			w.editing = decks[0]
+		} else {
+			w.editing = decks[len(decks)-1]
+		}
+		return
+	}
+
+	n := len(decks)
+	w.editing = decks[((at+delta)%n+n)%n]
+}
+
+// awaitingDeck reports whether a panel is in the middle of opening a deck,
+// so a target chosen before it arrives isn't thrown away.
+func (w *workspace) awaitingDeck(i int) bool {
+	if i < 0 || i >= len(w.panels) {
+		return false
+	}
+	return w.panels[i].loading && w.panels[i].kind == KindDecks
 }
 
 // editable reports whether a panel holds a local deck, the only thing that
@@ -228,19 +271,6 @@ func (w *workspace) editingList() *cardList {
 		return nil
 	}
 	return w.panels[w.editing].cardsView()
-}
-
-// pin fixes the editing deck on the focused panel, or lets go of it.
-func (w *workspace) pin() {
-	if !w.editable(w.focused) {
-		return
-	}
-	if w.pinned && w.editing == w.focused {
-		w.pinned = false
-		w.deriveEditing()
-		return
-	}
-	w.editing, w.pinned = w.focused, true
 }
 
 // ── Layout ──────────────────────────────────────────────────────

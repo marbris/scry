@@ -35,10 +35,9 @@ type panelSession struct {
 type session struct {
 	Panels  []panelSession `json:"panels,omitempty"`
 	Focused int            `json:"focused,omitempty"`
-	// Editing is the index of the panel that was the editing deck, and
-	// Pinned whether you chose it deliberately.
-	Editing int  `json:"editing,omitempty"`
-	Pinned  bool `json:"pinned,omitempty"`
+	// Editing is the index of the panel that was the editing deck. Chosen
+	// with e, so it is worth coming back to.
+	Editing int `json:"editing,omitempty"`
 }
 
 func sessionPath() string { return filepath.Join(paths.State(), sessionFile) }
@@ -59,7 +58,7 @@ func loadSession() session {
 // a few keystrokes tomorrow, and a dialogue about it on the way out would
 // cost more.
 func (m Model) saveSession() {
-	s := session{Focused: m.ws.focused, Editing: -1, Pinned: m.ws.pinned}
+	s := session{Focused: m.ws.focused, Editing: -1}
 
 	for i, p := range m.ws.panels {
 		ps := panelSession{Kind: p.kind.String()}
@@ -162,10 +161,12 @@ func (m *Model) restore() tea.Cmd {
 	if m.ws.count() == 0 {
 		return nil
 	}
-	if s.Editing >= 0 && s.Editing < m.ws.count() {
-		m.ws.editing, m.ws.pinned = s.Editing, s.Pinned
-	}
+	// Focus first: it re-checks the target, and the target is the thing we
+	// are about to restore.
 	m.ws.focus(minInt(s.Focused, m.ws.count()-1))
+	if s.Editing >= 0 && s.Editing < m.ws.count() {
+		m.ws.editing = s.Editing
+	}
 	return tea.Batch(cmds...)
 }
 

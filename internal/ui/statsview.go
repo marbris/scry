@@ -24,8 +24,12 @@ import (
 
 // statsState is what the information panel is showing while in statistics
 // mode, and what the list is narrowed to because of it.
+// statsState is deliberately only the two facts a frame can't work out for
+// itself. The bars themselves are derived when they are drawn, never stored:
+// they are a function of the cards, and a stored copy goes stale the moment
+// a search finishes — which is exactly what it did, leaving "nothing to
+// count" standing over a panel full of cards.
 type statsState struct {
-	groups []stats.Group
 	// row is the flattened index of the highlighted category, or -1 when
 	// the panel is showing totals and the list is unnarrowed.
 	row int
@@ -42,17 +46,15 @@ func statRows(groups []stats.Group) []stats.Row {
 	return out
 }
 
-// build counts the cards. rowSource decides which categories exist and in
-// what order — the whole list — while counted is what the numbers describe.
-// The two differ once a category is chosen: the rows hold still while the
-// numbers beside them describe what's left, so a category with nothing in it
-// stays put and reads zero rather than vanishing under the cursor.
-func (m *Model) buildStats() {
-	cards, source := m.statCards()
-	m.stats.groups = stats.Groups(source, cards)
-	if m.stats.row >= len(statRows(m.stats.groups)) {
-		m.stats.row = len(statRows(m.stats.groups)) - 1
-	}
+// statGroups counts the cards. The source decides which categories exist and
+// in what order — the whole list — while the counted set is what the numbers
+// describe. The two differ once a category is chosen: the rows hold still
+// while the numbers beside them describe what's left, so a category with
+// nothing in it stays put and reads zero rather than vanishing under the
+// cursor.
+func (m Model) statGroups() []stats.Group {
+	counted, source := m.statCards()
+	return stats.Groups(source, counted)
 }
 
 // statCards is what the statistics describe: the focused list, or every list
@@ -91,7 +93,7 @@ func (m *Model) statLists() []*cardList {
 // highlighted category — which is what makes walking the bars a way of
 // reading the deck rather than a report about it.
 func (m *Model) applyStatFilter() {
-	rows := statRows(m.stats.groups)
+	rows := statRows(m.statGroups())
 	var chosen *stats.Row
 	if m.stats.row >= 0 && m.stats.row < len(rows) {
 		chosen = &rows[m.stats.row]
@@ -100,7 +102,6 @@ func (m *Model) applyStatFilter() {
 		l.statFilter = chosen
 		l.refresh()
 	}
-	m.buildStats()
 }
 
 // clearStatFilter puts every list back.
@@ -117,7 +118,7 @@ func (m *Model) clearStatFilter() {
 // category at all, which is how you get the whole list back without
 // remembering which key clears it.
 func (m *Model) moveStat(delta int) {
-	rows := statRows(m.stats.groups)
+	rows := statRows(m.statGroups())
 	if len(rows) == 0 {
 		return
 	}
@@ -135,13 +136,14 @@ func (m *Model) moveStat(delta int) {
 
 // renderStats draws the groups as horizontal bars.
 func (m Model) renderStats(width int) []string {
-	if len(m.stats.groups) == 0 {
+	groups := m.statGroups()
+	if len(groups) == 0 {
 		return []string{mutedLine("nothing to count", width)}
 	}
 
 	// One scale across every group, so a glance compares them.
 	widest := 0
-	for _, g := range m.stats.groups {
+	for _, g := range groups {
 		for _, r := range g.Rows {
 			if r.Base > widest {
 				widest = r.Base
@@ -153,7 +155,7 @@ func (m Model) renderStats(width int) []string {
 	}
 
 	labelWidth := 0
-	for _, g := range m.stats.groups {
+	for _, g := range groups {
 		for _, r := range g.Rows {
 			if w := textWidth(r.Label); w > labelWidth {
 				labelWidth = w
@@ -170,7 +172,7 @@ func (m Model) renderStats(width int) []string {
 
 	var out []string
 	at := 0
-	for _, g := range m.stats.groups {
+	for _, g := range groups {
 		if len(out) > 0 {
 			out = append(out, "")
 		}
