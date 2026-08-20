@@ -191,7 +191,7 @@ Open panels straight to what you want:
 ```bash
 scry                       # come back to the panels you left
 scry 't:creature c:rw cmc<=3'   # run a Scryfall query
-scry 'lightning bolt'      # one exact match prints straight to the terminal
+scry Isshin                # one exact match prints straight to the terminal
 scry https://moxfield.com/decks/...   # open a deck on Moxfield
 ```
 
