@@ -157,21 +157,15 @@ func (m Model) viewInfo(width, height int) string {
 		lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)),
 	}
 
-	var body []string
+	body := m.infoContent(inner)
 	offset := m.info.offset
-	switch {
-	case m.info.mode == infoStats:
-		body = m.renderStats(inner)
+	if m.info.mode == infoStats {
 		// The statistics scroll to wherever the highlighted category is,
 		// rather than remembering a position: the category *is* the
 		// position, so deriving it can't drift out of step with it. J past
 		// the bottom used to move a cursor you could no longer see.
 		offset = scrollTo(statLine(m.statGroups(), m.stats.row),
 			offset, maxInt(height-4, 1), len(body))
-	case m.info.mode == infoVersions:
-		body = m.infoVersions(inner)
-	default:
-		body = m.infoBody(inner)
 	}
 	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
 	// read, never focused.
@@ -234,6 +228,73 @@ func (m Model) infoTitle() string {
 		return "deck"
 	}
 	return "card"
+}
+
+// infoContent is the whole information-panel body for the current mode,
+// before it is scrolled — the lines paragraph scrolling counts and the view
+// draws from the same place, so they can't disagree about where a paragraph
+// begins.
+func (m Model) infoContent(inner int) []string {
+	switch m.info.mode {
+	case infoStats:
+		return m.renderStats(inner)
+	case infoVersions:
+		return m.infoVersions(inner)
+	default:
+		return m.infoBody(inner)
+	}
+}
+
+// scrollInfoParagraph moves the information panel by a paragraph rather than
+// a line — the same idea as ctrl+k / ctrl+j jumping a whole group in
+// statistics, one level coarser than K and J. A card's rulings run to
+// several paragraphs, and a line at a time is a lot of pressing to walk them.
+func (m *Model) scrollInfoParagraph(delta int) {
+	l := m.ws.layout()
+	if l.info == 0 {
+		return // no information panel on a terminal this narrow
+	}
+	starts := paragraphStarts(m.infoContent(maxInt(l.info-2, 1)))
+	if len(starts) == 0 {
+		return
+	}
+
+	cur := m.info.offset
+	switch {
+	case delta > 0:
+		for _, s := range starts {
+			if s > cur {
+				m.info.offset = s
+				return
+			}
+		}
+		m.info.offset = starts[len(starts)-1]
+	default:
+		for i := len(starts) - 1; i >= 0; i-- {
+			if starts[i] < cur {
+				m.info.offset = starts[i]
+				return
+			}
+		}
+		m.info.offset = 0
+	}
+}
+
+// paragraphStarts is the line index each paragraph begins on: a non-blank
+// line at the top, or one following a blank line. Blank lines are the seams
+// the card panel puts between a card's type, its text, its printing and each
+// of its rulings.
+func paragraphStarts(body []string) []int {
+	var out []int
+	prevBlank := true
+	for i, line := range body {
+		blank := strings.TrimSpace(stripStyles(line)) == ""
+		if !blank && prevBlank {
+			out = append(out, i)
+		}
+		prevBlank = blank
+	}
+	return out
 }
 
 // scrollTo brings a line into view with as little movement as possible.
@@ -315,12 +376,13 @@ func (m Model) viewQuitQuestion() string {
 // memorised. Being able to see the menu is what makes a two-key binding
 // cheaper in practice than a one-key chord you can't remember.
 func (m Model) viewLeaderBar() string {
+	// No background fill: a band of colour across the bottom contrasts with
+	// an otherwise semi-transparent terminal, where nothing else here paints
+	// one. The menu is just text, indented a space like the hint bar.
 	lines := m.leaderBarLines()
 	painted := make([]string, len(lines))
 	for i, line := range lines {
-		painted[i] = lipgloss.NewStyle().
-			Background(theme.SurfaceAlt).Width(m.width).MaxWidth(m.width).
-			Render(" " + line)
+		painted[i] = " " + line
 	}
 	return strings.Join(painted, "\n")
 }
@@ -341,14 +403,11 @@ func (m Model) leaderBarLines() []string {
 	for _, c := range leaderMenu {
 		parts = append(parts, key.Render(c.key)+" "+what.Render(c.what))
 	}
-	if m.ws.count() > 1 {
-		parts = append(parts, key.Render("1-9")+" "+what.Render("go to"))
-	}
 	return packStyled(parts, sep, maxInt(m.width-2, 1))
 }
 
 // footerHeight is how many rows the bottom of the screen needs. The leader
-// menu is the only thing down there that can want more than one.
+// menu and the grouped hint bar can each want more than one.
 func (m Model) footerHeight() int {
 	if m.leader {
 		return maxInt(len(m.leaderBarLines()), 1)
@@ -356,77 +415,115 @@ func (m Model) footerHeight() int {
 	if m.quitting {
 		return 1
 	}
-	// The hint bar is the whole contextual keymap now, so it is as tall as
-	// that keymap needs. The panels give up the room, the way they do for
-	// the leader menu — being pushed off the top of the screen instead is a
-	// bug this project has already had once.
-	return maxInt(len(m.hintLines(maxInt(m.width-textWidth(m.viewStatus(m.ws.layout()))-6, 1))), 1)
+	// The hint bar is the whole contextual keymap now — one row per group,
+	// with a line for the last result above them when there is one. The
+	// panels give up the room, the way they do for the leader menu; being
+	// pushed off the top of the screen instead is a bug this project has
+	// already had once.
+	return maxInt(len(m.footerLines()), 1)
 }
 
-// viewHint is the keys that work where you are, wrapped over as many lines
-// as they need, with the last thing you did and the panel count kept out to
-// the right of them.
+// viewHint is the keys that work where you are, one grouped row each.
 func (m Model) viewHint(l layout) string {
-	right := m.viewStatus(l)
-	rightWidth := textWidth(right)
-
-	// Every hint line is packed to what is left over, so the status can
-	// never land on top of one. Two spaces of margin each side, and two
-	// between the two columns.
-	room := maxInt(m.width-rightWidth-6, 1)
-	lines := m.hintLines(room)
-
-	for i, line := range lines {
-		pad := maxInt(m.width-textWidth(line)-rightWidth-2, 1)
-		if i == 0 && right != "" {
-			lines[i] = " " + line + strings.Repeat(" ", pad) + right + " "
-			continue
-		}
-		lines[i] = " " + line
-	}
-	return strings.Join(lines, "\n")
+	return strings.Join(m.footerLines(), "\n")
 }
 
-// hintLines is the contextual keymap, packed into lines of the given width.
-func (m Model) hintLines(width int) []string {
+// footerLines is the bottom of the screen: the last thing you did on its own
+// line, then the grouped keys — one row per group, led by what the group is.
+//
+// The notice used to share the keys' first line, off to the right, and the
+// groups wrapped over as many lines as they liked; a result worth reading and
+// the keys for what to do next fought over the same row, and the bar grew
+// tall. The notice is on its own line above them now, and each group is a
+// single row across the full width.
+func (m Model) footerLines() []string {
+	hints := m.hintGroupLines(m.footerGroups(), maxInt(m.width-2, 1))
+	for i := range hints {
+		hints[i] = " " + hints[i]
+	}
+
+	var lines []string
+	if notice := m.viewNotice(); notice != "" {
+		lines = append(lines, " "+notice)
+	}
+	return append(lines, hints...)
+}
+
+// footerGroups is what the hint bar shows: at rest, the three keys that reach
+// everything else; pressing ? grows it to the whole contextual keymap.
+//
+// A focused search bar is the exception — it shows its own small keymap and ?
+// is a character there, so there is nothing to collapse or grow.
+func (m Model) footerGroups() []hintGroup {
+	p := m.ws.current()
+	if p != nil && p.searchOpen && p.search.Focused() {
+		return m.hintGroups()
+	}
+	if m.hintsExpanded {
+		return m.hintGroups()
+	}
+	return []hintGroup{{"", [][2]string{
+		{"space", "menu"},
+		{"?", "keys"},
+		{"q", "quit"},
+	}}}
+}
+
+// hintGroupLines renders grouped keys, one row per group, each led by its
+// title: "navigation: …", "select: …". A group is kept to a single row — keys
+// that would overrun the width are dropped rather than wrapped, since the full
+// set is one ? away. The labels are terse for the same reason: the bar is a
+// reminder, not the manual.
+func (m Model) hintGroupLines(groups []hintGroup, width int) []string {
+	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	key := lipgloss.NewStyle().Foreground(theme.Accent)
 	what := lipgloss.NewStyle().Foreground(theme.TextMuted)
-	sep := what.Render(" · ")
+	sep := what.Render("  ")
+	sepW := textWidth("  ")
 
-	var parts []string
-	for _, r := range m.contextKeys() {
-		parts = append(parts, key.Render(r[0])+" "+what.Render(r[1]))
+	var lines []string
+	for _, g := range groups {
+		var b strings.Builder
+		used := 0
+		if g.title != "" {
+			b.WriteString(head.Render(g.title + ":"))
+			used = textWidth(g.title) + 1 // the colon
+		}
+
+		for _, r := range g.keys {
+			part := key.Render(r[0]) + " " + what.Render(r[1])
+			w := textWidth(r[0]) + 1 + textWidth(r[1])
+			if used+sepW+w > width {
+				break // one row only; the rest is in the reference
+			}
+			if used > 0 {
+				b.WriteString(sep)
+				used += sepW
+			}
+			b.WriteString(part)
+			used += w
+		}
+		lines = append(lines, b.String())
 	}
-	lines := packStyled(parts, sep, width)
 	if len(lines) == 0 {
 		return []string{""}
 	}
 	return lines
 }
 
-// viewStatus is the right-hand column: what the last thing you did produced,
-// then which panel of how many and whether any are off screen.
-func (m Model) viewStatus(l layout) string {
-	var parts []string
-	if m.notice != "" {
-		style := lipgloss.NewStyle().Foreground(theme.Success)
-		if strings.HasPrefix(m.notice, "error:") {
-			style = lipgloss.NewStyle().Foreground(theme.Error)
-		}
-		// Half the screen at most. The keys wrap onto another line rather
-		// than being crowded out, so the notice can afford to be readable —
-		// and a notice cut short is one you have to guess at, which is what
-		// "that deck isn't yours — p nee…" reads like.
-		parts = append(parts, style.Render(truncate(m.notice, maxInt(m.width/2, 24))))
+// viewNotice is the last thing you did, on its own line above the keys.
+func (m Model) viewNotice() string {
+	if m.notice == "" {
+		return ""
 	}
-	if n := m.ws.count(); n > 0 {
-		count := itoa(m.ws.focused+1) + "/" + itoa(n)
-		if l.visible() < n {
-			count += " ↔"
-		}
-		parts = append(parts, lipgloss.NewStyle().Foreground(theme.Accent).Render(count))
+	style := lipgloss.NewStyle().Foreground(theme.Success)
+	if strings.HasPrefix(m.notice, "error:") {
+		style = lipgloss.NewStyle().Foreground(theme.Error)
 	}
-	return strings.Join(parts, "  ")
+	// A line of its own, so it can afford to be readable — a notice cut
+	// short is one you have to guess at, which is what "that deck isn't
+	// yours — p nee…" reads like.
+	return style.Render(truncate(m.notice, maxInt(m.width-2, 24)))
 }
 
 func itoa(n int) string {

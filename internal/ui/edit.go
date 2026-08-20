@@ -6,7 +6,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"scry/internal/deck"
-	"scry/internal/mtg"
 )
 
 // Editing the deck you're building.
@@ -279,11 +278,13 @@ func parseTagEdit(input string) (add, remove []string) {
 // commander marks a card as the deck's commander, or unmarks it. Toggling
 // rather than replacing, because a pair of partners is two of them.
 func (m *Model) commander(c deck.Card) tea.Cmd {
-	l, _ := m.editTarget()
+	l, why := m.editTarget()
 	if l == nil {
-		// Nothing to be the commander of yet, so make something. A deck
-		// named after its commander is what you would have typed anyway.
-		return newDeckWithCommander(c.Card)
+		// A commander is a role in a deck you're editing. With no such deck
+		// open, c has nothing to act on — it says so rather than conjuring a
+		// deck up around the card.
+		m.notice = why
+		return nil
 	}
 
 	i := l.indexOfCard(c.Card.Name)
@@ -306,20 +307,6 @@ func (m *Model) commander(c deck.Card) tea.Cmd {
 		m.notice = c.Card.Name + " is no longer the commander"
 	}
 	return nil
-}
-
-func newDeckWithCommander(c mtg.Card) tea.Cmd {
-	return func() tea.Msg {
-		slug, d, err := deck.New(c.Name, deck.DefaultFormat)
-		if err != nil {
-			return noticeMsg{err: err}
-		}
-		d.Entries = append(d.Entries, deck.Entry{Qty: 1, Name: c.Name, Section: "commander"})
-		if _, _, err := deck.SaveVersioned(slug, d); err != nil {
-			return noticeMsg{err: err}
-		}
-		return noticeMsg{text: "made " + slug + " with " + c.Name + " in the command zone"}
-	}
 }
 
 // ── Undo ────────────────────────────────────────────────────────

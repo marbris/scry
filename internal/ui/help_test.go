@@ -74,17 +74,20 @@ func TestTheReferenceDescribesThePanelYouAreIn(t *testing.T) {
 	own.ws.editing = own.ws.focused
 	deckKeys := keyText(own)
 
-	if !strings.Contains(deckKeys, "This deck") {
-		t.Errorf("a deck of yours is headed:\n%s", deckKeys)
+	// The editing keys are grouped under the deck they change, so the
+	// reference names it; a search with nothing being edited offers the way
+	// to choose one instead.
+	if !strings.Contains(deckKeys, "edit · this deck") {
+		t.Errorf("a deck's editing keys aren't headed by the deck:\n%s", deckKeys)
 	}
-	if !strings.Contains(searchKeys, "These cards") {
-		t.Errorf("a search is headed:\n%s", searchKeys)
+	if !strings.Contains(searchKeys, "choose a deck to edit") {
+		t.Errorf("a search doesn't offer a deck to edit:\n%s", searchKeys)
 	}
 
 	// Editing keys are listed against the deck they change, and not offered
 	// at all with no deck to change: on a search with nothing being edited,
 	// every one of them would do nothing but explain itself.
-	for _, only := range []string{"tag, tag again", "undo"} {
+	for _, only := range []string{"tag/retag", "undo"} {
 		if !strings.Contains(deckKeys, only) {
 			t.Errorf("%q is missing from a deck's keys:\n%s", only, deckKeys)
 		}
@@ -92,18 +95,13 @@ func TestTheReferenceDescribesThePanelYouAreIn(t *testing.T) {
 			t.Errorf("%q is offered on a search with no deck being edited", only)
 		}
 	}
-	// And they name that deck, so you can see where the card is going from
-	// a panel that isn't it.
-	if !strings.Contains(deckKeys, "this deck") {
-		t.Errorf("the editing keys don't say which deck they change:\n%s", deckKeys)
-	}
 }
 
 func TestTheDecksPanelHasItsOwnKeys(t *testing.T) {
 	m := drive(sized(140, 40), "space", "d")
 	got := keyText(m)
 
-	if !strings.Contains(got, "Your decks") {
+	if !strings.Contains(got, "decks") {
 		t.Errorf("headed:\n%s", got)
 	}
 	for _, want := range []string{"follow a deck", "new deck", "rename"} {
@@ -127,9 +125,9 @@ func TestTheBarsKeysAreOnTheHintLineNotInTheReference(t *testing.T) {
 	}
 }
 
-func TestTheReferenceFitsTheScreen(t *testing.T) {
-	// It laid itself out in one column and ran off the bottom, which loses
-	// exactly the part you were reaching for.
+func TestTheExpandedBarFitsTheScreen(t *testing.T) {
+	// Growing the bar with ? takes room from the panels rather than pushing
+	// the frame past the terminal.
 	for _, size := range [][2]int{{60, 20}, {80, 24}, {100, 30}, {200, 50}, {70, 16}} {
 		m := withCards(sized(size[0], size[1]), "d", sample(), sortArrival)
 		m.ws.current().cardsView().deck = &deck.Info{Name: "Ghen", Slug: "ghen"}
@@ -137,7 +135,7 @@ func TestTheReferenceFitsTheScreen(t *testing.T) {
 
 		lines := splitLines(m.View())
 		if len(lines) > size[1] {
-			t.Errorf("%dx%d: the reference is %d lines", size[0], size[1], len(lines))
+			t.Errorf("%dx%d: the frame is %d lines", size[0], size[1], len(lines))
 		}
 		for i, line := range lines {
 			if w := visibleWidth(line); w > size[0] {
@@ -147,40 +145,16 @@ func TestTheReferenceFitsTheScreen(t *testing.T) {
 	}
 }
 
-func TestTheReferenceKeepsEverySectionWhole(t *testing.T) {
-	// Splitting a block across two columns would be worse than a third
-	// column.
-	sections := []keySection{
-		{"one", [][2]string{{"a", "x"}, {"b", "y"}}},
-		{"two", [][2]string{{"c", "z"}}},
-		{"three", [][2]string{{"d", "w"}, {"e", "v"}, {"f", "u"}}},
-	}
-	groups := packSections(sections, 5)
-	if len(groups) < 2 {
-		t.Fatalf("everything fitted in %d column(s) of 5 lines", len(groups))
-	}
-
-	total := 0
-	for _, g := range groups {
-		for _, s := range g {
-			total++
-			_ = s
-		}
-	}
-	if total != len(sections) {
-		t.Errorf("%d sections came out of %d", total, len(sections))
-	}
-}
-
-// keyText is the reference as plain text.
+// keyText is the expanded hint bar as plain text — what ? grows the bar to.
 func keyText(m Model) string {
-	m = drive(m, "?")
-	return stripANSI(m.View())
+	m.hintsExpanded = true
+	return footerOf(m)
 }
 
-// footerOf is the bottom of the screen: the hint bar and the status beside
-// it, which is what the reference has to agree with.
+// footerOf is the bottom of the screen with the hint bar grown to the whole
+// keymap, which is the fuller form the tests below check the content of.
 func footerOf(m Model) string {
+	m.hintsExpanded = true
 	l := m.ws.layoutWithFooter(m.footerHeight())
 	return stripANSI(m.viewFooter(l))
 }
@@ -190,14 +164,14 @@ func TestTheHintBarDoesNotOfferStatisticsWhereThereAreNone(t *testing.T) {
 	// offer it there anyway, because it picked one of three fixed strings.
 	for _, key := range []string{"d", "r"} {
 		m := drive(sized(120, 30), "space", key)
-		if strings.Contains(footerOf(m), "statistics") {
-			t.Errorf("<space>%s offers statistics:\n%s", key, footerOf(m))
+		if strings.Contains(footerOf(m), "stats") {
+			t.Errorf("<space>%s offers stats:\n%s", key, footerOf(m))
 		}
 	}
 
 	cards := withCards(sized(120, 30), "f", sample(), sortArrival)
-	if !strings.Contains(footerOf(cards), "statistics") {
-		t.Errorf("a list of cards doesn't offer statistics:\n%s", footerOf(cards))
+	if !strings.Contains(footerOf(cards), "stats") {
+		t.Errorf("a list of cards doesn't offer stats:\n%s", footerOf(cards))
 	}
 }
 
@@ -212,11 +186,13 @@ func TestTheHintBarSaysWhichDeckTheEditingKeysChange(t *testing.T) {
 	// A second panel, so the editing deck is not the one in front of you.
 	m = withCards(m, "f", sample(), sortArrival)
 	got := footerOf(m)
-	if !strings.Contains(got, "Ghen") {
-		t.Errorf("the editing keys don't name the deck they change:\n%s", got)
+	// The name heads the group rather than trailing every key: "edit · Ghen"
+	// over a x, t T and the rest.
+	if !strings.Contains(got, "edit · Ghen") {
+		t.Errorf("the editing keys aren't headed by the deck they change:\n%s", got)
 	}
-	if !strings.Contains(got, "add, remove a copy — Ghen") {
-		t.Errorf("a and x don't say where the card goes:\n%s", got)
+	if !strings.Contains(got, "add/remove") {
+		t.Errorf("a and x aren't offered:\n%s", got)
 	}
 }
 
@@ -225,7 +201,7 @@ func TestNoEditingDeckMeansNoEditingKeys(t *testing.T) {
 	// what is offered instead is the way to choose a deck.
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	got := footerOf(m)
-	for _, gone := range []string{"add, remove a copy", "tag, tag again", "undo"} {
+	for _, gone := range []string{"add/remove", "tag/retag"} {
 		if strings.Contains(got, gone) {
 			t.Errorf("%q offered with no deck being edited:\n%s", gone, got)
 		}
@@ -284,10 +260,11 @@ func TestNoKeyIsOfferedTwice(t *testing.T) {
 	}
 }
 
-func TestTheNoticeSitsBesideTheKeysAndGoesAway(t *testing.T) {
-	// It used to replace the hint line rather than sit beside it, so the
-	// result of the last thing you did stood on top of the keys for the
-	// next — and nothing cleared it, so it stood there for good.
+func TestTheNoticeSitsAboveTheKeysAndGoesAway(t *testing.T) {
+	// The result of the last thing you did gets its own line above the keys,
+	// rather than sharing a line with them — so it can be read at a glance
+	// and the keys for what to do next aren't crowded. The next key clears
+	// it, which is what it always claimed to and once didn't.
 	m := withCards(sized(140, 30), "f", sample(), sortArrival)
 	m.notice = "+1 Sol Ring"
 
@@ -295,14 +272,17 @@ func TestTheNoticeSitsBesideTheKeysAndGoesAway(t *testing.T) {
 	if !strings.Contains(got, "+1 Sol Ring") {
 		t.Fatalf("the notice isn't shown:\n%s", got)
 	}
-	if !strings.Contains(got, "up and down") {
-		t.Errorf("the notice is standing on the keys:\n%s", got)
+	if !strings.Contains(got, "up/down") {
+		t.Errorf("the keys aren't shown alongside the notice:\n%s", got)
 	}
 
-	// Nothing on the first line runs into the notice.
-	first := strings.Split(got, "\n")[0]
-	if strings.Contains(first, "· +1 Sol Ring") {
-		t.Errorf("the notice is packed in among the keys:\n%s", first)
+	// The notice is its own line, above the keys; nothing on it is a hint.
+	lines := strings.Split(got, "\n")
+	if !strings.Contains(lines[0], "+1 Sol Ring") {
+		t.Errorf("the notice isn't on the first line:\n%s", got)
+	}
+	if strings.Contains(lines[0], "up/down") {
+		t.Errorf("the keys are packed onto the notice line:\n%s", lines[0])
 	}
 
 	m = drive(m, "j")

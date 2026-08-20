@@ -53,7 +53,7 @@ type infoPanel struct {
 // history stood over every card you moved to afterwards — each of them
 // showing "gv for how its text has changed", which is the prompt to press
 // the key you had just pressed. Checked from one place rather than at every
-// key that can move the cursor, because that list — j, k, gg, G, ctrl+d, a
+// key that can move the cursor, because that list — j, k, gg, G, a
 // filter narrowing the list out from under it — is exactly the list somebody
 // adds to and forgets.
 func (p *infoPanel) leaveVersions(oracle string) {
@@ -78,12 +78,5 @@ func (p *infoPanel) move(delta int) {
 	p.cursor += delta
 	if p.cursor < 0 {
 		p.cursor = 0
-	}
-}
-
-func (p *infoPanel) scroll(delta int) {
-	p.offset += delta
-	if p.offset < 0 {
-		p.offset = 0
 	}
 }

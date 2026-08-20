@@ -387,7 +387,7 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		return true, nil
 	}
 
-	if l.cursor.navKey(k, len(l.rows), m.pageStep()) {
+	if l.cursor.navKey(k, len(l.rows)) {
 		return true, nil
 	}
 
@@ -550,17 +550,21 @@ func isPips(s string) bool {
 	return true
 }
 
-func (l *deckList) keys() [][2]string {
-	return [][2]string{
-		{"j k", "up and down"},
-		{"enter", "open it here"},
-		{"L", "open it beside"},
-		{"/", "filter"},
-		{"o O", "sort"},
-		{"n", "new deck"},
-		{"r", "rename"},
-		{"c", "copy, or sync a remote"},
-		{"x", "delete, unfollow"},
-		{"gv", "versions of this deck"},
+func (l *deckList) keys() []hintGroup {
+	return []hintGroup{
+		{"navigation", [][2]string{
+			{"j k", "up/down"},
+			{"o O", "sort"},
+			{"/", "filter"},
+		}},
+		{"decks", [][2]string{
+			{"enter", "open"},
+			{"L", "beside"},
+			{"n", "new deck"},
+			{"r", "rename"},
+			{"c", "copy/sync"},
+			{"x", "delete"},
+			{"gv", "versions"},
+		}},
 	}
 }

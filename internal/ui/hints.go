@@ -11,34 +11,94 @@ package ui
 // or `gv` on a search result, which fell through to the default branch.
 //
 // A hint that lies is worse than no hint, and two lists describing one
-// keymap is how one of them comes to lie. There is one now.
+// keymap is how one of them comes to lie. There is one now: hintGroups.
+//
+// The keys are grouped — navigation, select, edit, info panel — so the bar
+// can lead each line with what it is rather than running the whole keymap
+// together. Each view declares its own groups; the workspace folds in the
+// keys it owns everywhere (the bar, the edit target, the information panel,
+// and the way between and out of panels), so no view repeats them and none
+// can offer esc under two different names.
 
-// contextKeys is every key that does something where you are, in the order
-// it reads: moving about the list, then what you can do to it, then the deck
-// those edits land in, then the panel itself.
+// contextKeys is every key that does something where you are, flattened out
+// of the groups for the reference, which lays them out to be read rather
+// than skimmed.
 func (m Model) contextKeys() [][2]string {
+	var out [][2]string
+	for _, g := range m.hintGroups() {
+		out = append(out, g.keys...)
+	}
+	return out
+}
+
+// hintGroups is the grouped keymap for where you are: the source both the
+// hint bar and the reference draw from.
+func (m Model) hintGroups() []hintGroup {
 	p := m.ws.current()
 	if p == nil {
-		return [][2]string{
-			{"space", "the menu"},
-			{"?", "these keys"},
+		return []hintGroup{{"", [][2]string{
+			{"space", "menu"},
+			{"?", "keys"},
 			{"q", "quit"},
-		}
+		}}}
 	}
 
 	// While the bar has the cursor it has every key, so nothing else is
 	// worth offering: a printable key types rather than acting.
 	if p.searchOpen && p.search.Focused() {
-		return m.barKeys(p)
+		return []hintGroup{{"search", m.barKeys(p)}}
 	}
 
-	var out [][2]string
+	// The view's own groups first — navigation, and whatever the view does.
+	var groups []hintGroup
 	if v := p.top(); v != nil {
-		out = append(out, v.keys()...)
+		groups = append(groups, v.keys()...)
 	}
-	out = append(out, m.editKeys(p)...)
-	out = append(out, m.panelKeys(p)...)
-	return out
+
+	// The search bar lives in the navigation group: i is how you reach it.
+	groups = addHints(groups, "navigation", [2]string{"i", p.kind.barLabel()})
+
+	// The editing keys, against the deck they change — which is routinely
+	// not the list under the cursor.
+	if title, keys := m.editGroup(p); len(keys) > 0 {
+		groups = append(groups, hintGroup{title, keys})
+	}
+
+	// The information panel, when it holds something these keys move within.
+	if keys := m.infoKeys(p); len(keys) > 0 {
+		groups = addHints(groups, "info panel", keys...)
+	}
+
+	// The tail of navigation: between panels, out of the panel, the menu.
+	var tail [][2]string
+	if m.ws.count() > 1 {
+		tail = append(tail, [2]string{"h l", "panel"})
+	}
+	if len(p.stack) > 1 {
+		tail = append(tail, [2]string{"esc", "back"})
+	} else {
+		tail = append(tail, [2]string{"esc", "clear/close"})
+	}
+	tail = append(tail,
+		[2]string{"space", "menu"},
+		[2]string{"?", "keys"},
+		[2]string{"q", "quit"},
+	)
+	groups = addHints(groups, "navigation", tail...)
+
+	return groups
+}
+
+// addHints appends keys to the group with the given title, making it at the
+// end if there isn't one yet.
+func addHints(groups []hintGroup, title string, keys ...[2]string) []hintGroup {
+	for i := range groups {
+		if groups[i].title == title {
+			groups[i].keys = append(groups[i].keys, keys...)
+			return groups
+		}
+	}
+	return append(groups, hintGroup{title, keys})
 }
 
 // barKeys is the search bar's own keymap. tab only means something where
@@ -58,50 +118,56 @@ func (m Model) barKeys(p *panel) [][2]string {
 	)
 }
 
-// editKeys are the keys that change a deck. They are listed against the deck
-// they change, which is not the list you are looking at: a, x, t, T, c and u
-// all act on the *editing* deck from whatever panel you are in. Reading
-// "add" while looking at somebody else's deck and watching the card land
-// somewhere else is the confusion this names away.
-func (m Model) editKeys(p *panel) [][2]string {
-	l := p.cardsView()
-	if l == nil {
-		return nil // a decks panel, the rules, a list of versions
+// editGroup is the keys that change a deck, and the name of the deck they
+// change. They act on the *editing* deck from whatever panel you are in — so
+// the deck they change is routinely not the list in front of you, which is
+// exactly why the group is headed with its name.
+//
+// Only offered where the focused panel is a list of cards: a, x, t and the
+// rest do nothing from a decks panel or the rules, so they are not named
+// there. With no deck being edited they explain themselves away and are
+// replaced by the way to choose one.
+func (m Model) editGroup(p *panel) (string, [][2]string) {
+	if p.cardsView() == nil {
+		return "", nil
 	}
 
-	out := [][2]string{
-		{"s", "statistics"},
-		{"y", "yank the selection"},
-	}
-
-	// Where the edits go. Named, because "the deck you're editing" is only
-	// useful if you can see which deck that is — and with no deck chosen,
-	// none of these keys does anything but explain itself, so they are not
-	// offered at all. What is offered then is the way to choose one.
 	target := m.ws.editingList()
 	if target == nil || target.deck == nil {
-		return append(out,
-			[2]string{"c", "start a deck with this commander"},
-			[2]string{"e E", "choose a deck to edit"},
-		)
+		return "edit", [][2]string{{"e E", "choose a deck to edit"}}
 	}
 
 	into := target.deck.Name
 	if m.ws.editing == m.ws.focused {
 		into = "this deck"
 	}
-	out = append(out,
-		[2]string{"a x", "add, remove a copy — " + into},
-		[2]string{"t T", "tag, tag again — " + into},
-		[2]string{"c", "commander — " + into},
-		[2]string{"u", "undo — " + into},
-	)
-	// p is the exception in this group: it puts into the list in front of
-	// you, which is why it needs that list to be one of yours.
-	if l.deck != nil && l.deck.Local() {
-		out = append(out, [2]string{"p", "put them here"})
+	return "edit · " + into, [][2]string{
+		{"a x", "add/remove"},
+		{"t T", "tag/retag"},
+		{"c", "commander"},
+		{"u", "undo"},
+		{"e E", m.editingLabel()},
 	}
-	return append(out, [2]string{"e E", m.editingLabel()})
+}
+
+// infoKeys are the information-panel keys for a card list — statistics, and
+// the two axes of moving through what the panel shows. The rules panel
+// declares its own, since what K and J read there is a rule, not a card.
+func (m Model) infoKeys(p *panel) [][2]string {
+	if p.cardsView() == nil {
+		return nil
+	}
+	out := [][2]string{{"s", "stats"}}
+	if m.info.mode == infoStats {
+		return append(out,
+			[2]string{"K J", "category"},
+			[2]string{"ctrl+k/j", "group"},
+		)
+	}
+	return append(out,
+		[2]string{"K J", "up/down"},
+		[2]string{"ctrl+k/j", "paragraph"},
+	)
 }
 
 // editingLabel says what e and E will do, which depends on whether there is
@@ -115,38 +181,7 @@ func (m Model) editingLabel() string {
 		}
 	}
 	if n > 1 {
-		return "edit the next, previous deck"
+		return "next/prev deck"
 	}
-	return "choose the deck to edit"
-}
-
-// panelKeys are the panel and the workspace: the bar, the way out, and the
-// keys that are the same wherever you are.
-func (m Model) panelKeys(p *panel) [][2]string {
-	out := [][2]string{{"i", p.kind.barLabel()}}
-
-	// The information panel is only worth naming when it holds something
-	// those keys move within.
-	switch {
-	case m.info.mode == infoStats:
-		out = append(out,
-			[2]string{"K J", "previous, next category"},
-			[2]string{"ctrl+k/j", "previous, next group"},
-		)
-	case p.cardsView() != nil:
-		out = append(out,
-			[2]string{"K J", "move in the info panel"},
-			[2]string{"ctrl+k/j", "scroll it"},
-		)
-	}
-
-	if m.ws.count() > 1 {
-		out = append(out, [2]string{"h l", "previous, next panel"})
-	}
-	return append(out,
-		[2]string{"esc", "clear, then close"},
-		[2]string{"space", "the menu"},
-		[2]string{"?", "these keys"},
-		[2]string{"q", "quit"},
-	)
+	return "choose deck"
 }

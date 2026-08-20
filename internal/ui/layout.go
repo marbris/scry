@@ -3,21 +3,21 @@ package ui
 // How the row is divided.
 //
 // The workspace is a row of panels with the information panel pinned to the
-// right, so every panel opened makes every other one narrower. That holds
-// until they reach a floor, past which narrowing them further would leave
-// each one too thin to read a card name in; after that the row scrolls
-// instead, and the panels you can't see are still there.
+// right. The information panel is just another column: it takes the same
+// share as each panel, so a lone deck sits beside an information panel half
+// the screen wide, three panels each take a quarter, and so on. Every panel
+// opened makes every column — the information panel included — narrower.
+//
+// That holds until they reach a floor, past which narrowing them further
+// would leave each one too thin to read a card name in; after that the row
+// scrolls instead, and the panels you can't see are still there.
 
 const (
-	// minPanel is the narrowest a panel is allowed to become, borders
+	// minPanel is the narrowest a column is allowed to become, borders
 	// included. Below about this, a card row is an abbreviation of an
-	// abbreviation and the panel stops earning its column.
+	// abbreviation and the column stops earning its place. The information
+	// panel is held to the same floor.
 	minPanel = 16
-
-	// The information panel is the one thing on screen whose content is
-	// prose, so it gets a width that prose survives at.
-	infoMin = 24
-	infoMax = 38
 
 	// hintHeight is the line along the bottom saying which keys apply.
 	hintHeight = 1
@@ -55,38 +55,37 @@ func computeLayout(width, height, count, focused, scroll int) layout {
 		return l
 	}
 
-	l.info = infoWidth(width)
-	// A terminal too narrow for both gives up the information panel first:
-	// the panels are what you're working in.
-	if width-l.info < minPanel {
-		l.info = 0
+	// Every column, the information panel included, is held to the same
+	// floor, so the most columns that fit is the width divided by it.
+	maxCols := width / minPanel
+	if maxCols < 1 {
+		maxCols = 1
 	}
 
-	avail := width - l.info
-	fit := avail / minPanel
-	if fit < 1 {
-		fit = 1
+	// One column for the information panel, the rest for the panels. When
+	// there is only room for a single column the panel wins it: what you're
+	// working in beats what you're reading.
+	totalCols := count + 1
+	if totalCols > maxCols {
+		totalCols = maxCols
 	}
-	visible := count
-	if visible > fit {
-		visible = fit
+	visible := totalCols - 1
+	if visible < 1 {
+		visible = minInt(count, maxCols)
+		l.first = clampFirst(scroll, focused, visible, count)
+		l.panels = share(width, visible)
+		return l
 	}
 
+	// Equal shares across the panels and the information panel together, so
+	// the panel beside a lone deck and the information panel are the same
+	// width. The remainder lands on the leftmost panels; the information
+	// panel takes the last, plain share.
+	cols := share(width, totalCols)
+	l.info = cols[len(cols)-1]
 	l.first = clampFirst(scroll, focused, visible, count)
-	l.panels = share(avail, visible)
+	l.panels = cols[:visible]
 	return l
-}
-
-// infoWidth is a quarter of the terminal, within reason.
-func infoWidth(total int) int {
-	w := total / 4
-	if w < infoMin {
-		w = infoMin
-	}
-	if w > infoMax {
-		w = infoMax
-	}
-	return w
 }
 
 // clampFirst keeps the focused panel on screen while otherwise leaving the

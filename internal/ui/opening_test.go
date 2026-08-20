@@ -206,28 +206,23 @@ func TestRenamingADeckChangesItsTitleAndNotItsFile(t *testing.T) {
 	_ = m
 }
 
-func TestCWithNoDeckOpenMakesOneAroundTheCommander(t *testing.T) {
-	// A deck named after its commander is what you would have typed anyway.
+func TestCWithNoDeckOpenDoesNothing(t *testing.T) {
+	// c is a role in a deck you're editing. With no such deck open it says
+	// so rather than conjuring a deck up around the card.
 	m := withCards(sized(140, 30), "f", []deck.Card{
 		{Card: mtg.Card{Name: "Ghen, Arcanum Weaver", TypeLine: "Legendary Creature — Human"}},
 	}, sortArrival)
 
 	m, cmd := press(m, "c")
-	if cmd == nil {
-		t.Fatal("c did nothing with no deck open")
+	if cmd != nil {
+		t.Fatal("c ran a command with no deck open")
 	}
-	m = settle(m, cmd)
-	t.Cleanup(func() { deck.Delete("ghen-arcanum-weaver") })
-
-	if !deck.Exists("ghen-arcanum-weaver") {
-		t.Fatal("no deck was made")
+	if deck.Exists("ghen-arcanum-weaver") {
+		deck.Delete("ghen-arcanum-weaver")
+		t.Fatal("c made a deck when it should have done nothing")
 	}
-	d, err := deck.Read("ghen-arcanum-weaver")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(d.Section("commander")) != 1 {
-		t.Errorf("the command zone holds %v", d.Section("commander"))
+	if !strings.Contains(stripANSI(m.View()), "no deck open to edit") {
+		t.Errorf("c did not explain itself:\n%s", stripANSI(m.View()))
 	}
 }
 

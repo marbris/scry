@@ -237,6 +237,23 @@ func TestCtrlOChangesTheOrderTheQueryAsksFor(t *testing.T) {
 	}
 }
 
+func TestTheQuerySortCanReachPowerAndToughness(t *testing.T) {
+	// ctrl+o walks every order Scryfall offers, power and toughness among
+	// them, so a search can come back biggest-first.
+	m, p := typed(sized(120, 30), "t:creature")
+	want := map[string]bool{"power": true, "toughness": true}
+	seen := map[string]bool{p.queryOrder(): true}
+	for i := 0; i < len(scryfall.SortOptions); i++ {
+		m = drive(m, "ctrl+o")
+		seen[p.queryOrder()] = true
+	}
+	for order := range want {
+		if !seen[order] {
+			t.Errorf("ctrl+o never reached %q; it cycled %v", order, seen)
+		}
+	}
+}
+
 func TestTheQuerySortAndTheListSortAreDifferentThings(t *testing.T) {
 	// One decides which cards come back; the other decides how the ones in
 	// front of you are arranged. Confusing them means re-fetching to

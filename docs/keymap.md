@@ -49,36 +49,52 @@ answered.
 | `<space>c` | close this panel |
 | `<space>o` | close every other panel ("only") |
 | `<space>h` `<space>l` | move this panel left / right in the row |
-| `<space>1`…`<space>9` | focus panel N |
-| `<space>?` | key reference |
+| `<space>?` | grow / shrink the hint bar (same as `?`) |
 
-## Hints and the reference
+`ctrl+h`/`ctrl+l` (and `ctrl+←`/`ctrl+→`) do the same as `<space>h`/`<space>l`
+— carry the focused panel along the row — on the keys your fingers are
+already on for moving between panels.
 
-The bar along the bottom is the whole contextual keymap — every key that does
-something where you are, wrapped over as many lines as it needs. Nothing is
-kept back for `?`; `?` lays the same list out to be read rather than skimmed,
-and adds the `<space>` table, which pressing `<space>` shows anyway.
+## The hint bar
 
-There is one list behind both (`contextKeys`, `internal/ui/hints.go`). There
-used to be two — the reference asked each view for its keys, and the bar had
+At rest the bar along the bottom is **three keys** — `space menu · ? keys ·
+q quit` — the ones that reach everything else. Pressing **`?` grows it in
+place** to the whole contextual keymap and `?` again shrinks it back; it
+stays where you put it rather than closing on the next key, so you can read
+it and act at the same time. There is no separate reference window — the bar
+grows downward and the panels give up the room, the way they do for the
+leader menu.
+
+Grown, the bar is the contextual keymap — the keys that do something where
+you are, **grouped** and led by what each group is: `navigation`, `select`,
+`edit`, `info panel`. Each group is **one row** across the full width, with
+terse labels: the bar is a reminder, not the manual. A key that would overrun
+its row is dropped rather than wrapped.
+
+There is one source (`hintGroups`, `internal/ui/hints.go`). There used to be
+two — a full-screen reference asked each view for its keys, and the bar had
 three hardcoded strings picked by a three-way switch — and the bar lied in
 three separate ways because of it: it offered `s` in a decks panel where
 there is nothing to count, offered `a`/`x`/`t` on a deck borrowed from
 Moxfield where all three refuse, and said nothing about `a`, `y`, `w` or `gv`
-on a search result, which fell through to the default branch.
+on a search result, which fell through to the default branch. Each view now
+declares its own groups; the workspace folds in the keys it owns everywhere —
+the bar, the edit target, the information panel, and the way between and out
+of panels — so no view repeats them and none can offer `esc` under two
+different names.
 
-The editing keys are listed against the deck they change, by name: `a x add,
-remove a copy — Ghen, Arcanum Weaver`. They act on the **editing deck** from
-whatever panel you are in, so the deck they change is routinely not the list
-under the cursor. With no deck being edited they aren't offered at all — they
-would do nothing but explain themselves — and `e E choose a deck to edit`
-takes their place.
+The editing keys are headed by the deck they change: `edit · Ghen` over `a x`,
+`t T` and the rest. They act on the **editing deck** from whatever panel you
+are in, so the deck they change is routinely not the list under the cursor.
+With no deck being edited they aren't offered at all — they would do nothing
+but explain themselves — and `e E choose a deck to edit` takes their place.
 
-`p` is the exception in that group: it puts into the list in front of you,
-which is why it only appears when that list is one of yours.
+`p` is the exception: it puts into the list in front of you, so it only
+appears in `select` when that list is one of yours.
 
-The result of the last thing you did sits to the **right** of the keys rather
-than on top of them, and the next keypress clears it.
+The result of the last thing you did sits on its **own line above** the keys,
+so it can be read at a glance without crowding the keys for what to do next;
+the next keypress clears it.
 
 Every `<space>` press raises the which-key popup (`leaderBar`), so none of
 this has to be memorised.
@@ -90,11 +106,10 @@ this has to be memorised.
 | `h` `l` | previous / next panel |
 | `j` `k` | previous / next row |
 | `gg` `G` | first / last row — `g` alone is a prefix, never a key |
-| `ctrl+d` `ctrl+u` | half a page |
 | `gd` | jump to the editing deck panel |
 | `gv` | **versions** of the highlighted row — see below |
 | `K` `J` | move the selection in the **information** panel |
-| `ctrl+k` `ctrl+j` | scroll the information panel |
+| `ctrl+k` `ctrl+j` | move the information panel a **paragraph** at a time |
 
 In **statistics** the same four keys walk the breakdown instead: `K`/`J` step
 a category at a time and narrow the list to it, `ctrl+k`/`ctrl+j` jump a whole
@@ -126,7 +141,7 @@ and "next row" are the same key, and that key is `j`.
 | `u` | undo the last edit |
 | `y` `p` | yank selected cards · put them in this list |
 | `t` `T` | tag (`ramp -draw` does both) · add and tag with the last tag |
-| `c` | set as commander |
+| `c` | set as the editing deck's commander (does nothing with no deck being edited) |
 | `s` | statistics for this list |
 | `gv` | printed-text history of this card — `y` fetches uncached sets, `esc` closes |
 | `w` | write this list — see **Writing a list** |
@@ -136,6 +151,11 @@ and "next row" are the same key, and that key is `j`.
 
 `enter` and `L` are unbound here: individual cards don't open, they're shown
 in the information panel as the cursor moves.
+
+The sort orders `o`/`O` cycle through are: as found, mana value, name, type,
+colour, rarity, edhrec, **power**, **toughness**. Sorting by power or by
+toughness shows the two together in the second column (`4/5`), since the
+number you didn't sort by is how you tell a 2/5 from a 5/2.
 
 ## In a decks panel — bare
 
@@ -267,11 +287,12 @@ lives with the bar rather than on `o`/`O`.
 | `w` `W` | write the focused list (here / in a new panel) |
 | `q` | quit (prompts if the editing deck has unsaved edits) |
 | `esc` | at the last panel with nothing to clear, quit |
-| `?` | keys for the focused panel |
+| `?` | grow / shrink the hint bar |
 
-Help is scope-declared: `?` shows the bindings for the panel you're in, not a
-global table. Every panel type declares its own set, and one hint line at the
-bottom shows what applies right now.
+Help is scope-declared and in place: `?` grows the hint bar to the bindings
+for the panel you're in, not a global table in a separate window. Every panel
+type declares its own set, and the resting bar shows the three keys that
+reach the rest.
 
 ## Prior art this draws on
 

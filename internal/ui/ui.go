@@ -22,11 +22,11 @@ type Model struct {
 	info infoPanel
 
 	// leader is set between pressing the leader key and the key that says
-	// what to do with it; showKeys is the full reference, which is a lid
-	// rather than a screen.
-	leader   bool
-	goPrefix bool
-	showKeys bool
+	// what to do with it; hintsExpanded grows the hint bar from its resting
+	// three keys to the whole contextual keymap, which ? toggles.
+	leader        bool
+	goPrefix      bool
+	hintsExpanded bool
 
 	// register is what y picked up, waiting for p. Whole deck cards, so a
 	// card moved between decks brings its quantity and tags with it.
@@ -265,9 +265,6 @@ func (m Model) View() string {
 		MaxWidth(m.width).
 		MaxHeight(m.height)
 
-	if m.showKeys {
-		return base.Render(m.viewKeys())
-	}
 	if m.ws.empty() {
 		return base.Render(m.viewSplash())
 	}

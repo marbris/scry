@@ -344,6 +344,12 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		if line := typeLine(f, width); line != "" {
 			out = append(out, dim.Render(line))
 		}
+		// Power/toughness on its own row rather than trailing the type line:
+		// the type line is the thing that runs long, and a narrow panel used
+		// to cut the "2/3" off the end of it.
+		if pt := statsLine(f, width); pt != "" {
+			out = append(out, dim.Render(pt))
+		}
 		if text := f.OracleText; text != "" {
 			out = append(out, "")
 			out = append(out, highlightOracle(text, f, width, rd)...)
@@ -411,17 +417,25 @@ func faceHeading(f mtg.Card, width int) string {
 	return name.Render(fit(f.Name, room-1)) + " " + cost
 }
 
-// typeLine puts power/toughness or loyalty on the end of the type line,
-// which is where a card prints them.
+// typeLine is the card's type line on its own, so a narrow panel gives up
+// the end of the type before it gives up the power/toughness beside it.
 func typeLine(f mtg.Card, width int) string {
-	line := f.TypeLine
+	if f.TypeLine == "" {
+		return ""
+	}
+	return fit(f.TypeLine, width)
+}
+
+// statsLine is power/toughness, or a planeswalker's loyalty, on a row of its
+// own — the numbers a card prints in its bottom-right corner.
+func statsLine(f mtg.Card, width int) string {
 	switch {
 	case f.Power != "" || f.Toughness != "":
-		line += "  " + f.Power + "/" + f.Toughness
+		return fit(f.Power+"/"+f.Toughness, width)
 	case f.Loyalty != "":
-		line += "  " + f.Loyalty
+		return fit("loyalty "+f.Loyalty, width)
 	}
-	return fit(line, width)
+	return ""
 }
 
 // formats are the ones worth reporting. Scryfall knows twenty; a Commander

@@ -160,20 +160,6 @@ func TestAPanelCanBeMovedAlongTheRow(t *testing.T) {
 	}
 }
 
-func TestTheLeaderJumpsStraightToAPanel(t *testing.T) {
-	m := openPanel(sized(200, 40), "f", "angel")
-	m = openPanel(m, "d", "marbri")
-	m = openPanel(m, "r", "flying")
-	m = drive(m, "space", "1")
-	if m.ws.focused != 0 {
-		t.Errorf("space 1 went to %d", m.ws.focused)
-	}
-	m = drive(m, "space", "3")
-	if m.ws.focused != 2 {
-		t.Errorf("space 3 went to %d", m.ws.focused)
-	}
-}
-
 func TestTabCyclesWhatANewPanelSearches(t *testing.T) {
 	m := drive(sized(120, 40), "space", "n")
 	if m.ws.current().kind != KindNew {
@@ -267,29 +253,6 @@ func TestClosingTheLastPanelLandsOnTheSplash(t *testing.T) {
 	}
 }
 
-func TestTheRowShowsWhichPanelYouAreOn(t *testing.T) {
-	m := openPanel(sized(120, 40), "f", "angel")
-	m = openPanel(m, "d", "marbri")
-
-	view := stripANSI(m.View())
-	if !strings.Contains(view, "2/2") {
-		t.Errorf("the hint line does not say which panel of how many:\n%s", view)
-	}
-}
-
-func TestOffScreenPanelsAreFlagged(t *testing.T) {
-	// Eight panels on a narrow terminal means some are out of sight; the
-	// row says so rather than letting them silently vanish.
-	m := sized(100, 40)
-	for i := 0; i < 8; i++ {
-		m = openPanel(m, "f", "angel")
-	}
-	view := stripANSI(m.View())
-	if !strings.Contains(view, "↔") {
-		t.Errorf("no sign that panels are off screen:\n%s", view)
-	}
-}
-
 // ── The list, driven through the model ──────────────────────────
 
 // withCards opens a panel and fills it, standing in for the search that
@@ -337,7 +300,7 @@ func TestOCyclesTheSortAndTheHeaderSaysSo(t *testing.T) {
 		t.Error("the panel does not say what it is sorted by")
 	}
 	m = drive(m, "O", "O")
-	if got := m.ws.current().cardsView().order; got != sortEDHREC {
+	if got := m.ws.current().cardsView().order; got != sortToughness {
 		t.Errorf("O wrapped to %v", got)
 	}
 }

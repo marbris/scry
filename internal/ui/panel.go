@@ -123,6 +123,13 @@ type panel struct {
 	// sit on top of the decks list; esc pops back rather than closing.
 	stack []view
 
+	// previewing means the stack holds a tab-preview rather than committed
+	// content: tabbing to the decks target fills the body with the decks
+	// list while the bar is still open over it, so the decks appear without
+	// waiting for enter. tab may freely replace a preview; it must not touch
+	// a real search or deck reached by reopening the bar with i.
+	previewing bool
+
 	// filtering is the / prompt, open only while you're typing in it.
 	filtering   bool
 	filterInput textinput.Model
@@ -180,6 +187,7 @@ func newPanel(kind Kind) *panel {
 func (p *panel) show(v view) {
 	p.title = v.title()
 	p.stack = []view{v}
+	p.previewing = false
 	p.searchOpen = false
 	p.search.Blur()
 	// Whatever was being waited for has arrived, by definition.
@@ -189,7 +197,10 @@ func (p *panel) show(v view) {
 
 // push steps into something reached from the current view — a deck's
 // versions, a user's decks — keeping the way back.
-func (p *panel) push(v view) { p.stack = append(p.stack, v) }
+func (p *panel) push(v view) {
+	p.stack = append(p.stack, v)
+	p.previewing = false
+}
 
 // pop steps back out, reporting whether there was anywhere to go.
 func (p *panel) pop() bool {

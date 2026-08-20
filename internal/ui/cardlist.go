@@ -375,7 +375,7 @@ func (l *cardList) lines(width, height int, focused bool, m *Model) []string {
 }
 
 func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
-	if l.cursor.navKey(k, len(l.rows), m.pageStep()) {
+	if l.cursor.navKey(k, len(l.rows)) {
 		return true, nil
 	}
 	switch k {
@@ -451,22 +451,34 @@ func (l *cardList) info(width int) []string {
 	return cardInfo(c, width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
 }
 
-// keys is what this list offers. The editing keys are not here: a, x, t, T,
-// c and u act on the editing deck rather than on the list under the cursor,
-// so they are listed against that deck by editKeys, which knows its name.
-func (l *cardList) keys() [][2]string {
-	out := [][2]string{
-		{"j k", "up and down"},
-		{"gg G", "first, last"},
-		{"ctrl+d/u", "half a page"},
-		{"/", "filter"},
+// keys is what this list offers, in two groups: moving about it, and picking
+// cards out of it. The editing keys are not here: a, x, t, T, c and u act on
+// the editing deck rather than on the list under the cursor, so hintGroups
+// lists them against that deck, under its name.
+func (l *cardList) keys() []hintGroup {
+	nav := [][2]string{
+		{"j k", "up/down"},
+		{"gg G", "first/last"},
 		{"o O", "sort"},
-		{"v V", "pick out one, all"},
-		{"gv", "how its text has changed"},
+		{"/", "filter"},
+	}
+
+	sel := [][2]string{
+		{"v V", "pick one/all"},
+		{"y", "yank"},
+	}
+	// p puts into the list in front of you, so it only earns a hint when
+	// that list is one of yours to write to.
+	if l.deck != nil && l.deck.Local() {
+		sel = append(sel, [2]string{"p", "put"})
 	}
 	if l.deck != nil && l.deck.Local() {
-		return append(out, [2]string{"w", "save this deck"})
+		sel = append(sel, [2]string{"w", "save"})
+	} else {
+		// Not yours, so writing it asks for a name and makes it yours.
+		sel = append(sel, [2]string{"w W", "save as deck"})
 	}
-	// Not yours, so writing it asks for a name and makes it yours.
-	return append(out, [2]string{"w W", "save as a deck of yours"})
+	sel = append(sel, [2]string{"gv", "text history"})
+
+	return []hintGroup{{"navigation", nav}, {"select", sel}}
 }

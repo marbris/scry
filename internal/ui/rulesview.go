@@ -383,14 +383,6 @@ func (v *rulesView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		if !v.selectable(v.cursor.at) {
 			v.step(-1)
 		}
-	case "ctrl+d":
-		for i := 0; i < m.pageStep(); i++ {
-			v.step(1)
-		}
-	case "ctrl+u":
-		for i := 0; i < m.pageStep(); i++ {
-			v.step(-1)
-		}
 	case "o":
 		if !v.grouped {
 			v.order = 1 - v.order
@@ -517,13 +509,16 @@ func repeatsTerm(text, term string) bool {
 	return text == term || text == term+"s" || strings.TrimSuffix(text, "s") == term
 }
 
-func (v *rulesView) keys() [][2]string {
-	out := [][2]string{
-		{"j k", "up and down"},
+func (v *rulesView) keys() []hintGroup {
+	nav := [][2]string{
+		{"j k", "up/down"},
 		{"/", "filter"},
 	}
 	if !v.grouped {
-		out = append(out, [2]string{"o O", "rule number, relevance"})
+		nav = append(nav, [2]string{"o O", "order"})
 	}
-	return append(out, [2]string{"K J", "read the rule beside this list"})
+	return []hintGroup{
+		{"navigation", nav},
+		{"info panel", [][2]string{{"K J", "read rule"}}},
+	}
 }

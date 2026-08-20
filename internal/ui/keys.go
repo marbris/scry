@@ -46,20 +46,13 @@ var leaderMenu = []leaderCmd{
 	{"o", "only", func(m *Model) { m.ws.only() }},
 	{"h", "move left", func(m *Model) { m.ws.movePanel(-1) }},
 	{"l", "move right", func(m *Model) { m.ws.movePanel(1) }},
-	{"?", "keys", func(m *Model) { m.showKeys = !m.showKeys }},
+	{"?", "keys", func(m *Model) { m.hintsExpanded = !m.hintsExpanded }},
 }
 
 // handleLeader runs the command a key names. A key that names nothing
 // cancels, rather than doing something surprising with a near miss.
 func (m *Model) handleLeader(key string) tea.Cmd {
 	m.leader = false
-
-	// <space>1…9 jumps straight to a panel, which beats counting presses of
-	// l once four or five are open.
-	if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
-		m.ws.focus(int(key[0] - '1'))
-		return nil
-	}
 
 	// Two entries hand back a command rather than only changing the
 	// workspace, so they can't sit in the table above.
@@ -116,12 +109,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// The key reference is a lid: anything closes it.
-	if m.showKeys {
-		m.showKeys = false
-		return m, nil
-	}
-
 	// With nothing open, the leader is the only way forward, so the splash
 	// takes a couple of shortcuts to it.
 	if m.ws.empty() {
@@ -131,7 +118,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "q", "esc", "ctrl+c":
 			return m.tryQuit()
 		case "?":
-			m.showKeys = true
+			m.hintsExpanded = !m.hintsExpanded
 		}
 		return m, nil
 	}
@@ -199,6 +186,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cmd := m.hover()
 		return m, cmd
 
+	// ctrl with a direction carries the panel itself along the row, focus
+	// going with it — the same thing <space>h and <space>l do, on the keys
+	// your fingers are already on for moving between panels.
+	case "ctrl+h", "ctrl+left":
+		m.ws.movePanel(-1)
+	case "ctrl+l", "ctrl+right":
+		m.ws.movePanel(1)
+
 	case "i":
 		// The bar keeps the query that produced what's on screen, so i is
 		// "edit this search" rather than "start again" — with the cursor
@@ -228,20 +223,23 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.info.mode == infoStats {
 			m.jumpStat(-1)
 		} else {
-			m.info.scroll(-1)
+			m.scrollInfoParagraph(-1)
 		}
 	case "ctrl+j":
 		if m.info.mode == infoStats {
 			m.jumpStat(1)
 		} else {
-			m.info.scroll(1)
+			m.scrollInfoParagraph(1)
 		}
 
 	case "s":
 		m.toggleStats(false)
 
 	case "?":
-		m.showKeys = true
+		// Grow the hint bar to the whole keymap, or shrink it back. It stays
+		// where you put it rather than closing on the next key, so you can
+		// read it and act at the same time.
+		m.hintsExpanded = !m.hintsExpanded
 
 	case "esc":
 		// The cascade, outward one step at a time, as the design has it:
@@ -282,10 +280,10 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
 		p.setKind(p.kind.next(1))
-		return m, nil
+		return m, m.previewKind(p)
 	case "shift+tab":
 		p.setKind(p.kind.next(-1))
-		return m, nil
+		return m, m.previewKind(p)
 
 	case "esc":
 		// The same cascade as everywhere else: clear what's clearable, then
@@ -301,6 +299,12 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// splash, so there is always one press between you and the exit.
 			m.ws.close()
 			return m, nil
+		}
+		// Leaving the bar over a tab-preview commits it: the decks it was
+		// showing become the panel's content rather than vanishing.
+		if p.previewing {
+			p.previewing = false
+			p.title = p.top().title()
 		}
 		p.searchOpen = false
 		p.search.Blur()
@@ -327,8 +331,21 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			p.search.SetValue("")
 			p.searchOpen = false
 			p.search.Blur()
+			var cmd tea.Cmd
 			if p.top() == nil {
-				p.show(newDeckList())
+				l := newDeckList()
+				p.show(l)
+				cmd = checkLegality(l.localSlugs())
+			} else {
+				// A tab-preview committed by pressing enter: keep the decks
+				// already on screen rather than fetching them again.
+				p.previewing = false
+				p.title = p.top().title()
+			}
+			// An empty bar was only a way of choosing the target, so enter
+			// commits the decks list without trying to follow anything.
+			if q == "" {
+				return m, cmd
 			}
 			return m, follow(q)
 		}
@@ -366,14 +383,28 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// pageStep is half a screen, which is what ctrl+d and ctrl+u move by in vim.
+// previewKind fills the body with what the newly chosen target will show,
+// so tabbing to the decks target lists your decks straight away rather than
+// leaving a blank panel until enter. The bar stays open over the preview.
 //
-// Half of what is actually left after the hint bar, which is as tall as the
-// contextual keymap needs rather than the one line it used to be. Half a
-// screen that counts rows the panel doesn't have overshoots by exactly the
-// rows it got wrong.
-func (m Model) pageStep() int {
-	return maxInt((m.height-m.footerHeight()-4)/2, 1)
+// Only a preview is ours to replace. A panel already holding a real search
+// or deck — reached by reopening its bar with i — keeps it: tab there is
+// only retargeting the bar, not throwing away what you found.
+func (m *Model) previewKind(p *panel) tea.Cmd {
+	if p.previewing {
+		p.stack = nil
+		p.previewing = false
+	}
+	if p.top() != nil {
+		return nil
+	}
+	if p.kind == KindDecks {
+		l := newDeckList()
+		p.stack = []view{l}
+		p.previewing = true
+		return checkLegality(l.localSlugs())
+	}
+	return nil
 }
 
 // handleFilterKey is the / prompt. It narrows as you type, so you can see

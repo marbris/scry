@@ -140,7 +140,7 @@ func (l *versionList) clear() bool {
 }
 
 func (l *versionList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
-	if l.cursor.navKey(k, len(l.commits), m.pageStep()) {
+	if l.cursor.navKey(k, len(l.commits)) {
 		return true, l.wantDiff()
 	}
 	if k == "/" {
@@ -240,10 +240,11 @@ func renderDiff(diff string, width int) []string {
 	return out
 }
 
-func (l *versionList) keys() [][2]string {
-	return [][2]string{
-		{"j k", "up and down"},
-		{"/", "filter"},
-		{"esc", "back to the deck"},
+func (l *versionList) keys() []hintGroup {
+	return []hintGroup{
+		{"navigation", [][2]string{
+			{"j k", "up/down"},
+			{"/", "filter"},
+		}},
 	}
 }

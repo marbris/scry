@@ -94,12 +94,22 @@ func TestTheInformationPanelGivesWayOnANarrowTerminal(t *testing.T) {
 	}
 }
 
-func TestTheInformationPanelStaysReadable(t *testing.T) {
+func TestTheInformationPanelTakesAnEqualShare(t *testing.T) {
+	// The information panel is just another column: it is the same width as
+	// each panel, give or take the odd remainder column.
 	for _, width := range []int{80, 120, 200, 400} {
-		l := computeLayout(width, 40, 2, 0, 0)
-		if l.info < infoMin || l.info > infoMax {
-			t.Errorf("width %d: info = %d, want between %d and %d",
-				width, l.info, infoMin, infoMax)
+		for count := 1; count <= 4; count++ {
+			l := computeLayout(width, 40, count, 0, 0)
+			if l.info == 0 {
+				t.Errorf("width %d, %d panels: information panel dropped", width, count)
+				continue
+			}
+			for _, w := range l.panels {
+				if diff := w - l.info; diff < -1 || diff > 1 {
+					t.Errorf("width %d, %d panels: panel %d vs info %d differ by more than one",
+						width, count, w, l.info)
+				}
+			}
 		}
 	}
 }

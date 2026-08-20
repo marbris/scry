@@ -2,6 +2,7 @@ package ui
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"scry/internal/deck"
@@ -28,10 +29,13 @@ const (
 	sortColor
 	sortRarity
 	sortEDHREC
+	sortPower
+	sortToughness
 )
 
 var cardSorts = []cardSort{
 	sortArrival, sortMana, sortName, sortType, sortColor, sortRarity, sortEDHREC,
+	sortPower, sortToughness,
 }
 
 func (s cardSort) String() string {
@@ -48,6 +52,10 @@ func (s cardSort) String() string {
 		return "rarity"
 	case sortEDHREC:
 		return "edhrec"
+	case sortPower:
+		return "power"
+	case sortToughness:
+		return "toughness"
 	}
 	return "as found"
 }
@@ -62,7 +70,7 @@ func (s cardSort) next(delta int) cardSort {
 // whether it gets painted symbol by symbol.
 func (s cardSort) showsMana() bool {
 	switch s {
-	case sortType, sortRarity, sortEDHREC:
+	case sortType, sortRarity, sortEDHREC, sortPower, sortToughness:
 		return false
 	}
 	return true
@@ -82,8 +90,26 @@ func (s cardSort) column(c mtg.Card) string {
 			return "—"
 		}
 		return itoa(c.EDHRECRank)
+	case sortPower, sortToughness:
+		// Power and toughness travel together: sorting by one still shows
+		// both, since a 2/5 and a 5/2 are a different card and the number
+		// you didn't sort by is how you tell them apart.
+		return powerToughness(c)
 	}
 	return manaCost(c)
+}
+
+// powerToughness is a creature's "P/T", or a planeswalker's loyalty, or a
+// dash for anything that has neither — so a list sorted by power still lines
+// up, lands and all.
+func powerToughness(c mtg.Card) string {
+	switch {
+	case c.Power != "" || c.Toughness != "":
+		return c.Power + "/" + c.Toughness
+	case c.Loyalty != "":
+		return c.Loyalty
+	}
+	return "—"
 }
 
 // abbreviates reports whether this column can be shortened when the panel
@@ -214,8 +240,60 @@ func lessFor(s cardSort) func(a, b mtg.Card) bool {
 			}
 			return byName(a, b)
 		}
+
+	case sortPower:
+		// Biggest first — a list sorted by power is one you're reading for
+		// the top of the curve. Toughness breaks a tie, then the name.
+		return func(a, b mtg.Card) bool {
+			pa, oka := statValue(a.Power)
+			pb, okb := statValue(b.Power)
+			if oka != okb {
+				return oka // cards with a power at all come first
+			}
+			if pa != pb {
+				return pa > pb
+			}
+			ta, _ := statValue(a.Toughness)
+			tb, _ := statValue(b.Toughness)
+			if ta != tb {
+				return ta > tb
+			}
+			return byName(a, b)
+		}
+
+	case sortToughness:
+		return func(a, b mtg.Card) bool {
+			ta, oka := statValue(a.Toughness)
+			tb, okb := statValue(b.Toughness)
+			if oka != okb {
+				return oka
+			}
+			if ta != tb {
+				return ta > tb
+			}
+			pa, _ := statValue(a.Power)
+			pb, _ := statValue(b.Power)
+			if pa != pb {
+				return pa > pb
+			}
+			return byName(a, b)
+		}
 	}
 	return func(a, b mtg.Card) bool { return false }
+}
+
+// statValue reads a power or toughness for sorting. Empty means the card has
+// none — a land, an instant — and sorts apart from the ones that do. A value
+// that isn't a plain number, "*" or "1+*", counts as having one but sorts
+// below the plain numbers, since there is no honest number to place it at.
+func statValue(s string) (int, bool) {
+	if s == "" {
+		return 0, false
+	}
+	if n, err := strconv.Atoi(s); err == nil {
+		return n, true
+	}
+	return -1, true
 }
 
 // typeRank orders by the precedence a decklist groups by, so sorting by type

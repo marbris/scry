@@ -120,7 +120,7 @@ func renderUserDeck(d moxfield.UserDeck, width int, under bool) string {
 }
 
 func (l *userDeckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
-	if l.cursor.navKey(k, len(l.decks), m.pageStep()) {
+	if l.cursor.navKey(k, len(l.decks)) {
 		return true, nil
 	}
 
@@ -184,13 +184,16 @@ func (l *userDeckList) info(width int) []string {
 	return append(out, "", mutedLine("enter to open · c to take a copy", width))
 }
 
-func (l *userDeckList) keys() [][2]string {
-	return [][2]string{
-		{"j k", "up and down"},
-		{"enter", "open it here"},
-		{"L", "open it beside"},
-		{"c", "take a copy"},
-		{"/", "filter"},
-		{"esc", "back to your decks"},
+func (l *userDeckList) keys() []hintGroup {
+	return []hintGroup{
+		{"navigation", [][2]string{
+			{"j k", "up/down"},
+			{"/", "filter"},
+		}},
+		{"decks", [][2]string{
+			{"enter", "open"},
+			{"L", "beside"},
+			{"c", "copy"},
+		}},
 	}
 }
