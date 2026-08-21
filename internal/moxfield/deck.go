@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Moxfield serves a deck's whole contents from one endpoint, keyed by the
@@ -38,6 +39,11 @@ type Deck struct {
 	CreatedByUser struct {
 		UserName string `json:"userName"`
 	} `json:"createdByUser"`
+	// The summary fields the decks list shows beside a followed deck without
+	// opening it. Moxfield sends these on the full deck too, the same names the
+	// search endpoint uses, so a remote can carry its colours, size and age.
+	ColorIdentity []string `json:"colorIdentity"`
+	LastUpdated   string   `json:"lastUpdatedAtUtc"`
 }
 
 type Board struct {
@@ -108,6 +114,50 @@ func Fetch(id string) (Deck, error) {
 	return d, nil
 }
 
+// Meta is the handful of facts the decks list shows beside a followed deck
+// without opening it: its colours, its size, and when it last changed. Enough
+// to tell one bookmark from another at a glance.
+type Meta struct {
+	Colors  []string
+	Count   int
+	Updated time.Time
+}
+
+// FetchMeta pulls just those summary facts for a deck. It's one request, and
+// unlike Load it doesn't resolve every card on Scryfall — the decks list wants
+// the shape of a deck, not its contents.
+func FetchMeta(id string) (Meta, error) {
+	d, err := Fetch(id)
+	if err != nil {
+		return Meta{}, err
+	}
+	return d.meta(), nil
+}
+
+// meta reads the summary out of a fetched deck. The count is the command zone
+// and mainboard together — the cards the deck is, not its sideboard or the
+// maybeboard it's still deciding on.
+func (d Deck) meta() Meta {
+	count := 0
+	for _, board := range []string{"commanders", "mainboard"} {
+		for _, e := range d.Boards[board].Cards {
+			count += maxInt(e.Quantity, 1)
+		}
+	}
+	var updated time.Time
+	if t, err := time.Parse(time.RFC3339, d.LastUpdated); err == nil {
+		updated = t
+	}
+	return Meta{Colors: d.ColorIdentity, Count: count, Updated: updated}
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 // boardOrder is the order boards are read in, and the deck file section
 // each becomes. Moxfield carries more boards than these; the rest are a
 // deck's history rather than the deck, and aren't imported.
@@ -163,6 +213,47 @@ func ToFile(d Deck, id string) (*deck.File, error) {
 
 	if len(out.Entries) == 0 {
 		return nil, fmt.Errorf("deck %q has no cards", id)
+	}
+	return out, nil
+}
+
+// consideringBoard is Moxfield's key for the "Considering" list — the cards an
+// author is weighing but hasn't put in the deck. It's the maybeboard under an
+// older name.
+const consideringBoard = "maybeboard"
+
+// ImportConsidering builds a deck file from a Moxfield deck's Considering list
+// alone, so it can be taken as a local deck of its own beside the main copy.
+// Nil, with no error, when the author is considering nothing — an empty list is
+// not a failure, just nothing to copy.
+func ImportConsidering(id string) (*deck.File, error) {
+	d, err := Fetch(id)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &deck.File{Name: d.Name + " (considering)", Format: d.Format, Source: d.PublicURL}
+	if out.Source == "" {
+		out.Source = "https://moxfield.com/decks/" + id
+	}
+
+	seen := map[string]bool{}
+	for _, e := range d.Boards[consideringBoard].Cards {
+		name := strings.TrimSpace(e.Card.Name)
+		if name == "" || seen[strings.ToLower(name)] {
+			continue
+		}
+		seen[strings.ToLower(name)] = true
+		out.Entries = append(out.Entries, deck.Entry{
+			Qty:     maxInt(e.Quantity, 1),
+			Name:    name,
+			Tags:    deck.ParseTags(strings.Join(d.AuthorTags[name], ",")),
+			Section: "mainboard",
+		})
+	}
+
+	if len(out.Entries) == 0 {
+		return nil, nil
 	}
 	return out, nil
 }

@@ -226,15 +226,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case legalityMsg:
 		return m.handleLegality(msg)
 
+	case remoteMetaMsg:
+		return m.handleRemoteMeta(msg)
+
 	case reloadDecksMsg:
+		// A decks list can be sitting under a sub-view — a user's decks
+		// reached by pressing enter on them — so the whole stack is walked,
+		// not just the top. Otherwise a deck followed or copied from that
+		// sub-view wouldn't be there when esc stepped back down to the list.
 		var slugs []string
 		for _, p := range m.ws.panels {
-			if l, ok := p.top().(*deckList); ok {
-				l.reload()
-				slugs = append(slugs, l.localSlugs()...)
+			for _, v := range p.stack {
+				if l, ok := v.(*deckList); ok {
+					l.reload()
+					slugs = append(slugs, l.localSlugs()...)
+				}
 			}
 		}
-		return m, checkLegality(slugs)
+		return m, tea.Batch(checkLegality(slugs), refreshRemotes())
 	}
 	return m, nil
 }

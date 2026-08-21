@@ -244,6 +244,53 @@ func copyEntry(e deckEntry) tea.Cmd {
 	}
 }
 
+// copyEntryBoth takes a remote deck's main list and its Considering list as
+// two separate local decks — c makes one copy, C makes both. The Considering
+// list is where an author keeps the cards they're weighing, and it's often
+// the more interesting half to borrow.
+func copyEntryBoth(e deckEntry) tea.Cmd {
+	return func() tea.Msg {
+		if e.kind != entryRemote {
+			return noticeMsg{text: "only a Moxfield deck has a considering list"}
+		}
+
+		main, err := moxfield.Import(e.id)
+		if err != nil {
+			return noticeMsg{err: err}
+		}
+		mainSlug := deck.Slugify(main.Name)
+		if _, _, err := deck.SaveVersioned(mainSlug, main); err != nil {
+			return noticeMsg{err: err}
+		}
+
+		cons, err := moxfield.ImportConsidering(e.id)
+		if err != nil {
+			return noticeMsg{err: err}
+		}
+		if cons == nil {
+			return noticeMsg{text: "copied to " + mainSlug + " · nothing being considered"}
+		}
+		consSlug := deck.Slugify(cons.Name)
+		if _, _, err := deck.SaveVersioned(consSlug, cons); err != nil {
+			return noticeMsg{err: err}
+		}
+		return noticeMsg{text: "copied to " + mainSlug + " and " + consSlug}
+	}
+}
+
+// followRemote bookmarks a Moxfield deck without taking a copy of it — the r
+// on somebody's decks, which saves the deck as a remote you can come back to.
+func followRemote(name, id, url string) tea.Cmd {
+	return func() tea.Msg {
+		b := deck.LoadBookmarks()
+		b.AddRemote(deck.Remote{Name: name, ID: id, URL: url})
+		if err := deck.SaveBookmarks(b); err != nil {
+			return noticeMsg{err: err}
+		}
+		return noticeMsg{text: "following " + name}
+	}
+}
+
 // uniqueName finds a name whose slug isn't taken, so copying twice gives you
 // two decks rather than an error.
 func uniqueName(base string) string {
@@ -336,6 +383,13 @@ func follow(input string) tea.Cmd {
 // reloadDecks tells every decks panel to read the directory again.
 func reloadDecks() tea.Msg { return reloadDecksMsg{} }
 
+// loadDecks is the background work a freshly opened decks list wants doing:
+// the legality of the local decks, from the cache, and the summary of the
+// followed ones, from Moxfield. Both fill in beside the rows as they arrive.
+func loadDecks(l *deckList) tea.Cmd {
+	return tea.Batch(checkLegality(l.localSlugs()), refreshRemotes())
+}
+
 // ── Legality ────────────────────────────────────────────────────
 
 // legalityMsg carries the verdict on one deck back to the lists showing it,
@@ -359,6 +413,57 @@ func checkLegality(slugs []string) tea.Cmd {
 		})
 	}
 	return tea.Batch(cmds...)
+}
+
+// ── Remote summaries ────────────────────────────────────────────
+
+// remoteMetaMsg carries a followed deck's summary back to the lists showing
+// it — its colours, size and age, worked out without opening it.
+type remoteMetaMsg struct {
+	id   string
+	meta moxfield.Meta
+}
+
+// refreshRemotes fetches the summary of every followed deck that hasn't been
+// looked at yet, so the decks list can show a remote's colours, size and age
+// beside its name. Only the un-fetched ones, and one request each, so a list
+// of remotes fills in over a moment rather than blocking on all of them —
+// and a second visit to the panel costs nothing.
+func refreshRemotes() tea.Cmd {
+	b := deck.LoadBookmarks()
+	var cmds []tea.Cmd
+	for _, r := range b.Remotes {
+		if r.Fetched {
+			continue
+		}
+		id := r.ID
+		cmds = append(cmds, func() tea.Msg {
+			meta, err := moxfield.FetchMeta(id)
+			if err != nil {
+				return nil // a remote we can't reach keeps just its name
+			}
+			return remoteMetaMsg{id: id, meta: meta}
+		})
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m Model) handleRemoteMeta(msg remoteMetaMsg) (tea.Model, tea.Cmd) {
+	// Keep it for next time, so the fetch happens once rather than on every
+	// visit to the decks panel.
+	b := deck.LoadBookmarks()
+	b.SetRemoteMeta(msg.id, msg.meta.Colors, msg.meta.Count, msg.meta.Updated)
+	deck.SaveBookmarks(b)
+
+	for _, p := range m.ws.panels {
+		if l, ok := p.top().(*deckList); ok {
+			l.setRemoteMeta(msg.id, msg.meta)
+		}
+	}
+	return m, nil
 }
 
 func (m Model) handleLegality(msg legalityMsg) (tea.Model, tea.Cmd) {

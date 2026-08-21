@@ -58,6 +58,12 @@ func (m Model) hintGroups() []hintGroup {
 	// The search bar lives in the navigation group: i is how you reach it.
 	groups = addHints(groups, "navigation", [2]string{"i", p.kind.barLabel()})
 
+	// b clears the narrowings, but only earns a hint while there is one to
+	// clear — otherwise it is a key that does nothing, offered next to esc.
+	if m.focusNarrowed() {
+		groups = addHints(groups, "navigation", [2]string{"b", "clear filter"})
+	}
+
 	// The editing keys, against the deck they change — which is routinely
 	// not the list under the cursor.
 	if title, keys := m.editGroup(p); len(keys) > 0 {
@@ -87,6 +93,29 @@ func (m Model) hintGroups() []hintGroup {
 	groups = addHints(groups, "navigation", tail...)
 
 	return groups
+}
+
+// focusNarrowed reports whether the focused list has a narrowing b would
+// clear: a text filter, or — for a card list — the statistics category too.
+func (m Model) focusNarrowed() bool {
+	p := m.ws.current()
+	if p == nil {
+		return false
+	}
+	if l := p.cardsView(); l != nil {
+		return l.filter != "" || l.statFilter != nil
+	}
+	switch v := p.top().(type) {
+	case *deckList:
+		return v.filter != ""
+	case *userDeckList:
+		return v.filter != ""
+	case *versionList:
+		return v.filter != ""
+	case *rulesView:
+		return v.filter != ""
+	}
+	return false
 }
 
 // addHints appends keys to the group with the given title, making it at the

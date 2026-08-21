@@ -281,9 +281,44 @@ func TestAPersonsDecksCanBeNarrowed(t *testing.T) {
 		t.Errorf("filtering to 'elf' left %d decks", len(v.decks))
 	}
 
-	m = drive(m, "esc")
+	// b clears the filter; esc would step back to your own decks instead.
+	m = drive(m, "b")
 	if len(v.decks) != 3 {
-		t.Errorf("esc left %d decks", len(v.decks))
+		t.Errorf("b left %d decks", len(v.decks))
+	}
+}
+
+func TestFollowingFromAUsersDecksReachesTheListBeneath(t *testing.T) {
+	// A user's decks sit on top of your own decks in the same panel, so a
+	// reload has to walk the whole stack — otherwise a deck followed or copied
+	// from up there isn't in the list esc steps back down to.
+	t.Cleanup(func() { deck.SaveBookmarks(deck.Bookmarks{}) })
+
+	m := sized(160, 30)
+	p := m.ws.open(KindDecks)
+	dl := newDeckList()
+	p.show(dl)
+	p.push(newUserDeckList("MarBri", []moxfield.UserDeck{
+		{Name: "Elf Ball", PublicID: "a", Cards: 100},
+	}))
+
+	// Following writes the bookmark, then asks for a reload.
+	var b deck.Bookmarks
+	b.AddRemote(deck.Remote{Name: "Elf Ball", ID: "a"})
+	if err := deck.SaveBookmarks(b); err != nil {
+		t.Fatal(err)
+	}
+	next, _ := m.Update(reloadDecksMsg{})
+	m = next.(Model)
+
+	found := false
+	for _, e := range dl.all {
+		if e.kind == entryRemote && e.id == "a" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the reload did not reach the decks list under the sub-view: %v", dl.all)
 	}
 }
 

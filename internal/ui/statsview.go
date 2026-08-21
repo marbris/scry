@@ -114,6 +114,41 @@ func (m *Model) clearStatFilter() {
 	}
 }
 
+// clearActiveFilters drops the narrowings on the focused list alone: its text
+// filter and the statistics category. b. The statistics category is a single
+// selection shown in the bars, so clearing it steps the highlight back to no
+// category rather than leaving a bar lit over an unfiltered list.
+func (m *Model) clearActiveFilters() {
+	p := m.ws.current()
+	if p == nil {
+		return
+	}
+	if m.stats.row >= 0 {
+		m.stats.row = -1
+		m.applyStatFilter()
+	}
+	if l := p.cardsView(); l != nil && l.statFilter != nil {
+		l.statFilter = nil
+		l.refresh()
+	}
+	if v, ok := p.top().(filterable); ok {
+		v.setFilter("")
+	}
+}
+
+// clearAllFilters drops every narrowing on every list — text filters and the
+// statistics category alike. space b, for when you've narrowed several panels
+// and want them all back at once.
+func (m *Model) clearAllFilters() {
+	m.stats.row = -1
+	m.clearStatFilter()
+	for _, p := range m.ws.panels {
+		if v, ok := p.top().(filterable); ok {
+			v.setFilter("")
+		}
+	}
+}
+
 // moveStat walks the categories. Stepping off the top goes back to no
 // category at all, which is how you get the whole list back without
 // remembering which key clears it.

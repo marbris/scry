@@ -135,7 +135,7 @@ func (m *Model) restore() tea.Cmd {
 		case "decks":
 			l := newDeckList()
 			m.ws.open(KindDecks).show(l)
-			cmds = append(cmds, checkLegality(l.localSlugs()))
+			cmds = append(cmds, loadDecks(l))
 
 		case "rules":
 			p := m.ws.open(KindRules)

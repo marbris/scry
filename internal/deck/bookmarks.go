@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"scry/internal/paths"
 )
@@ -30,6 +31,15 @@ type Remote struct {
 	// right — a URL can be pasted in any of several shapes.
 	ID  string `json:"id"`
 	URL string `json:"url,omitempty"`
+
+	// The summary the decks list shows beside a remote without opening it —
+	// its colours, its size and when it last changed on Moxfield. Filled in by
+	// a background pass the first time the list is shown; Fetched records that
+	// the pass has run, so an empty deck isn't fetched again on every open.
+	Colors  []string  `json:"colors,omitempty"`
+	Count   int       `json:"count,omitempty"`
+	Updated time.Time `json:"updated,omitempty"`
+	Fetched bool      `json:"fetched,omitempty"`
 }
 
 type Bookmarks struct {
@@ -81,6 +91,22 @@ func (b *Bookmarks) RemoveRemote(id string) {
 		}
 	}
 	b.Remotes = out
+}
+
+// SetRemoteMeta records the summary a background fetch worked out for a
+// remote, and marks it fetched so the pass leaves it alone next time. A remote
+// no longer in the list is ignored, since it was unfollowed while the fetch
+// was in flight.
+func (b *Bookmarks) SetRemoteMeta(id string, colors []string, count int, updated time.Time) {
+	for i := range b.Remotes {
+		if b.Remotes[i].ID == id {
+			b.Remotes[i].Colors = colors
+			b.Remotes[i].Count = count
+			b.Remotes[i].Updated = updated
+			b.Remotes[i].Fetched = true
+			return
+		}
+	}
 }
 
 func (b *Bookmarks) RenameRemote(id, name string) {

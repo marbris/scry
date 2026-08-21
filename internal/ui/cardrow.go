@@ -48,6 +48,18 @@ type rowState struct {
 
 // renderRow draws one card to exactly width columns.
 func renderRow(c deck.Card, order cardSort, st rowState, width int) string {
+	return renderRowCol(c, order, st, width, 0)
+}
+
+// renderRowCol draws one card, sharing a name-column width with the rest of
+// the list when one is given.
+//
+// nameCol of zero is the per-row ladder: each row decides for itself how much
+// to give up, which mixes full and shortened columns down the list. A positive
+// nameCol pins the boundary between the name and the column beside it, so the
+// second column lines up and never reads as overlapping the names — which is
+// what the type line, the only column long enough to collide, needs.
+func renderRowCol(c deck.Card, order cardSort, st rowState, width, nameCol int) string {
 	if width < 1 {
 		return ""
 	}
@@ -57,7 +69,12 @@ func renderRow(c deck.Card, order cardSort, st rowState, width int) string {
 
 	name := cardName(c)
 	col := order.column(c.Card)
-	text, colText := layoutRow(name, col, order.abbreviates(), body)
+	var text, colText string
+	if nameCol > 0 {
+		text, colText = layoutColumns(name, col, nameCol, body)
+	} else {
+		text, colText = layoutRow(name, col, order.abbreviates(), body)
+	}
 
 	// The sort decides what the row is about, so it decides what is worth
 	// colouring. Sorting by colour and reading a column of grey names tells
@@ -72,8 +89,9 @@ func renderRow(c deck.Card, order cardSort, st rowState, width int) string {
 	line := markStyle.Render(pad(mark, gutter)) + nameStyle.Render(text) + painted
 	if st.cursor {
 		// The cursor is a background so it reads at a glance across four
-		// panels, where a colour change alone gets lost.
-		return lipgloss.NewStyle().Background(theme.SelectionBg).Width(width).Render(line)
+		// panels, where a colour change alone gets lost — and it has to run
+		// the whole row, not stop at the marker.
+		return highlightLine(line, width, theme.SelectionBg)
 	}
 	return line
 }
@@ -81,15 +99,13 @@ func renderRow(c deck.Card, order cardSort, st rowState, width int) string {
 // nameColour is what the card's name is written in.
 //
 // Plain text unless the list is ordered by something the name can carry: by
-// colour, the name takes the card's colour; by type, its type's. The order
-// you chose is the question you are asking, and the answer is worth being
-// able to see down the column.
+// colour, the name takes the card's colour. Sorting by type colours the type
+// column alone — the name stays plain, so the eye reads the types as bands
+// without the whole row taking their colour.
 func nameColour(c mtg.Card, order cardSort) lipgloss.Color {
 	switch order {
 	case sortColor:
 		return colourForCard(c.DisplayColors())
-	case sortType:
-		return typeColour(c.TypeLine)
 	}
 	return theme.Text
 }
@@ -198,6 +214,68 @@ func layoutRow(name, col string, colAbbreviates bool, width int) (string, string
 	return truncate(short, width), ""
 }
 
+// layoutColumns places the name and its column against a shared name-column
+// width, so the whole list abbreviates on the same boundary rather than each
+// row on its own. The column is shortened when it would cross into the name's
+// half, the name only when it overruns its own — the same order the ladder
+// gives things up in, decided once for the list instead of per row.
+func layoutColumns(name, col string, nameCol, body int) (string, string) {
+	typeCol := maxInt(body-nameCol-gap, 1)
+
+	// The column keeps its full form while it fits its half, then becomes an
+	// initialism, then is cut — but the threshold is the shared column, not
+	// this row's name, so a short name can't buy a longer column than its
+	// neighbours show.
+	if textWidth(col) > typeCol {
+		col = initialism(col, false)
+	}
+	if textWidth(col) > typeCol {
+		col = truncate(col, typeCol)
+	}
+
+	// The name keeps its column; only a name that overruns even that is given
+	// up, and to an initialism before a cut, the way the ladder does it.
+	if textWidth(name) > nameCol {
+		if short := initialism(name, true); textWidth(short) <= nameCol {
+			name = short
+		} else {
+			name = truncate(name, nameCol)
+		}
+	}
+
+	return padBetween(name, col, body)
+}
+
+// nameColumnFor is the width the name column takes across a set of rows: the
+// longest name, held back far enough that the widest abbreviated column still
+// fits beside it. It is what turns the per-row ladder into aligned columns,
+// and is only worth computing for a column long enough to collide with a name
+// — the type line.
+func nameColumnFor(cards []deck.Card, order cardSort, width int) int {
+	body := maxInt(width-gutter, 1)
+
+	fullName, abbrCol := 0, 0
+	for _, c := range cards {
+		if w := textWidth(cardName(c)); w > fullName {
+			fullName = w
+		}
+		if w := textWidth(initialism(order.column(c.Card), false)); w > abbrCol {
+			abbrCol = w
+		}
+	}
+
+	nameCol := fullName
+	// Leave room for the widest abbreviated column plus the gap; a name past
+	// that point is shortened rather than allowed to push the column off.
+	if room := body - gap - abbrCol; nameCol > room {
+		nameCol = room
+	}
+	if nameCol < 1 {
+		nameCol = 1
+	}
+	return nameCol
+}
+
 // padBetween puts the two columns at either end of the width.
 func padBetween(left, right string, width int) (string, string) {
 	space := width - textWidth(left) - textWidth(right)
@@ -222,6 +300,14 @@ func initialism(s string, trailingDot bool) string {
 	var b strings.Builder
 
 	for _, word := range strings.Fields(s) {
+		// The slash between the halves of a split card — a name or a type
+		// line — survives whole: "Invasion of Tarkir // Defiant Thundermaw"
+		// shortens to "IoT//DT.", not "IoT-DT.", so the two halves stay
+		// legibly two.
+		if word == "//" {
+			b.WriteString("//")
+			continue
+		}
 		// A dash standing on its own is a separator, not a word.
 		if isDash(word) {
 			b.WriteString("-")
@@ -258,7 +344,7 @@ func initialism(s string, trailingDot bool) string {
 
 func isDash(w string) bool {
 	switch w {
-	case "-", "–", "—", "//":
+	case "-", "–", "—":
 		return true
 	}
 	return false

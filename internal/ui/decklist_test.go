@@ -396,6 +396,31 @@ func TestPipsAreAlwaysInWUBRGOrder(t *testing.T) {
 	}
 }
 
+func TestTheKindLetterLinesUpDownTheList(t *testing.T) {
+	// A user carries only their letter, where a local deck carries a whole
+	// tail — but U still has to sit under L and R, so the columns are sized
+	// once for the list and held fixed per row.
+	rows := []deckEntry{
+		{kind: entryLocal, name: "Local", count: 100, colours: []string{"G"},
+			legal: deck.Legality{Known: true, Legal: true}},
+		{kind: entryRemote, name: "Remote", count: 60, colours: []string{"U"}},
+		{kind: entryUser, name: "Person"},
+	}
+	const width = 40
+	cols := measureDeckCols(rows, width)
+	pos := width - deckTailWidth(cols) // where the kind letter must land
+
+	for _, e := range rows {
+		line := []rune(stripANSI(renderEntryCols(e, cols, width, false)))
+		if textWidth(string(line)) != width {
+			t.Fatalf("row %q is %d wide, want %d", e.name, textWidth(string(line)), width)
+		}
+		if got := string(line[pos]); got != e.kind.letter() {
+			t.Errorf("%s row has %q at the kind column, want %q", e.name, got, e.kind.letter())
+		}
+	}
+}
+
 func TestAColourlessOrRemoteRowShowsNoPips(t *testing.T) {
 	got := stripANSI(renderEntry(deckEntry{kind: entryRemote, name: "Someone's"}, 30, false))
 	if strings.ContainsAny(got, "WUBRG") && !strings.Contains(got, "Someone") {

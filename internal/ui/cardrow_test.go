@@ -41,8 +41,70 @@ func TestInitialismKeepsCaseSoLittleWordsStayLittle(t *testing.T) {
 }
 
 func TestInitialismHandlesDoubleFacedNames(t *testing.T) {
-	if got := initialism("Brutal Cathar // Moonrage Brute", true); got != "BC-MB." {
-		t.Errorf("got %q, want BC-MB.", got)
+	// The "//" between the halves of a split or double-faced name survives as
+	// "//", so the two halves stay legibly two rather than joining across a
+	// dash.
+	if got := initialism("Brutal Cathar // Moonrage Brute", true); got != "BC//MB." {
+		t.Errorf("got %q, want BC//MB.", got)
+	}
+	if got := initialism("Battle - Siege // Creature - Dragon", false); got != "B-S//C-D" {
+		t.Errorf("got %q, want B-S//C-D", got)
+	}
+}
+
+func TestTypeColumnSharesANameBoundaryAcrossRows(t *testing.T) {
+	// Sorted by type, the whole list abbreviates the type column on one shared
+	// boundary rather than each row on its own fit — so a short-named row can't
+	// show a fuller type than a long-named one, which is the overlap the column
+	// layout removes.
+	short := deck.Card{Card: mtg.Card{Name: "Ix", TypeLine: "Legendary Creature — Elf"}}
+	long := deck.Card{Card: mtg.Card{
+		Name: "A Reasonably Long Deck Name", TypeLine: "Legendary Creature — Elf",
+	}}
+	l := newCardList([]deck.Card{short, long}, sortType, "")
+
+	lines := l.render(40, 5, nil, false)
+	joined := stripANSI(lines[0]) + "\n" + stripANSI(lines[1])
+	// The long name — which fits — sets the shared column wide, leaving the
+	// type column too narrow for the full line, so both rows show the
+	// initialism. The short-named row does not get to keep the full type.
+	if !strings.Contains(joined, "A Reasonably Long Deck Name") || !strings.Contains(joined, "Ix") {
+		t.Fatalf("both cards should be present in full:\n%s", joined)
+	}
+	if strings.Count(joined, "LC-E") != 2 {
+		t.Errorf("both type columns should abbreviate on the shared boundary:\n%s", joined)
+	}
+}
+
+func TestTheTypeColumnListNeverOverrunsItsWidth(t *testing.T) {
+	// The shared-column path is not the per-row ladder, so it earns its own
+	// width check across the range a panel can be.
+	cards := []deck.Card{
+		{Card: mtg.Card{Name: "Ix", TypeLine: "Creature — Elf"}},
+		{Card: mtg.Card{Name: "A Reasonably Long Deck Name",
+			TypeLine: "Legendary Enchantment Creature — God"}},
+		{Card: mtg.Card{Name: "Sol Ring", TypeLine: "Artifact"}},
+	}
+	l := newCardList(cards, sortType, "")
+	for width := 6; width <= 60; width++ {
+		for _, line := range l.render(width, len(cards), nil, false) {
+			if got := textWidth(stripANSI(line)); got > width {
+				t.Errorf("width %d rendered %d columns: %q", width, got, stripANSI(line))
+			}
+		}
+	}
+}
+
+func TestSortByUSDColumnShowsThePrice(t *testing.T) {
+	c := deck.Card{Card: mtg.Card{Name: "Sol Ring", Prices: mtg.Prices{USD: "3.99"}}}
+	if got := row(c, sortUSD, 40); !strings.Contains(got, "$3.99") {
+		t.Errorf("the usd column does not show the price: %q", got)
+	}
+
+	// A card with no price shows a dash rather than posing as free.
+	none := deck.Card{Card: mtg.Card{Name: "Some Token"}}
+	if got := row(none, sortUSD, 40); !strings.Contains(got, "—") {
+		t.Errorf("a priceless card should show a dash: %q", got)
 	}
 }
 
@@ -232,8 +294,10 @@ func TestTheNameTakesItsColourFromWhatYouSortedBy(t *testing.T) {
 	if got := nameColour(green, sortColor); got != theme.ManaG {
 		t.Errorf("sorting by colour painted the name %v, want green", got)
 	}
-	if got := nameColour(green, sortType); got != typeColour("Creature — Elf") {
-		t.Errorf("sorting by type painted the name %v", got)
+	// Sorting by type colours the type column, not the name: the name stays
+	// plain so the coloured bands are the types alone.
+	if got := nameColour(green, sortType); got != theme.Text {
+		t.Errorf("sorting by type painted the name %v, want plain", got)
 	}
 	if got := nameColour(green, sortMana); got != theme.Text {
 		t.Errorf("sorting by mana painted the name %v, want plain", got)

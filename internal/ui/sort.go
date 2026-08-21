@@ -31,11 +31,12 @@ const (
 	sortEDHREC
 	sortPower
 	sortToughness
+	sortUSD
 )
 
 var cardSorts = []cardSort{
 	sortArrival, sortMana, sortName, sortType, sortColor, sortRarity, sortEDHREC,
-	sortPower, sortToughness,
+	sortPower, sortToughness, sortUSD,
 }
 
 func (s cardSort) String() string {
@@ -56,6 +57,8 @@ func (s cardSort) String() string {
 		return "power"
 	case sortToughness:
 		return "toughness"
+	case sortUSD:
+		return "usd"
 	}
 	return "as found"
 }
@@ -70,7 +73,7 @@ func (s cardSort) next(delta int) cardSort {
 // whether it gets painted symbol by symbol.
 func (s cardSort) showsMana() bool {
 	switch s {
-	case sortType, sortRarity, sortEDHREC, sortPower, sortToughness:
+	case sortType, sortRarity, sortEDHREC, sortPower, sortToughness, sortUSD:
 		return false
 	}
 	return true
@@ -95,8 +98,21 @@ func (s cardSort) column(c mtg.Card) string {
 		// both, since a 2/5 and a 5/2 are a different card and the number
 		// you didn't sort by is how you tell them apart.
 		return powerToughness(c)
+	case sortUSD:
+		return usdText(c)
 	}
 	return manaCost(c)
+}
+
+// usdText is a card's dollar price for the column: "$3.99", or a dash for a
+// card Scryfall has no price for — the same dash the other columns use for a
+// value a card simply doesn't have.
+func usdText(c mtg.Card) string {
+	v, ok := c.USD()
+	if !ok {
+		return "—"
+	}
+	return "$" + strconv.FormatFloat(v, 'f', 2, 64)
 }
 
 // powerToughness is a creature's "P/T", or a planeswalker's loyalty, or a
@@ -273,6 +289,22 @@ func lessFor(s cardSort) func(a, b mtg.Card) bool {
 			}
 			pa, _ := statValue(a.Power)
 			pb, _ := statValue(b.Power)
+			if pa != pb {
+				return pa > pb
+			}
+			return byName(a, b)
+		}
+
+	case sortUSD:
+		// Dearest first — a list sorted by price is one you're reading to see
+		// what a deck costs, or what to cut. A card with no known price sorts
+		// to the bottom rather than posing as free.
+		return func(a, b mtg.Card) bool {
+			pa, oka := a.USD()
+			pb, okb := b.USD()
+			if oka != okb {
+				return oka
+			}
 			if pa != pb {
 				return pa > pb
 			}

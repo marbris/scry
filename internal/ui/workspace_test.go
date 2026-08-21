@@ -187,17 +187,16 @@ func TestTheSearchBarTakesTypingRatherThanCommands(t *testing.T) {
 	}
 }
 
-func TestEscClearsBeforeItCloses(t *testing.T) {
+func TestEscClosesAFilteredPanelRatherThanClearingIt(t *testing.T) {
+	// esc is the way out now, not a filter-clearer: a filtered panel with
+	// nothing transient in it closes on the first esc, and b is what would
+	// have kept it open by clearing the filter instead.
 	m := withCards(sized(120, 40), "f", sample(), sortArrival)
 	m = drive(m, "/", "e", "l", "f", "enter")
 
 	m = drive(m, "esc")
-	if m.ws.count() != 1 {
-		t.Fatal("esc closed a panel that still had a filter to clear")
-	}
-	m = drive(m, "esc")
 	if m.ws.count() != 0 {
-		t.Error("esc did not close a panel with nothing left to clear")
+		t.Error("esc did not close the panel; it should no longer stop to clear a filter")
 	}
 }
 
@@ -300,7 +299,7 @@ func TestOCyclesTheSortAndTheHeaderSaysSo(t *testing.T) {
 		t.Error("the panel does not say what it is sorted by")
 	}
 	m = drive(m, "O", "O")
-	if got := m.ws.current().cardsView().order; got != sortToughness {
+	if got := m.ws.current().cardsView().order; got != sortUSD {
 		t.Errorf("O wrapped to %v", got)
 	}
 }
@@ -334,17 +333,37 @@ func TestTheEscCascadeInAList(t *testing.T) {
 	m = drive(m, "/", "e", "l", "f", "enter")
 	m = drive(m, "v") // pick one out
 
-	m = drive(m, "esc") // marks first
+	m = drive(m, "esc") // the selection is transient, so it goes first
 	if m.ws.current().cardsView().markCount() != 0 {
 		t.Error("the first esc did not clear the selection")
 	}
-	m = drive(m, "esc") // then the filter
-	if m.ws.current().cardsView().filter != "" {
-		t.Error("the second esc did not clear the filter")
+	// The filter is not transient: esc leaves it so you can carry on reading
+	// the cards it left. b clears it, esc steps past it.
+	if m.ws.current().cardsView().filter == "" {
+		t.Error("esc cleared the filter, which it should leave for b")
 	}
-	m = drive(m, "esc") // and then, with nothing left to clear, the panel goes
+	m = drive(m, "esc") // nothing transient left, so the panel goes
 	if m.ws.count() != 0 {
-		t.Error("the third esc did not close the panel")
+		t.Error("esc did not close the panel once the selection was gone")
+	}
+}
+
+func TestBClearsTheFilterWithoutClosingThePanel(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, "/", "e", "l", "f", "enter")
+	if m.ws.current().cardsView().count() != 2 {
+		t.Fatalf("the filter did not narrow the list: %d rows", m.ws.current().cardsView().count())
+	}
+
+	m = drive(m, "b")
+	if got := m.ws.current().cardsView().filter; got != "" {
+		t.Errorf("b left the filter %q in place", got)
+	}
+	if m.ws.count() != 1 {
+		t.Error("b closed the panel instead of clearing the filter")
+	}
+	if m.ws.current().cardsView().count() != 4 {
+		t.Error("clearing the filter did not put the whole list back")
 	}
 }
 

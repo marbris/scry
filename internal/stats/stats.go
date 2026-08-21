@@ -191,6 +191,46 @@ func typeRows() []Row {
 	return rows
 }
 
+// priceRows is the spread of what the cards cost, in the dollar bands a
+// collection tends to clump into: a wall of commons under a dollar, a handful
+// of staples in the tens, the odd reserved-list card off on its own. A card
+// Scryfall has no price for is counted in none of them, the way a land is left
+// out of the curve — a bar it can't be placed in is worse than no bar.
+func priceRows() []Row {
+	bands := []struct {
+		label  string
+		lo, hi float64 // [lo, hi); hi of 0 means no upper bound
+	}{
+		{"<$1", 0, 1},
+		{"$1–5", 1, 5},
+		{"$5–10", 5, 10},
+		{"$10–20", 10, 20},
+		{"$20–50", 20, 50},
+		{"$50–100", 50, 100},
+		{"$100–500", 100, 500},
+		{">$500", 500, 0},
+	}
+
+	rows := make([]Row, 0, len(bands))
+	for _, band := range bands {
+		lo, hi := band.lo, band.hi
+		rows = append(rows, Row{
+			Group: "Price (USD)", Label: band.label, Color: theme.Special,
+			Match: func(ci deck.Card) bool {
+				v, ok := ci.Card.USD()
+				if !ok {
+					return false
+				}
+				if hi == 0 {
+					return v >= lo
+				}
+				return v >= lo && v < hi
+			},
+		})
+	}
+	return rows
+}
+
 // tagRows come from the deck itself — only a Moxfield deck whose author
 // tagged their cards has any.
 func tagRows(entries []deck.Card) []Row {
@@ -254,6 +294,7 @@ func Groups(rowSource, counted []deck.Card) []Group {
 		{Title: "Color (excl. lands)", Rows: colorRows()},
 		{Title: "Mana Value (excl. lands)", Rows: cmcRows()},
 		{Title: "Rarity", Rows: rarityRows(rowSource)},
+		{Title: "Price (USD)", Rows: priceRows()},
 	}
 
 	out := make([]Group, 0, len(groups))

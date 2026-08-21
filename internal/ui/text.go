@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
 )
 
@@ -81,6 +82,15 @@ func pad(s string, width int) string {
 	return s
 }
 
+// padLeft extends a string to a display width from the left, for a
+// right-aligned column — the mirror of pad.
+func padLeft(s string, width int) string {
+	if n := textWidth(s); n < width {
+		return strings.Repeat(" ", width-n) + s
+	}
+	return s
+}
+
 // fit does both: exactly this wide, cut or padded.
 func fit(s string, width int) string { return pad(truncate(s, width), width) }
 
@@ -115,6 +125,41 @@ func wrap(s string, width int) []string {
 		}
 	}
 	return out
+}
+
+// ansiReset is the sequence lipgloss ends every styled span with. It clears
+// the background as well as the foreground, which is the whole reason a row
+// needs highlightLine.
+const ansiReset = "\x1b[0m"
+
+// highlightLine paints a whole assembled row under bg and pads it to width, so
+// a highlighted row is coloured edge to edge.
+//
+// A row is built from styled spans, each ending in lipgloss's reset — and a
+// reset clears the background too. So the obvious
+// lipgloss.NewStyle().Background(bg).Width(w).Render(line) colours only as far
+// as the first reset: the marker, and nothing past it, which is the bug of a
+// selection that covers just the leftmost column. This sets the background at
+// the front and re-sets it after every reset, so the fill runs the whole row.
+func highlightLine(line string, width int, bg lipgloss.Color) string {
+	seq := bgStart(bg)
+	body := seq + strings.ReplaceAll(line, ansiReset, ansiReset+seq)
+	if pad := width - textWidth(stripStyles(line)); pad > 0 {
+		body += strings.Repeat(" ", pad)
+	}
+	return body + ansiReset
+}
+
+// bgStart is the escape sequence that switches the background to bg, taken
+// from lipgloss so it matches the colour profile in force. Empty when colour
+// is off, which is what keeps highlightLine a no-op under a plain terminal and
+// in tests.
+func bgStart(bg lipgloss.Color) string {
+	s := lipgloss.NewStyle().Background(bg).Render("\x00")
+	if i := strings.IndexByte(s, 0); i >= 0 {
+		return s[:i]
+	}
+	return ""
 }
 
 // stripStyles removes colour, for measuring text that has already been

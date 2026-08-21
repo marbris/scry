@@ -41,6 +41,7 @@ var leaderMenu = []leaderCmd{
 	{"r", "rules", nil}, // needs a command, so it is run below
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
 	{"s", "stats (everything)", func(m *Model) { m.toggleStats(true) }},
+	{"b", "clear all filters", func(m *Model) { m.clearAllFilters() }},
 	{"w", "save the editing deck", nil}, // hands back a command, so it is run below
 	{"c", "close", func(m *Model) { m.ws.close() }},
 	{"o", "only", func(m *Model) { m.ws.only() }},
@@ -62,7 +63,7 @@ func (m *Model) handleLeader(key string) tea.Cmd {
 	if key == "d" {
 		l := newDeckList()
 		m.ws.open(KindDecks).show(l)
-		return checkLegality(l.localSlugs())
+		return loadDecks(l)
 	}
 	if key == "w" {
 		return m.writeEditing()
@@ -242,16 +243,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.hintsExpanded = !m.hintsExpanded
 
 	case "esc":
-		// The cascade, outward one step at a time, as the design has it:
-		// clear a narrowing, step back out of a sub-view, close the panel.
-		// Closing the last one lands on the splash rather than quitting —
-		// esc *from* the splash is what leaves.
+		// The cascade, outward one step at a time: step off the information
+		// panel's modes, drop a transient selection, step back out of a
+		// sub-view, close the panel. Closing the last one lands on the splash
+		// rather than quitting — esc *from* the splash is what leaves.
+		//
+		// esc no longer clears a filter: a narrowing outlives the step back,
+		// so you can leave the statistics or a sub-view and go on reading the
+		// cards it left. b clears a filter, space b clears them all.
 		switch {
-		// A statistics narrowing is the outermost thing esc undoes: it was
-		// imposed from the panel beside the list, so it comes off first.
-		case m.info.mode == infoStats && m.stats.row >= 0:
-			m.stats.row = -1
-			m.applyStatFilter()
 		case m.info.mode == infoStats:
 			m.toggleStats(m.stats.global)
 		// A printed history was put on the information panel from here, so
@@ -265,6 +265,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		default:
 			m.ws.close()
 		}
+
+	case "b":
+		// Clear the narrowings on the list in front of you — the text filter
+		// and the statistics category both — leaving the panel and the
+		// statistics view where they are. esc used to do this, which is why
+		// you couldn't step back out of the bars without losing your place.
+		m.clearActiveFilters()
 
 	case "q", "ctrl+c":
 		return m.tryQuit()
@@ -335,7 +342,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if p.top() == nil {
 				l := newDeckList()
 				p.show(l)
-				cmd = checkLegality(l.localSlugs())
+				cmd = loadDecks(l)
 			} else {
 				// A tab-preview committed by pressing enter: keep the decks
 				// already on screen rather than fetching them again.
@@ -402,7 +409,7 @@ func (m *Model) previewKind(p *panel) tea.Cmd {
 		l := newDeckList()
 		p.stack = []view{l}
 		p.previewing = true
-		return checkLegality(l.localSlugs())
+		return loadDecks(l)
 	}
 	return nil
 }
@@ -511,19 +518,22 @@ func (m Model) saveEverything() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// toggleStats turns the statistics on or off. Turning them off puts back
-// whatever they were narrowing, because a narrowing you can no longer see
-// the reason for is a bug you'd spend a while finding.
+// toggleStats turns the statistics on or off. The narrowing it imposed lives
+// on the list, not on the view, so turning the bars off leaves it in place —
+// you can read the cards it left with the statistics gone, and the panel's
+// subtitle still names the category. b is what clears it. Only a change of
+// scope — focused to everything, or back — starts fresh, since a category from
+// one scope's rows means nothing against the other's.
 func (m *Model) toggleStats(global bool) {
 	if m.info.mode == infoStats && m.stats.global == global {
 		m.info.mode = infoCard
+		return
+	}
+	if m.stats.global != global {
 		m.stats.row = -1
 		m.clearStatFilter()
-		return
 	}
 	m.info.mode = infoStats
 	m.stats.global = global
-	m.stats.row = -1
 	m.info.offset = 0
-	m.clearStatFilter()
 }

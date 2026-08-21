@@ -57,6 +57,23 @@ func TestSortingByManaValue(t *testing.T) {
 	}
 }
 
+func TestSortingByUSDPutsTheDearestFirst(t *testing.T) {
+	cards := []deck.Card{
+		{Card: mtg.Card{Name: "Cheap", Prices: mtg.Prices{USD: "0.10"}}},
+		{Card: mtg.Card{Name: "Priceless"}}, // no price at all
+		{Card: mtg.Card{Name: "Dear", Prices: mtg.Prices{USD: "50.00"}}},
+	}
+	l := newCardList2(cards, sortUSD)
+	got := names(l)
+	if got[0] != "Dear" || got[1] != "Cheap" {
+		t.Errorf("usd sort put them %v, want dearest first", got)
+	}
+	// A card with no known price sorts last, not as though it were free.
+	if got[2] != "Priceless" {
+		t.Errorf("the priceless card is at %v, want the bottom", got)
+	}
+}
+
 func TestCommandersSortWithEveryoneElse(t *testing.T) {
 	// They lead a decklist because that's how a decklist is built, not
 	// because anything pins them there.

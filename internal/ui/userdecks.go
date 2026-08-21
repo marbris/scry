@@ -67,7 +67,11 @@ func (l *userDeckList) subtitle() string {
 	if len(l.decks) != len(l.all) {
 		out += "/" + itoa(len(l.all))
 	}
-	return out + " " + plural("deck", len(l.decks))
+	out += " " + plural("deck", len(l.decks))
+	if l.filter != "" {
+		out += " · /" + l.filter
+	}
+	return out
 }
 
 func (l *userDeckList) lines(width, height int, focused bool, m *Model) []string {
@@ -80,43 +84,102 @@ func (l *userDeckList) lines(width, height int, focused bool, m *Model) []string
 	}
 
 	l.cursor.scrollInto(height, len(l.decks))
+	// The same columns the decks list uses, sized once for the whole list so
+	// they line up: legality, colours, size and age.
+	cols := measureUserCols(l.decks, width)
 	lines := make([]string, 0, height)
 	for i := l.cursor.offset; i < len(l.decks) && len(lines) < height; i++ {
-		lines = append(lines, renderUserDeck(l.decks[i], width, focused && i == l.cursor.at))
+		lines = append(lines, renderUserDeck(l.decks[i], cols, width, focused && i == l.cursor.at))
 	}
 	return fillTo(lines, width, height)
 }
 
-func (l *userDeckList) clear() bool {
-	if l.filter != "" {
-		l.setFilter("")
-		return true
-	}
-	return false
+// clear has nothing transient to drop for esc; the filter is cleared with b.
+func (l *userDeckList) clear() bool { return false }
+
+// userCols mirrors deckCols for someone else's decks: the widths of the
+// colours, size and age columns, held fixed across the list so they align. The
+// legality mark is a fixed single character, so it needs no measuring.
+type userCols struct {
+	pips  int
+	count int
+	age   int
 }
 
-func renderUserDeck(d moxfield.UserDeck, width int, under bool) string {
-	tail := []string{itoa(d.Cards)}
-	if age := d.Age(); age != "" {
-		tail = append(tail, age)
-	}
-	right := tail[0]
-	if len(tail) > 1 && textWidth(d.Name)+textWidth(tail[0])+textWidth(tail[1])+3 <= width {
-		right = tail[0] + " " + tail[1]
+func measureUserCols(decks []moxfield.UserDeck, width int) userCols {
+	var c userCols
+	for _, d := range decks {
+		c.pips = maxInt(c.pips, textWidth(manaPips(d.Colors)))
+		c.count = maxInt(c.count, textWidth(itoa(d.Cards)))
+		c.age = maxInt(c.age, textWidth(shortAge(d.UpdatedAt())))
 	}
 
-	name := fit(d.Name, maxInt(width-textWidth(right)-1, 0))
+	const minName = 12
+	for userTailWidth(c)+minName+1 > width {
+		switch {
+		case c.age > 0:
+			c.age = 0
+		case c.count > 0:
+			c.count = 0
+		case c.pips > 0:
+			c.pips = 0
+		default:
+			return c
+		}
+	}
+	return c
+}
+
+func userTailWidth(c userCols) int {
+	w := 1 // the legality mark
+	for _, col := range []int{c.pips, c.count, c.age} {
+		if col > 0 {
+			w += 1 + col
+		}
+	}
+	return w
+}
+
+// renderUserDeck draws one of someone's decks in the same shape as the decks
+// list: the name, then legality — by Moxfield's own reckoning — colours, size
+// and an abbreviated age.
+func renderUserDeck(d moxfield.UserDeck, cols userCols, width int, under bool) string {
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+
+	slots := []string{userLegalMark(d.Legal)}
+	if cols.pips > 0 {
+		slots = append(slots, paintMana(padLeft(manaPips(d.Colors), cols.pips)))
+	}
+	if cols.count > 0 {
+		slots = append(slots, dim.Render(padLeft(itoa(d.Cards), cols.count)))
+	}
+	if cols.age > 0 {
+		slots = append(slots, dim.Render(padLeft(shortAge(d.UpdatedAt()), cols.age)))
+	}
+	right := strings.Join(slots, " ")
+	tailWidth := textWidth(stripStyles(right))
+
+	name := fit(d.Name, maxInt(width-tailWidth-1, 0))
 	style := lipgloss.NewStyle().Foreground(theme.Text)
 	if under {
 		style = style.Foreground(theme.SelectionFg).Bold(true)
 	}
 
-	line := style.Render(name) + " " +
-		lipgloss.NewStyle().Foreground(theme.TextDim).Render(right)
+	line := style.Render(name) + " " + right
 	if under {
-		return lipgloss.NewStyle().Background(theme.SelectionBg).Width(width).Render(line)
+		return highlightLine(line, width, theme.SelectionBg)
 	}
 	return line
+}
+
+// userLegalMark is Moxfield's own legality verdict, in the one character the
+// row has room for: the same * / ! the decks list uses. Moxfield always tells
+// us, so unlike a local deck there is no unknown state.
+func userLegalMark(legal bool) string {
+	if legal {
+		return lipgloss.NewStyle().Foreground(theme.Success).Render("*")
+	}
+	return lipgloss.NewStyle().Foreground(theme.Error).Render("!")
 }
 
 func (l *userDeckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
@@ -152,6 +215,20 @@ func (l *userDeckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			d := l.decks[l.cursor.at]
 			return true, copyEntry(deckEntry{kind: entryRemote, name: d.Name, id: d.PublicID})
 		}
+
+	case "C":
+		// Take the main deck and the author's Considering list, as two decks.
+		if l.cursor.at < len(l.decks) {
+			d := l.decks[l.cursor.at]
+			return true, copyEntryBoth(deckEntry{kind: entryRemote, name: d.Name, id: d.PublicID})
+		}
+
+	case "r":
+		// Follow it, so it lands in your decks list without a copy.
+		if l.cursor.at < len(l.decks) {
+			d := l.decks[l.cursor.at]
+			return true, followRemote(d.Name, d.PublicID, d.PublicURL)
+		}
 	}
 	return false, nil
 }
@@ -181,7 +258,10 @@ func (l *userDeckList) info(width int) []string {
 	if age := d.Age(); age != "" {
 		out = append(out, dim.Render(fit("updated "+age, width)))
 	}
-	return append(out, "", mutedLine("enter to open · c to take a copy", width))
+	out = append(out, "",
+		mutedLine("enter to open · r to follow", width),
+		mutedLine("c to copy · C for the considering list too", width))
+	return out
 }
 
 func (l *userDeckList) keys() []hintGroup {
@@ -193,7 +273,9 @@ func (l *userDeckList) keys() []hintGroup {
 		{"decks", [][2]string{
 			{"enter", "open"},
 			{"L", "beside"},
+			{"r", "follow"},
 			{"c", "copy"},
+			{"C", "copy + considering"},
 		}},
 	}
 }

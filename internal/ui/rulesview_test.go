@@ -357,9 +357,10 @@ func TestSlashNarrowsTheRules(t *testing.T) {
 		t.Errorf("filtering left %d of %d rows", len(v.rows), before)
 	}
 
-	m = drive(m, "esc")
+	// b clears the filter; esc is the way back out of the panel now.
+	m = drive(m, "b")
 	if len(v.rows) != before {
-		t.Errorf("esc left %d of %d rows", len(v.rows), before)
+		t.Errorf("b left %d of %d rows", len(v.rows), before)
 	}
 }
 

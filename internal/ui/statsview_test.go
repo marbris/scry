@@ -95,33 +95,52 @@ func TestSteppingBackOffTheTopClearsTheNarrowing(t *testing.T) {
 	}
 }
 
-func TestLeavingStatisticsPutsTheListBack(t *testing.T) {
-	// A narrowing you can no longer see the reason for is a bug you would
-	// spend a while finding.
+func TestLeavingStatisticsKeepsTheNarrowing(t *testing.T) {
+	// The narrowing lives on the list, not the bars: turning the statistics
+	// off leaves it in place so you can read the cards it left. The subtitle
+	// still names the category, and b clears it.
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
 	m = drive(m, "s", "J")
-	m = drive(m, "s")
-
-	if l.count() != 6 {
-		t.Errorf("the list is still narrowed to %d cards", l.count())
+	narrowed := l.count()
+	if narrowed == 6 {
+		t.Fatal("the category did not narrow the list")
 	}
+
+	m = drive(m, "s")
 	if m.info.mode == infoStats {
 		t.Error("s did not turn the statistics off")
 	}
+	if l.count() != narrowed {
+		t.Errorf("leaving the statistics put the list back to %d, want it held at %d",
+			l.count(), narrowed)
+	}
 }
 
-func TestEscClearsTheNarrowingBeforeAnythingElse(t *testing.T) {
+func TestEscLeavesTheStatisticsButKeepsTheNarrowing(t *testing.T) {
 	m := withCards(sized(120, 30), "d", deckSample(), sortArrival)
 	l := m.ws.current().cardsView()
 	m = drive(m, "s", "J")
+	narrowed := l.count()
 
-	m = drive(m, "esc")
-	if l.count() != 6 {
-		t.Errorf("esc left the list narrowed to %d", l.count())
+	m = drive(m, "esc") // back to the card view, narrowing intact
+	if m.info.mode == infoStats {
+		t.Error("esc did not step off the statistics")
+	}
+	if l.count() != narrowed {
+		t.Errorf("esc put the list back to %d, want it held at %d", l.count(), narrowed)
 	}
 	if m.ws.count() != 1 {
-		t.Error("esc closed the panel instead of clearing the narrowing")
+		t.Error("esc closed the panel instead of stepping off the statistics")
+	}
+
+	// b is what clears it, without disturbing the panel.
+	m = drive(m, "b")
+	if l.count() != 6 {
+		t.Errorf("b left the list narrowed to %d", l.count())
+	}
+	if m.ws.count() != 1 {
+		t.Error("b closed the panel instead of clearing the narrowing")
 	}
 }
 

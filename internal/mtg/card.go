@@ -5,7 +5,10 @@
 // bottom of the dependency graph and stays that way.
 package mtg
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // SearchResponse is a page of results from Scryfall's search endpoint.
 type SearchResponse struct {
@@ -40,6 +43,7 @@ type Card struct {
 	Legalities    map[string]string `json:"legalities"`
 	CMC           float64           `json:"cmc"`
 	EDHRECRank    int               `json:"edhrec_rank"`
+	Prices        Prices            `json:"prices"`
 
 	// Transforming and modal double-faced cards carry no top-level oracle
 	// text, mana cost or colors at all — it's per face.
@@ -112,6 +116,33 @@ func (c Card) DisplayManaCost() string {
 		return c.ManaCost
 	}
 	return c.CardFaces[0].ManaCost
+}
+
+// Prices is what Scryfall last saw the card sell for, in a few currencies. We
+// only read the non-foil US-dollar figure — it's the one most decklists are
+// costed in — and it arrives as a string so that a card with no known price is
+// an empty field rather than a misleading zero.
+type Prices struct {
+	USD     string `json:"usd"`
+	USDFoil string `json:"usd_foil"`
+}
+
+// USD is the card's dollar price as a number, and whether it had one at all. A
+// card Scryfall has no price for returns (0, false), so it can be told apart
+// from a card that genuinely costs nothing.
+func (c Card) USD() (float64, bool) {
+	s := c.Prices.USD
+	if s == "" {
+		s = c.Prices.USDFoil // a foil-only card still has a price worth showing
+	}
+	if s == "" {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
 }
 
 type Ruling struct {

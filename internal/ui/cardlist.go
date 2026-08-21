@@ -318,14 +318,22 @@ func filterTerms(s string) []string {
 func (l *cardList) render(width, height int, members map[string]bool, focused bool) []string {
 	l.cursor.scrollInto(height, len(l.rows))
 
+	// When the column beside the name is a type line it can be long enough to
+	// crowd the names, so the whole list shares one name-column width and
+	// abbreviates on that boundary — no ragged overlap between the two.
+	nameCol := 0
+	if l.order.abbreviates() {
+		nameCol = nameColumnFor(l.rows, l.order, width)
+	}
+
 	lines := make([]string, 0, height)
 	for i := l.cursor.offset; i < len(l.rows) && len(lines) < height; i++ {
 		c := l.rows[i]
-		lines = append(lines, renderRow(c, l.order, rowState{
+		lines = append(lines, renderRowCol(c, l.order, rowState{
 			selected: l.marked(c),
 			member:   members[markKey(c)],
 			cursor:   focused && i == l.cursor.at,
-		}, width))
+		}, width, nameCol))
 	}
 	for len(lines) < height {
 		lines = append(lines, strings.Repeat(" ", width))
@@ -359,6 +367,15 @@ func (l *cardList) subtitle() string {
 	out += " · " + l.orderName()
 	if n := l.markCount(); n > 0 {
 		out += " · " + itoa(n) + " picked"
+	}
+	// The two narrowings the rows can't show for themselves: a panel filtered
+	// down to a few cards otherwise looks like a short search, and a stat
+	// filter set from the panel beside it leaves no mark here at all.
+	if l.filter != "" {
+		out += " · /" + l.filter
+	}
+	if l.statFilter != nil {
+		out += " · [" + l.statFilter.Label + "]"
 	}
 	return out
 }
@@ -429,17 +446,15 @@ func currentOr(l *cardList) deck.Card {
 	return c
 }
 
-// clear undoes one narrowing: the selection first, then the filter.
+// clear drops the transient selection for esc — the cards picked out with v.
+// A filter is not transient and outlives the step back: b clears that, so esc
+// can stay the way out.
 func (l *cardList) clear() bool {
-	switch {
-	case l.markCount() > 0:
+	if l.markCount() > 0 {
 		l.clearMarks()
-	case l.filter != "":
-		l.setFilter("")
-	default:
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 // info is the card under the cursor, in full.

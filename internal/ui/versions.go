@@ -131,13 +131,8 @@ func (l *versionList) setFilter(s string) {
 	l.cursor.clamp(len(l.commits))
 }
 
-func (l *versionList) clear() bool {
-	if l.filter != "" {
-		l.setFilter("")
-		return true
-	}
-	return false
-}
+// clear has nothing transient to drop for esc; the filter is cleared with b.
+func (l *versionList) clear() bool { return false }
 
 func (l *versionList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	if l.cursor.navKey(k, len(l.commits)) {

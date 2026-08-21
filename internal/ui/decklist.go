@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"scry/internal/deck"
+	"scry/internal/moxfield"
 	"scry/internal/theme"
 )
 
@@ -149,6 +150,19 @@ func (l *deckList) setLegality(slug string, verdict deck.Legality, colours []str
 	l.refresh()
 }
 
+// setRemoteMeta fills a followed deck's row with the summary a background
+// fetch worked out: its colours, its size, and when it last changed.
+func (l *deckList) setRemoteMeta(id string, meta moxfield.Meta) {
+	for i := range l.all {
+		if l.all[i].kind == entryRemote && l.all[i].id == id {
+			l.all[i].colours = meta.Colors
+			l.all[i].count = meta.Count
+			l.all[i].modified = meta.Updated
+		}
+	}
+	l.refresh()
+}
+
 // reload rebuilds from disk. Every change goes through it, so the list can
 // never disagree with the files behind it.
 func (l *deckList) reload() {
@@ -165,7 +179,10 @@ func (l *deckList) reload() {
 
 	b := deck.LoadBookmarks()
 	for _, r := range b.Remotes {
-		all = append(all, deckEntry{kind: entryRemote, name: r.Name, id: r.ID})
+		all = append(all, deckEntry{
+			kind: entryRemote, name: r.Name, id: r.ID,
+			colours: r.Colors, count: r.Count, modified: r.Updated,
+		})
 	}
 	for _, u := range b.Users {
 		all = append(all, deckEntry{kind: entryUser, name: u, user: u})
@@ -253,7 +270,11 @@ func (l *deckList) subtitle() string {
 	if len(l.rows) != len(l.all) {
 		out += "/" + itoa(len(l.all))
 	}
-	return out + " · " + l.order.String()
+	out += " · " + l.order.String()
+	if l.filter != "" {
+		out += " · /" + l.filter
+	}
+	return out
 }
 
 func (l *deckList) lines(width, height int, focused bool, m *Model) []string {
@@ -273,65 +294,120 @@ func (l *deckList) lines(width, height int, focused bool, m *Model) []string {
 	}
 
 	l.cursor.scrollInto(height, len(l.rows))
+	// One set of column widths for the whole list, so the kind letter and each
+	// value line up down the panel however little any single row carries — a
+	// user, who has only their letter, still sits it under the L and R above.
+	cols := measureDeckCols(l.rows, width)
 	lines := make([]string, 0, height)
 	for i := l.cursor.offset; i < len(l.rows) && len(lines) < height; i++ {
-		lines = append(lines, renderEntry(l.rows[i], width, focused && i == l.cursor.at))
+		lines = append(lines, renderEntryCols(l.rows[i], cols, width, focused && i == l.cursor.at))
 	}
 	return fillTo(lines, width, height)
 }
 
-func (l *deckList) clear() bool {
-	if l.filter != "" {
-		l.setFilter("")
-		return true
-	}
-	return false
-}
+// clear has nothing transient to drop for esc; the filter is cleared with b.
+func (l *deckList) clear() bool { return false }
 
 // ── Drawing a row ───────────────────────────────────────────────
 
-// renderEntry draws one row: the name, then a tail of kind, legality, size
-// and age. The tail is given up from the right as the panel narrows.
+// deckCols are the widths the decks list gives its right-hand columns. Shared
+// across the list and held fixed per row — a row without colours or a count
+// still reserves the space — so every column lines up vertically. A width of
+// zero means no row has that column, or the panel is too narrow to keep it.
+type deckCols struct {
+	pips  int
+	count int
+	age   int
+}
+
+// measureDeckCols works out those widths from the rows, then gives columns up
+// from the right until the tail leaves room for a name — the same order the
+// old per-row tail yielded in, decided once for the list so the drop is
+// uniform and the columns stay aligned.
+func measureDeckCols(rows []deckEntry, width int) deckCols {
+	var c deckCols
+	for _, e := range rows {
+		c.pips = maxInt(c.pips, textWidth(manaPips(e.colours)))
+		c.count = maxInt(c.count, textWidth(entryCount(e)))
+		c.age = maxInt(c.age, textWidth(shortAge(e.modified)))
+	}
+
+	const minName = 12
+	for deckTailWidth(c)+minName+1 > width {
+		switch {
+		case c.age > 0:
+			c.age = 0
+		case c.count > 0:
+			c.count = 0
+		case c.pips > 0:
+			c.pips = 0
+		default:
+			return c
+		}
+	}
+	return c
+}
+
+// deckTailWidth is how wide the right-hand block is: the two-character kind and
+// legality flag, then a space and its width for each column still standing.
+func deckTailWidth(c deckCols) int {
+	w := 2 // the kind letter and the legality mark
+	for _, col := range []int{c.pips, c.count, c.age} {
+		if col > 0 {
+			w += 1 + col
+		}
+	}
+	return w
+}
+
+// entryCount is the size column's text: a local deck says its size even when
+// that's zero — blank reads as "we haven't looked", and an empty deck is a
+// fact — while a remote says nothing until we've looked, and a person never.
+func entryCount(e deckEntry) string {
+	if e.kind == entryLocal || e.count > 0 {
+		return itoa(e.count)
+	}
+	return ""
+}
+
+// renderEntry draws one row with columns sized to itself, which is what the
+// tests want to measure. The list draws with renderEntryCols instead, so its
+// columns are shared and aligned.
 func renderEntry(e deckEntry, width int, under bool) string {
+	return renderEntryCols(e, measureDeckCols([]deckEntry{e}, width), width, under)
+}
+
+// renderEntryCols draws one row against a shared set of column widths: the
+// name, then a right-aligned tail of kind, legality, colours, size and age.
+// Each column keeps its slot whether or not this row fills it, so the columns
+// line up down the list.
+func renderEntryCols(e deckEntry, cols deckCols, width int, under bool) string {
 	if width < 1 {
 		return ""
 	}
 
-	// The kind and its legality mark travel together: they are two
-	// characters saying what this is and whether it's playable.
-	kind := e.kind.letter()
-	legal := e.legal.Flag()
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
-	tail := []string{kind + legal}
-	if pips := manaPips(e.colours); pips != "" {
-		tail = append(tail, pips)
+	// The kind letter and its legality mark travel together: two characters
+	// saying what this is and whether it's playable.
+	slots := []string{dim.Render(e.kind.letter()) + legalMark(e, e.legal.Flag())}
+	if cols.pips > 0 {
+		slots = append(slots, paintMana(padLeft(manaPips(e.colours), cols.pips)))
 	}
-	// A deck with no cards says 0 rather than nothing: blank reads as "we
-	// haven't looked", and an empty deck is a fact.
-	if e.kind == entryLocal {
-		tail = append(tail, itoa(e.count))
-	} else if e.count > 0 {
-		tail = append(tail, itoa(e.count))
+	if cols.count > 0 {
+		slots = append(slots, dim.Render(padLeft(entryCount(e), cols.count)))
 	}
-	if age := shortAge(e.modified); age != "" {
-		tail = append(tail, age)
+	if cols.age > 0 {
+		slots = append(slots, dim.Render(padLeft(shortAge(e.modified), cols.age)))
 	}
+	right := strings.Join(slots, " ")
+	tailWidth := textWidth(stripStyles(right))
 
-	// Drop from the right until the name has somewhere worth living. A
-	// name with no age beside it is still a name; an age with no name is
-	// nothing, so the tail yields first and keeps yielding.
 	name := e.name
 	if e.broken {
 		name += " (unreadable)"
 	}
-	const minName = 12
-	for len(tail) > 1 && textWidth(strings.Join(tail, " "))+minName+1 > width {
-		tail = tail[:len(tail)-1]
-	}
-
-	right := paintTail(tail, e)
-	space := width - textWidth(stripStyles(right))
-	left := fit(name, maxInt(space-1, 0))
+	left := fit(name, maxInt(width-tailWidth-1, 0))
 
 	nameStyle := lipgloss.NewStyle().Foreground(theme.Text)
 	switch {
@@ -346,11 +422,9 @@ func renderEntry(e deckEntry, width int, under bool) string {
 		nameStyle = nameStyle.Foreground(theme.SelectionFg).Bold(true)
 	}
 
-	line := nameStyle.Render(left) + " " +
-		lipgloss.NewStyle().Foreground(theme.TextDim).Render(right)
-
+	line := nameStyle.Render(left) + " " + right
 	if under {
-		return lipgloss.NewStyle().Background(theme.SelectionBg).Width(width).Render(line)
+		return highlightLine(line, width, theme.SelectionBg)
 	}
 	return line
 }
@@ -416,6 +490,12 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			return true, copyEntry(e)
 		}
 
+	case "C":
+		// A remote's Considering list, alongside the main copy c would take.
+		if e, ok := l.current(); ok && e.kind == entryRemote {
+			return true, copyEntryBoth(e)
+		}
+
 	case "x":
 		e, ok := l.current()
 		if !ok {
@@ -458,7 +538,9 @@ func (l *deckList) info(width int) []string {
 		out = append(out, "", mutedLine("enter to open · gv for versions", width))
 	case entryRemote:
 		out = append(out, dim.Render(fit("on Moxfield", width)))
-		out = append(out, "", mutedLine("enter to look · c to take a copy", width))
+		out = append(out, "",
+			mutedLine("enter to look · c to take a copy", width),
+			mutedLine("C copies the considering list too", width))
 	case entryUser:
 		out = append(out, dim.Render(fit("a person on Moxfield", width)))
 		out = append(out, "", mutedLine("enter for their decks", width))
@@ -508,25 +590,6 @@ func manaPips(colours []string) string {
 	return b.String()
 }
 
-// paintTail colours the row's tail: the pips in their mana colours, the
-// legality mark by whether it passed, the rest dim.
-func paintTail(parts []string, e deckEntry) string {
-	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
-
-	out := make([]string, 0, len(parts))
-	for i, part := range parts {
-		switch {
-		case i == 0:
-			out = append(out, dim.Render(part[:1])+legalMark(e, part[1:]))
-		case isPips(part):
-			out = append(out, paintMana(part))
-		default:
-			out = append(out, dim.Render(part))
-		}
-	}
-	return strings.Join(out, " ")
-}
-
 func legalMark(e deckEntry, mark string) string {
 	switch {
 	case !e.legal.Known:
@@ -535,19 +598,6 @@ func legalMark(e deckEntry, mark string) string {
 		return lipgloss.NewStyle().Foreground(theme.Success).Render(mark)
 	}
 	return lipgloss.NewStyle().Foreground(theme.Error).Render(mark)
-}
-
-// isPips reports whether a tail part is a colour string rather than a count.
-func isPips(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if !strings.ContainsRune("WUBRG", r) {
-			return false
-		}
-	}
-	return true
 }
 
 func (l *deckList) keys() []hintGroup {
@@ -563,6 +613,7 @@ func (l *deckList) keys() []hintGroup {
 			{"n", "new deck"},
 			{"r", "rename"},
 			{"c", "copy/sync"},
+			{"C", "copy + considering"},
 			{"x", "delete"},
 			{"gv", "versions"},
 		}},

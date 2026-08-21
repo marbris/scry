@@ -356,14 +356,8 @@ func (v *rulesView) lines(width, height int, focused bool, m *Model) []string {
 	return fillTo(lines, width, height)
 }
 
-func (v *rulesView) clear() bool {
-	if v.filter != "" {
-		v.filter = ""
-		v.refresh()
-		return true
-	}
-	return false
-}
+// clear has nothing transient to drop for esc; the filter is cleared with b.
+func (v *rulesView) clear() bool { return false }
 
 func (v *rulesView) setFilter(s string) {
 	v.filter = s
