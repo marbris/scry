@@ -51,6 +51,46 @@ func loadVersions(panelID int, slug, name string) tea.Cmd {
 	}
 }
 
+// revertVersion brings a deck back to an older version, recorded as a new
+// commit — the version you reverted from stays in the history, and so does the
+// one you reverted over. r.
+func revertVersion(slug, name, hash string) tea.Cmd {
+	return func() tea.Msg {
+		if err := deck.Restore(slug, hash); err != nil {
+			return noticeMsg{err: err}
+		}
+		return noticeMsg{text: "reverted " + name + " to " + shortHash(hash)}
+	}
+}
+
+// copyVersion makes a new deck out of a deck as it stood at an older version,
+// leaving the deck you copied from untouched. c.
+func copyVersion(slug, name, hash string) tea.Cmd {
+	return func() tea.Msg {
+		old, err := deck.At(slug, hash)
+		if err != nil {
+			return noticeMsg{err: err}
+		}
+		newSlug, copied, err := deck.New(uniqueName(old.Name+" copy"), old.Format)
+		if err != nil {
+			return noticeMsg{err: err}
+		}
+		copied.Entries = old.Entries
+		copied.Source = old.Source
+		if _, _, err := deck.SaveVersioned(newSlug, copied); err != nil {
+			return noticeMsg{err: err}
+		}
+		return noticeMsg{text: "copied to " + newSlug}
+	}
+}
+
+func shortHash(hash string) string {
+	if len(hash) > 7 {
+		return hash[:7]
+	}
+	return hash
+}
+
 func (m Model) handleVersions(msg versionsMsg) (tea.Model, tea.Cmd) {
 	p := m.ws.byID(msg.panel)
 	if p == nil {
@@ -101,7 +141,7 @@ func (l *versionList) lines(width, height int, focused bool, m *Model) []string 
 		line := style.Render(subject) + " " +
 			lipgloss.NewStyle().Foreground(theme.TextDim).Render(when)
 		if under {
-			line = lipgloss.NewStyle().Background(theme.SelectionBg).Width(width).Render(line)
+			line = highlightLine(line, width, theme.SelectionBg)
 		}
 		lines = append(lines, line)
 	}
@@ -138,11 +178,28 @@ func (l *versionList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	if l.cursor.navKey(k, len(l.commits)) {
 		return true, l.wantDiff()
 	}
-	if k == "/" {
+	switch k {
+	case "/":
 		p.openFilter(l.filter)
 		return true, nil
+	case "r":
+		if c, ok := l.current(); ok {
+			return true, revertVersion(l.slug, l.name, c.Hash)
+		}
+	case "c":
+		if c, ok := l.current(); ok {
+			return true, copyVersion(l.slug, l.name, c.Hash)
+		}
 	}
 	return false, nil
+}
+
+// current is the commit under the cursor.
+func (l *versionList) current() (deck.Commit, bool) {
+	if l.cursor.at < 0 || l.cursor.at >= len(l.commits) {
+		return deck.Commit{}, false
+	}
+	return l.commits[l.cursor.at], true
 }
 
 // wantDiff fetches the diff for whatever the cursor has landed on, if it
@@ -194,6 +251,7 @@ func (l *versionList) info(width int) []string {
 	out := []string{
 		head.Render(fit(c.Subject, width)),
 		dim.Render(fit(c.Short+" · "+c.When, width)),
+		mutedLine("r revert to this · c copy from it", width),
 		"",
 	}
 
@@ -240,6 +298,10 @@ func (l *versionList) keys() []hintGroup {
 		{"navigation", [][2]string{
 			{"j k", "up/down"},
 			{"/", "filter"},
+		}},
+		{"versions", [][2]string{
+			{"r", "revert to"},
+			{"c", "copy from"},
 		}},
 	}
 }

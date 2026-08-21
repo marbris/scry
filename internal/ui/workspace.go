@@ -21,8 +21,25 @@ type workspace struct {
 	// nextID hands out panel identities, which outlive a panel's position.
 	nextID int
 
+	// closed is the panels shut with c or esc, newest last, so space u can
+	// bring the last one back where it was. They are kept whole — the same
+	// panel, lifted out of the row — so restoring one costs no re-fetch.
+	closed []closedPanel
+
 	width, height int
 }
+
+// closedPanel remembers a shut panel and where it sat, for undo-close.
+type closedPanel struct {
+	panel   *panel
+	at      int
+	editing bool
+}
+
+// closedLimit caps how far back undo-close reaches — deep enough for the
+// mistakes you actually make, shallow enough not to pin every panel you have
+// ever closed in memory.
+const closedLimit = 20
 
 func newWorkspace() workspace {
 	return workspace{editing: -1}
@@ -93,6 +110,16 @@ func (w *workspace) close() {
 		return
 	}
 	at := w.focused
+
+	// Remember it whole, so space u can bring it back where it was rather than
+	// re-opening an empty panel and re-running the search.
+	w.closed = append(w.closed, closedPanel{
+		panel: w.panels[at], at: at, editing: w.editing == at,
+	})
+	if len(w.closed) > closedLimit {
+		w.closed = w.closed[len(w.closed)-closedLimit:]
+	}
+
 	w.panels = append(w.panels[:at], w.panels[at+1:]...)
 
 	if w.editing == at {
@@ -105,6 +132,40 @@ func (w *workspace) close() {
 		at = len(w.panels) - 1
 	}
 	w.focus(maxInt(at, 0))
+}
+
+// restoreClosed brings back the last panel closed, at the spot it held, with
+// focus — the counterpart to shutting one by mistake. Nothing to bring back is
+// a no-op, not an error.
+func (w *workspace) restoreClosed() {
+	n := len(w.closed)
+	if n == 0 {
+		return
+	}
+	last := w.closed[n-1]
+	w.closed = w.closed[:n-1]
+
+	at := last.at
+	if at > len(w.panels) {
+		at = len(w.panels)
+	}
+	if at < 0 {
+		at = 0
+	}
+
+	// Inserting at `at` shifts everything from there up by one; the editing
+	// index has to move with it before the panel takes its place.
+	if w.editing >= at {
+		w.editing++
+	}
+	w.panels = append(w.panels, nil)
+	copy(w.panels[at+1:], w.panels[at:])
+	w.panels[at] = last.panel
+
+	if last.editing {
+		w.editing = at
+	}
+	w.focus(at)
 }
 
 // only closes everything but the focused panel.

@@ -142,6 +142,41 @@ func TestYourThemeShadowsTheBuiltin(t *testing.T) {
 	}
 }
 
+func TestSeedBuiltinsWritesReadableThemeFiles(t *testing.T) {
+	configHome(t)
+	SeedBuiltins()
+
+	// The default has to land as a real file, and read back as a theme.
+	path := filepath.Join(Dir(), DefaultName+".json")
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("the default theme was not seeded: %v", err)
+	}
+	if _, err := readTheme(path); err != nil {
+		t.Errorf("the seeded theme did not parse: %v", err)
+	}
+}
+
+func TestSeedBuiltinsLeavesAnExistingFileAlone(t *testing.T) {
+	configHome(t)
+	if err := os.MkdirAll(Dir(), 0755); err != nil {
+		t.Fatal(err)
+	}
+	// A file already there — a built-in you have edited — must not be
+	// overwritten by the seed.
+	path := filepath.Join(Dir(), DefaultName+".json")
+	mine := []byte(`{"name":"gruvbox","palette":{"bg":"#000000"}}` + "\n")
+	if err := os.WriteFile(path, mine, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	SeedBuiltins()
+
+	got, _ := os.ReadFile(path)
+	if string(got) != string(mine) {
+		t.Error("SeedBuiltins overwrote a theme file that was already there")
+	}
+}
+
 func TestSetRefusesAThemeThatIsntThere(t *testing.T) {
 	configHome(t)
 	if err := Set("nosuch"); err == nil {

@@ -75,6 +75,10 @@ func Current() string {
 // unreadable is reported, and the default stays up — a typo in a config file
 // shouldn't leave someone staring at an unusable screen.
 func Load() error {
+	// Lay the built-ins down as real files first, so there is always one to
+	// read and one to copy the format from.
+	SeedBuiltins()
+
 	name := Current()
 	t, err := Find(name)
 	if err != nil {
@@ -82,6 +86,36 @@ func Load() error {
 	}
 	Use(t)
 	return nil
+}
+
+// SeedBuiltins writes the built-in themes into your config themes directory,
+// so the theme in force is a file you can read and the format is one you can
+// see and copy. It only ever fills gaps: a theme file already there may be one
+// you have edited — including a built-in you have changed — so it is left
+// exactly as it is. Best-effort throughout; a read-only config directory just
+// means the embedded copies keep serving as the fallback.
+func SeedBuiltins() {
+	dir := Dir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return
+	}
+
+	files, _ := builtin.ReadDir("themes")
+	for _, f := range files {
+		name, ok := themeName(f.Name())
+		if !ok {
+			continue
+		}
+		path := filepath.Join(dir, name+".json")
+		if _, err := os.Stat(path); err == nil {
+			continue // already there — leave any edits alone
+		}
+		body, err := builtin.ReadFile("themes/" + f.Name())
+		if err != nil {
+			continue
+		}
+		os.WriteFile(path, body, 0644)
+	}
 }
 
 // ── Finding themes ──────────────────────────────────────────────

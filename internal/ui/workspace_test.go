@@ -200,6 +200,42 @@ func TestEscClosesAFilteredPanelRatherThanClearingIt(t *testing.T) {
 	}
 }
 
+func TestSpaceUReopensAClosedPanelWhereItWas(t *testing.T) {
+	m := sized(160, 30)
+	m = withCards(m, "f", sample(), sortArrival)     // panel 0
+	m = withCards(m, "d", sample()[:2], sortArrival) // panel 1
+	m.ws.panels[0].cardsView().name = "keep-me"
+	if m.ws.count() != 2 {
+		t.Fatalf("setup left %d panels", m.ws.count())
+	}
+
+	m = focusOn(m, 0)
+	m = drive(m, "space", "c") // close the first panel
+	if m.ws.count() != 1 {
+		t.Fatalf("close left %d panels", m.ws.count())
+	}
+
+	m = drive(m, "space", "u") // undo the close
+	if m.ws.count() != 2 {
+		t.Fatalf("space u left %d panels", m.ws.count())
+	}
+	if got := m.ws.panels[0].cardsView().name; got != "keep-me" {
+		t.Errorf("the restored panel came back at the wrong spot; index 0 holds %q", got)
+	}
+	if m.ws.focused != 0 {
+		t.Errorf("space u focused panel %d, want the one it restored", m.ws.focused)
+	}
+}
+
+func TestSpaceUWithNothingClosedIsANoOp(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	before := m.ws.count()
+	m = drive(m, "space", "u")
+	if m.ws.count() != before {
+		t.Errorf("space u changed the panels with nothing to restore: %d → %d", before, m.ws.count())
+	}
+}
+
 func TestTheLeaderMenuAppearsAndCancels(t *testing.T) {
 	m := openPanel(sized(120, 40), "f", "angel")
 	m = drive(m, "space")

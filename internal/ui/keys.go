@@ -44,6 +44,7 @@ var leaderMenu = []leaderCmd{
 	{"b", "clear all filters", func(m *Model) { m.clearAllFilters() }},
 	{"w", "save the editing deck", nil}, // hands back a command, so it is run below
 	{"c", "close", func(m *Model) { m.ws.close() }},
+	{"u", "undo close", func(m *Model) { m.ws.restoreClosed() }},
 	{"o", "only", func(m *Model) { m.ws.only() }},
 	{"h", "move left", func(m *Model) { m.ws.movePanel(-1) }},
 	{"l", "move right", func(m *Model) { m.ws.movePanel(1) }},
