@@ -56,6 +56,10 @@ func main() {
 	case "deck":
 		runDeck(args[1:])
 		return
+
+	case "sync":
+		runSync(args[1:])
+		return
 	}
 
 	query := strings.Join(args, " ")

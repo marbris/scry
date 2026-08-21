@@ -380,6 +380,22 @@ func follow(input string) tea.Cmd {
 	}
 }
 
+// syncDecks mirrors the decks directory to its git remote — the s key in the
+// decks panel. Setting the remote up is a terminal job (`scry sync init`); this
+// is only the recurring push-and-pull, so the whole of it is one background
+// call whose result becomes a notice. The reload that follows any notice picks
+// up whatever a pull brought in.
+func syncDecks() tea.Msg {
+	if !deck.SyncConfigured() {
+		return noticeMsg{err: fmt.Errorf("syncing isn't set up — run `scry sync remote <url>` in your shell")}
+	}
+	res, err := deck.Sync()
+	if err != nil {
+		return noticeMsg{err: err}
+	}
+	return noticeMsg{text: "sync: " + res.Summary()}
+}
+
 // reloadDecks tells every decks panel to read the directory again.
 func reloadDecks() tea.Msg { return reloadDecksMsg{} }
 
