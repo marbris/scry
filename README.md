@@ -31,12 +31,13 @@ You still can — `scry` reads from both. It just fixes the parts of that workfl
 - **Tag cards in bulk.** Select a whole theme with one key and tag them together — then filter and sort by those tags.
 - **Statistics you can drill into.** Filter a list by tag or category and watch the histograms recompute for exactly that subset.
 - **Version-controlled decks.** Every deck is a plain file in a git repository, so every change is kept and `git log` works on your decks like anything else.
+- **Sync across machines.** Because that repository is ordinary git, `scry` can mirror your whole collection to a private remote you own — GitHub, Codeberg, GitLab, self-hosted — and pull it back anywhere else. Set it up once, then `s` in the decks panel keeps both ends in step.
 - **Moxfield built in.** Follow a deck by URL, or browse someone's decks by username, and pull a copy in to edit.
 - **A couple of extras I find handy:** the comprehensive rules are searchable and drive keyword highlighting in card text, and you can see how a card's wording has changed across printings.
 
 What it **doesn't** do (yet):
 
-- It can't save decks back to Moxfield — edits stay local.
+- It can't save decks back to Moxfield — though you can mirror them to a private git remote of your own instead (see [Sync across machines](#every-change-kept)).
 - A Scryfall search returns the first 175 results, not the entire set.
 
 ## A quick tour
@@ -88,6 +89,8 @@ The decks panel lists your local decks alongside the Moxfield decks and users yo
 Each deck is a file in a git repository, so `scry` keeps every version. Press `gv` on a deck to walk its history and read the diff for each change — what you added, what you cut, and when.
 
 ![A deck's version history, with the diff for the selected version shown in the info panel](screenshots/deck-git.png)
+
+And because it's a git repository, it can sync. Point `scry` at a private remote you own — `scry sync remote <url>` — and `s` in the decks panel (or `scry sync`) mirrors your whole collection to it and pulls back whatever you changed on another machine. It's plain git, so any host works — GitHub, Codeberg, GitLab, or your own server — and there's nothing to install beyond the git you already have. A remote you seeded with a README merges in cleanly on the first sync; the one thing git can't decide for you — the same deck edited two places at once — surfaces as a conflict to resolve with git, never a silent overwrite. Make the repo **private**; your decks are yours.
 
 ## Install
 
@@ -209,6 +212,11 @@ scry deck log <name>            # what you've changed, and when (it's git)
 scry deck restore <name> <ref>  # bring back an earlier version
 scry deck dir                   # where your decks live on disk
 
+scry sync                       # push and pull your decks
+scry sync remote <url>          # connect a private git remote you own
+scry sync status                # what's ahead or behind
+scry sync off                   # disconnect (your decks are untouched)
+
 scry rules <query>              # search the comprehensive rules
 scry theme                      # list colour themes
 scry theme <name>               # switch theme
@@ -258,7 +266,8 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | --- | --- |
 | `enter` `L` | open the deck (here / beside) |
 | `i` | follow a Moxfield deck URL or a username |
-| `n` `r` `x` `c` | new · rename · delete · copy or sync |
+| `n` `r` `x` `c` | new · rename · delete · copy |
+| `s` | sync your decks to their git remote |
 | `gv` | git versions of the deck |
 
 **The editing deck**
