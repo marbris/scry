@@ -477,6 +477,12 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	case "L":
 		return true, m.openEntry(l, p, true)
 
+	case "s":
+		// Mirror to the git remote. Unlike the mutations above this touches
+		// the network, so it runs off the main thread and reports back as a
+		// notice; the reload a notice triggers shows anything a pull brought in.
+		return true, syncDecks
+
 	case "n":
 		p.ask(askNewDeck, "name", "")
 
@@ -614,6 +620,7 @@ func (l *deckList) keys() []hintGroup {
 			{"r", "rename"},
 			{"c", "copy/sync"},
 			{"C", "copy + considering"},
+			{"s", "sync to remote"},
 			{"x", "delete"},
 			{"gv", "versions"},
 		}},

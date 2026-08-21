@@ -9,6 +9,7 @@ Usage:
   scry <query>              Run a Scryfall query; one result prints to stdout
   scry <moxfield url>       Look at a deck on Moxfield
   scry deck …               Your decks — see ` + "`scry deck`" + `
+  scry sync …               Mirror your decks to a git remote — see ` + "`scry sync`" + `
   scry rules …              The comprehensive rules — see ` + "`scry rules`" + `
   scry theme …              Colours — see ` + "`scry theme`" + `
   scry -h, --help           This

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"scry/internal/config"
 	"scry/internal/paths"
 )
 
@@ -35,37 +36,21 @@ func init() {
 
 // ── Configuration ───────────────────────────────────────────────
 
-type config struct {
-	Theme string `json:"theme"`
-}
-
-func configPath() string { return filepath.Join(paths.Config(), "config.json") }
-
-func readConfig() config {
-	var c config
-	body, err := os.ReadFile(configPath())
-	if err != nil {
-		return c
-	}
-	json.Unmarshal(body, &c)
-	return c
-}
-
 // Set writes the chosen theme to the config file, having checked it exists.
+// It reads the whole file first and writes it back whole, so a sync remote or
+// any other setting kept alongside the theme is left in place.
 func Set(name string) error {
 	if _, err := Find(name); err != nil {
 		return err
 	}
-	body, err := json.MarshalIndent(config{Theme: name}, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath(), append(body, '\n'), 0644)
+	c := config.Load()
+	c.Theme = name
+	return config.Save(c)
 }
 
 // Current is the name of the configured theme.
 func Current() string {
-	if name := readConfig().Theme; name != "" {
+	if name := config.Load().Theme; name != "" {
 		return name
 	}
 	return DefaultName
