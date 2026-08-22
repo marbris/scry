@@ -18,6 +18,10 @@ import (
 // The entry point and the non-TUI paths out of it: the one-shot card lookup
 // that prints to stdout, and the `scry rules` / `scry deck` subcommands.
 
+// version is the release, set at build time with
+// -ldflags "-X main.version=$(VERSION)". It stays "dev" for a plain go build.
+var version = "dev"
+
 // ── Stdout output ───────────────────────────────────────────────
 
 // ── Entry point ─────────────────────────────────────────────────
@@ -43,6 +47,10 @@ func main() {
 	switch args[0] {
 	case "-h", "--help", "help":
 		printUsage()
+		return
+
+	case "-v", "--version", "version":
+		fmt.Println("scry " + version)
 		return
 
 	case "theme":

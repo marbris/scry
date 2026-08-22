@@ -12,6 +12,7 @@ Usage:
   scry sync …               Mirror your decks to a git remote — see ` + "`scry sync`" + `
   scry rules …              The comprehensive rules — see ` + "`scry rules`" + `
   scry theme …              Colours — see ` + "`scry theme`" + `
+  scry -v, --version        Print the version
   scry -h, --help           This
 
 Queries use Scryfall's own syntax:
