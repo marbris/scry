@@ -246,7 +246,7 @@ func tagRows(entries []deck.Card) []Row {
 	}
 	sort.Strings(labels)
 
-	rows := make([]Row, 0, len(labels))
+	rows := make([]Row, 0, len(labels)+1)
 	for _, l := range labels {
 		tag := l
 		rows = append(rows, Row{
@@ -261,8 +261,22 @@ func tagRows(entries []deck.Card) []Row {
 			},
 		})
 	}
+	// An untagged line, but only once something is tagged: a histogram whose
+	// one bar is "untagged" says nothing, so a deck with no tags has no tag
+	// group at all. When some cards are tagged, the untagged remainder is worth
+	// seeing — and it sits at the bottom, as the leftover rather than a tag.
+	if len(labels) > 0 {
+		rows = append(rows, Row{
+			Group: "Tags", Label: untaggedLabel, Color: theme.TextDim,
+			Match: func(ci deck.Card) bool { return len(ci.Tags) == 0 },
+		})
+	}
 	return rows
 }
+
+// untaggedLabel names the remainder row in the tag group. It is matched and
+// ordered by this label, so it stays distinct from any real tag.
+const untaggedLabel = "untagged"
 
 // copies is how many cards an entry stands for.
 //
@@ -324,7 +338,14 @@ func Groups(rowSource, counted []deck.Card) []Group {
 		// Tags have no natural order, so the commonest lead — by their
 		// standing in the whole set, so walking the list can't reorder it.
 		if g.Title == "Tags" {
-			sort.SliceStable(kept, func(i, j int) bool { return kept[i].Base > kept[j].Base })
+			sort.SliceStable(kept, func(i, j int) bool {
+				// Untagged is the leftover, not a tag, so it sinks below every
+				// real tag however many cards it holds.
+				if iu, ju := kept[i].Label == untaggedLabel, kept[j].Label == untaggedLabel; iu != ju {
+					return ju
+				}
+				return kept[i].Base > kept[j].Base
+			})
 		}
 		out = append(out, Group{Title: g.Title, Rows: kept})
 	}

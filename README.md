@@ -251,8 +251,8 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `o` `O` | cycle the sort order |
 | `i` | edit the search |
 | `v` `V` | select one / all shown |
-| `a` `x` | add / remove a copy from the editing deck |
-| `t` `T` | tag the selection · add-and-tag with the last tag |
+| `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
+| `t` `x` | tag the selection · remove a copy |
 | `c` | set as the editing deck's commander |
 | `u` | undo the last edit |
 | `y` `p` | yank the selection · put it into this list |

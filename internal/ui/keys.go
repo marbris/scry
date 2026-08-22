@@ -2,6 +2,8 @@ package ui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"scry/internal/rules"
 )
 
 // Keys, in two spaces.
@@ -490,6 +492,21 @@ func (m *Model) versions(p *panel) tea.Cmd {
 		if c, ok := v.current(); ok {
 			return m.openHistory(c.Card)
 		}
+
+	case *rulesView:
+		// The rules have no per-item history; gv here is the diff between the
+		// cached release and the one before it, opened on the rule you were on.
+		if !rules.HasPrevious() {
+			return func() tea.Msg {
+				return noticeMsg{text: "no previous rules to compare — sync first"}
+			}
+		}
+		focus := ""
+		if r, ok := v.current(); ok {
+			focus = r.number
+		}
+		p.loading = true
+		return loadRulesDiff(p.id, focus)
 	}
 	return nil
 }

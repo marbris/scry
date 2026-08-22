@@ -110,6 +110,22 @@ func TestFilteringIsLiteralAndSearchesTheRulesText(t *testing.T) {
 	}
 }
 
+func TestTheHeaderCountsCopiesNotRows(t *testing.T) {
+	// The sample is four rows but ten cards — the 7x Forest is seven of them.
+	// "how many cards" is what a deck's size answers, so the header sums them.
+	l := newCardList2(sample(), sortArrival)
+	if got := l.cardCount(); got != 10 {
+		t.Errorf("cardCount = %d, want 10 copies across the four rows", got)
+	}
+
+	// Filtered down, the numerator is the copies still shown and the
+	// denominator the copies in the whole list: the Forests, then all ten.
+	l.setFilter("forest")
+	if got := stripANSI(l.subtitle()); !strings.HasPrefix(got, "7/10") {
+		t.Errorf("subtitle is %q, want it to open 7/10", got)
+	}
+}
+
 func TestFilterTermsAllHaveToMatch(t *testing.T) {
 	l := newCardList2(sample(), sortArrival)
 	l.setFilter("elf druid")

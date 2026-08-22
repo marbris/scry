@@ -217,6 +217,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case rulesLoadedMsg:
 		return m.handleRulesLoaded(msg)
 
+	case rulesSyncedMsg:
+		return m.handleRulesSynced(msg)
+
+	case rulesDiffMsg:
+		return m.handleRulesDiff(msg)
+
 	case diffMsg:
 		return m.handleDiff(msg)
 

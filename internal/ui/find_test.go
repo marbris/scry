@@ -93,7 +93,9 @@ func TestTheCountSaysHowManyWereMatchedNotJustFetched(t *testing.T) {
 	m = drive(m, "enter")
 	m = answer(m, p, sample(), 213, nil)
 
-	if got := stripANSI(m.View()); !strings.Contains(got, "4/213") {
+	// The header counts copies, not rows: this sample is four rows but ten
+	// cards. What matters here is the "/213" — a page is not the answer.
+	if got := stripANSI(m.View()); !strings.Contains(got, "10/213") {
 		t.Errorf("the count does not mention the 213 matched:\n%s", got)
 	}
 }

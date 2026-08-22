@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"errors"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"scry/internal/mtg"
@@ -22,6 +24,64 @@ type rulesLoadedMsg struct {
 func loadRules() tea.Msg {
 	data, err := rules.Load()
 	return rulesLoadedMsg{data: data, err: err}
+}
+
+// rulesSyncedMsg is the outcome of pressing s in the rules panel: what the
+// sync did, and — when it pulled a new release — the freshly parsed rulebook.
+type rulesSyncedMsg struct {
+	result rules.Result
+	data   rules.Data
+	err    error
+}
+
+// syncRules checks for a newer rules release, downloads and re-parses it if
+// there is one. Off the main thread, since it touches the network and parses a
+// megabyte of text.
+func syncRules() tea.Msg {
+	res, err := rules.Sync()
+	if err != nil {
+		return rulesSyncedMsg{err: err}
+	}
+	if !res.Changed {
+		return rulesSyncedMsg{result: res}
+	}
+	data, err := rules.Load()
+	return rulesSyncedMsg{result: res, data: data, err: err}
+}
+
+func (m Model) handleRulesSynced(msg rulesSyncedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		if errors.Is(msg.err, rules.ErrNoLink) {
+			m.notice = "couldn't find the rules link — download the latest from " +
+				"magic.wizards.com/en/rules and save it at " + rules.FilePath()
+		} else {
+			m.notice = "error: " + msg.err.Error()
+		}
+		return m, nil
+	}
+
+	if !msg.result.Changed {
+		m.notice = "rules are up to date (" + msg.result.To + ")"
+		return m, nil
+	}
+
+	// A new release: hand it to the model and to every rules panel already
+	// open, so what they show and what a fresh query sees are the same rules.
+	m.rules = msg.data
+	for _, p := range m.ws.panels {
+		for _, v := range p.stack {
+			if rv, ok := v.(*rulesView); ok {
+				rv.data = msg.data
+			}
+		}
+	}
+	from := msg.result.From
+	if from == "" {
+		m.notice = "rules updated to " + msg.result.To
+	} else {
+		m.notice = "rules updated " + from + " → " + msg.result.To
+	}
+	return m, nil
 }
 
 // wantRules is what a rules panel is waiting for: a query to run, or a card

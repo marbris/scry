@@ -238,7 +238,7 @@ func (m *Model) tag(cards []deck.Card, input string) {
 	}
 }
 
-// tagWithLast is T: add the cards to the deck and tag them with the tag you
+// tagWithLast is A: add the cards to the deck and tag them with the tag you
 // last used, in one keystroke. Sorting a search into a deck is dozens of
 // these, and having to retype the tag each time is what makes people stop.
 func (m *Model) tagWithLast(cards []deck.Card) {
