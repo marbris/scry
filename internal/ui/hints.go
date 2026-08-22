@@ -171,8 +171,8 @@ func (m Model) editGroup(p *panel) (string, [][2]string) {
 		into = "this deck"
 	}
 	return "edit · " + into, [][2]string{
-		{"a x", "add/remove"},
-		{"t T", "tag/retag"},
+		{"a A", "add / add + tag"},
+		{"t x", "tag / remove"},
 		{"c", "commander"},
 		{"u", "undo"},
 		{"e E", m.editingLabel()},

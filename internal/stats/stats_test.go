@@ -54,6 +54,46 @@ func TestLandsAreOutOfTheCurveAndTheColours(t *testing.T) {
 	}
 }
 
+func TestUntaggedIsTheLeftoverAndOnlyWhenSomethingIsTagged(t *testing.T) {
+	// A histogram whose one bar is "untagged" says nothing, so a deck with no
+	// tags has no tag group; once anything is tagged, the untagged remainder
+	// earns a bar — and it sits below every real tag, however big it is.
+	tagsGroup := func(entries []deck.Card) *Group {
+		for _, g := range Groups(entries, entries) {
+			if g.Title == "Tags" {
+				return &g
+			}
+		}
+		return nil
+	}
+
+	// Nothing tagged: no tag group at all, not a lone untagged bar.
+	none := []deck.Card{
+		{Card: mtg.Card{Name: "Sol Ring", TypeLine: "Artifact"}, Qty: 1},
+		{Card: mtg.Card{Name: "Plains", TypeLine: "Basic Land — Plains"}, Qty: 5},
+	}
+	if g := tagsGroup(none); g != nil {
+		t.Errorf("a deck with no tags still has a tag group: %+v", g.Rows)
+	}
+
+	// Some tagged, some not: a bar for the tag and one for the remainder, with
+	// untagged last even though it holds more cards.
+	some := []deck.Card{
+		{Card: mtg.Card{Name: "Sol Ring", TypeLine: "Artifact"}, Qty: 1, Tags: []string{"ramp"}},
+		{Card: mtg.Card{Name: "Plains", TypeLine: "Basic Land — Plains"}, Qty: 20},
+	}
+	g := tagsGroup(some)
+	if g == nil {
+		t.Fatal("no tag group though a card is tagged")
+	}
+	if len(g.Rows) != 2 {
+		t.Fatalf("want a tag row and an untagged row, got %+v", g.Rows)
+	}
+	if g.Rows[len(g.Rows)-1].Label != untaggedLabel {
+		t.Errorf("untagged is not last: %+v", g.Rows)
+	}
+}
+
 func TestStatGroupsSayTheyExcludeLands(t *testing.T) {
 	// The reader has to be told, or the numbers look wrong.
 	entries := []deck.Card{

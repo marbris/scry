@@ -389,6 +389,10 @@ func (v *rulesView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		}
 	case "/":
 		p.openFilter(v.filter)
+	case "s":
+		// Check for a new release and pull it in. Off the main thread, so it
+		// reports back as a notice.
+		return true, syncRules
 	default:
 		return false, nil
 	}
@@ -513,6 +517,10 @@ func (v *rulesView) keys() []hintGroup {
 	}
 	return []hintGroup{
 		{"navigation", nav},
+		{"rules", [][2]string{
+			{"s", "sync"},
+			{"gv", "diff vs previous"},
+		}},
 		{"info panel", [][2]string{{"K J", "read rule"}}},
 	}
 }

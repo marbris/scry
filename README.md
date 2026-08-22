@@ -251,8 +251,8 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `o` `O` | cycle the sort order |
 | `i` | edit the search |
 | `v` `V` | select one / all shown |
-| `a` `x` | add / remove a copy from the editing deck |
-| `t` `T` | tag the selection · add-and-tag with the last tag |
+| `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
+| `t` `x` | tag the selection · remove a copy |
 | `c` | set as the editing deck's commander |
 | `u` | undo the last edit |
 | `y` `p` | yank the selection · put it into this list |
@@ -262,11 +262,18 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 
 **In the decks panel**
 
+The panel is a folder tree: local decks group by the folder part of their slug
+(`aggro/mono-red`), and the Moxfield decks and people you follow sit under one
+`moxfield` folder.
+
 | Key | Does |
 | --- | --- |
-| `enter` `L` | open the deck (here / beside) |
+| `enter` | fold/unfold a folder, or open the deck/person |
+| `L` | open beside, in a new panel |
 | `i` | follow a Moxfield deck URL or a username |
-| `n` `r` `x` `c` | new · rename · delete · copy |
+| `n` `r` `c` | new (in the current folder) · rename · copy |
+| `y` `x` `p` | yank (copy) · cut (move) · put into the folder you're on |
+| `d` | delete |
 | `s` | sync your decks to their git remote |
 | `gv` | git versions of the deck |
 

@@ -228,7 +228,7 @@ func TestTaggingSkipsCardsThatArentInTheDeck(t *testing.T) {
 	}
 }
 
-func TestBigTAddsAndTagsInOneKey(t *testing.T) {
+func TestBigAAddsAndTagsInOneKey(t *testing.T) {
 	// Sorting a search into a deck is dozens of these, and retyping the tag
 	// each time is what makes people stop.
 	m, search, target := editing(t)
@@ -236,22 +236,22 @@ func TestBigTAddsAndTagsInOneKey(t *testing.T) {
 
 	m = focusOn(m, 0)
 	search.selectByName("Llanowar Elves")
-	m = drive(m, "T")
+	m = drive(m, "A")
 
 	i := target.indexOfCard("Llanowar Elves")
 	if i < 0 {
-		t.Fatal("T did not add the card")
+		t.Fatal("A did not add the card")
 	}
 	if len(target.all[i].Tags) != 1 || target.all[i].Tags[0] != "removal" {
 		t.Errorf("tags are %v, want the last one used", target.all[i].Tags)
 	}
 }
 
-func TestBigTWithNoTagYetSaysSo(t *testing.T) {
+func TestBigAWithNoTagYetSaysSo(t *testing.T) {
 	m, search, _ := editing(t)
 	m = focusOn(m, 0)
 	search.selectByName("Llanowar Elves")
-	m = drive(m, "T")
+	m = drive(m, "A")
 	if !strings.Contains(stripANSI(m.View()), "no tag used yet") {
 		t.Errorf("got:\n%s", stripANSI(m.View()))
 	}

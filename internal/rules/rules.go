@@ -624,18 +624,34 @@ func cardTypes(typeLine string) []string {
 
 // ── File management ─────────────────────────────────────────────
 
+// rulesURL is the last link known at build time. It is only a fallback: the
+// live link is discovered from the rules page (sync.go), because the rules
+// update a few times a year and the filename is date-stamped.
 const rulesURL = "https://media.wizards.com/2026/downloads/MagicCompRules%2020260417.txt"
 
 func FilePath() string {
 	return filepath.Join(paths.Cache(), "comprules.txt")
 }
 
+// Download fetches the current rules the first time they are needed. It tries
+// the live link and falls back to the built-in one, and records the version so
+// a later Sync knows what is already on disk.
 func Download() error {
-	body, err := fetch.GetFile(rulesURL)
+	url, version, err := LatestURL()
+	if err != nil {
+		url, version = rulesURL, versionFromURL(rulesURL)
+	}
+	body, err := fetch.GetFile(url)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(FilePath(), body, 0644)
+	if err := os.WriteFile(FilePath(), body, 0644); err != nil {
+		return err
+	}
+	m := readMeta()
+	m.Current = version
+	writeMeta(m)
+	return nil
 }
 
 func Load() (Data, error) {
@@ -646,16 +662,25 @@ func Load() (Data, error) {
 		}
 	}
 
-	content, err := os.ReadFile(path)
+	text, err := readText(path)
 	if err != nil {
 		return Data{}, err
 	}
+	return Parse(text), nil
+}
 
+// readText reads a rules file and normalises it: the byte-order mark some
+// downloads carry, and Windows line endings, both gone so the parser and the
+// diff see the same text however it arrived.
+func readText(path string) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
 	text := strings.TrimPrefix(string(content), "\xef\xbb\xbf")
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	text = strings.ReplaceAll(text, "\r", "\n")
-
-	return Parse(text), nil
+	return text, nil
 }
 
 // KeywordSpan is a keyword the rules know about, found in a piece of text.

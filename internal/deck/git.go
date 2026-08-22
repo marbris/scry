@@ -2,6 +2,7 @@ package deck
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -143,7 +144,58 @@ func DeleteCommitted(slug string) error {
 	if err := Delete(slug); err != nil {
 		return err
 	}
-	return record(slug, "Delete "+slug)
+	err := record(slug, "Delete "+slug)
+	pruneEmptyDirs(filepath.Dir(Path(slug)))
+	return err
+}
+
+// Move relocates a deck from one slug to another — between folders, or to a new
+// name — and records it. It prefers `git mv` so the history follows the file;
+// an untracked or git-less deck falls back to a plain rename, still recorded
+// where it can be. The empty folder a move leaves behind is swept up so the
+// tree doesn't fill with them.
+func Move(oldSlug, newSlug string) error {
+	if oldSlug == newSlug {
+		return nil
+	}
+	if Exists(newSlug) {
+		return fmt.Errorf("a deck already exists at %q", newSlug)
+	}
+	oldPath, newPath := Path(oldSlug), Path(newSlug)
+	if err := os.MkdirAll(filepath.Dir(newPath), 0755); err != nil {
+		return err
+	}
+
+	moved := false
+	if GitAvailable() && ensureRepo() == nil {
+		if _, err := git("mv", oldSlug+FileExt, newSlug+FileExt); err == nil {
+			_, _ = git("commit", "-q", "-m", "Move "+oldSlug+" to "+newSlug,
+				"--", oldSlug+FileExt, newSlug+FileExt)
+			moved = true
+		}
+	}
+	if !moved {
+		if err := os.Rename(oldPath, newPath); err != nil {
+			return err
+		}
+		_ = record(oldSlug, "Move "+oldSlug+" to "+newSlug)
+		_ = record(newSlug, "Move "+oldSlug+" to "+newSlug)
+	}
+
+	pruneEmptyDirs(filepath.Dir(oldPath))
+	return nil
+}
+
+// pruneEmptyDirs removes now-empty folders left by a move or delete, up to but
+// not including the decks directory itself.
+func pruneEmptyDirs(dir string) {
+	root := Dir()
+	for dir != root && strings.HasPrefix(dir, root) {
+		if err := os.Remove(dir); err != nil {
+			return // not empty, or gone already — nothing more to do
+		}
+		dir = filepath.Dir(dir)
+	}
 }
 
 // ── History ─────────────────────────────────────────────────────
@@ -162,8 +214,10 @@ func History(slug string, limit int) ([]Commit, error) {
 	}
 
 	// %x1f is a unit separator — safe in a way that any character a commit
-	// subject might contain is not.
-	out, err := git("log", fmt.Sprintf("-%d", limit),
+	// subject might contain is not. --follow keeps a deck's history whole
+	// across a move between folders, where the file's path changes but the
+	// deck does not.
+	out, err := git("log", fmt.Sprintf("-%d", limit), "--follow",
 		"--format=%H%x1f%h%x1f%cr%x1f%s", "--", slug+FileExt)
 	if err != nil {
 		return nil, err

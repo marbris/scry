@@ -124,13 +124,14 @@ func TestABrokenDeckStillGetsARow(t *testing.T) {
 }
 
 func TestSortingTheDeckList(t *testing.T) {
+	// The sort orders the decks within a folder; these all sit at the root.
 	l := &deckList{order: byName, all: []deckEntry{
-		{kind: entryLocal, name: "Zebra", count: 10},
-		{kind: entryUser, name: "alice"},
-		{kind: entryLocal, name: "Mango", count: 100},
+		{kind: entryLocal, name: "Zebra", slug: "zebra", count: 10},
+		{kind: entryLocal, name: "Apple", slug: "apple", count: 5},
+		{kind: entryLocal, name: "Mango", slug: "mango", count: 100},
 	}}
 	l.refresh()
-	if l.rows[0].name != "alice" {
+	if l.rows[0].name != "Apple" {
 		t.Errorf("by name starts with %s", l.rows[0].name)
 	}
 
@@ -139,23 +140,172 @@ func TestSortingTheDeckList(t *testing.T) {
 	if l.rows[0].name != "Mango" {
 		t.Errorf("by size starts with %s, want the biggest", l.rows[0].name)
 	}
-
-	l.order = byKind
-	l.refresh()
-	if l.rows[0].kind != entryLocal {
-		t.Error("by kind should put your own decks first")
-	}
 }
 
 func TestThingsWithNoDateSortLastNotFirst(t *testing.T) {
-	// A remote has no modification time, and shouldn't claim 1970.
+	// A deck with no modification time shouldn't claim 1970 and lead the list.
 	l := &deckList{order: byModified, all: []deckEntry{
-		{kind: entryRemote, name: "remote"},
-		{kind: entryLocal, name: "local", modified: time.Now().Add(-time.Hour)},
+		{kind: entryLocal, name: "undated", slug: "undated"},
+		{kind: entryLocal, name: "dated", slug: "dated", modified: time.Now().Add(-time.Hour)},
 	}}
 	l.refresh()
-	if l.rows[0].name != "local" {
+	if l.rows[0].name != "dated" {
 		t.Errorf("by last touched starts with %s", l.rows[0].name)
+	}
+}
+
+func TestFollowedThingsLiveUnderTheMoxfieldFolder(t *testing.T) {
+	l := &deckList{all: []deckEntry{
+		{kind: entryLocal, name: "Ghen", slug: "ghen"},
+		{kind: entryUser, name: "alice", user: "alice"},
+		{kind: entryRemote, name: "someones brew", id: "abc"},
+	}}
+	l.refresh()
+
+	// The moxfield folder is a row of its own, with the two followed things
+	// indented under it and the local deck at the root.
+	var folder *deckEntry
+	for i := range l.rows {
+		if l.rows[i].kind == entryFolder && l.rows[i].slug == moxFolder {
+			folder = &l.rows[i]
+		}
+	}
+	if folder == nil {
+		t.Fatal("no moxfield folder")
+	}
+	if folder.count != 2 {
+		t.Errorf("moxfield folder holds %d, want the remote and the user", folder.count)
+	}
+	for _, r := range l.rows {
+		if (r.kind == entryRemote || r.kind == entryUser) && r.depth != 1 {
+			t.Errorf("%s is at depth %d, want it under moxfield", r.name, r.depth)
+		}
+	}
+}
+
+func TestDecksGroupIntoFoldersByTheirSlug(t *testing.T) {
+	l := &deckList{collapsed: map[string]bool{}, all: []deckEntry{
+		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
+		{kind: entryLocal, name: "Budget", slug: "aggro/budget"},
+		{kind: entryLocal, name: "Loose", slug: "loose"},
+	}}
+	l.refresh()
+
+	// A folder row for aggro, its two decks indented under it, then the root deck.
+	if l.rows[0].kind != entryFolder || l.rows[0].slug != "aggro" || l.rows[0].count != 2 {
+		t.Fatalf("first row isn't the aggro folder: %+v", l.rows[0])
+	}
+	for _, r := range l.rows {
+		if r.kind == entryLocal && folderOf(r.slug) == "aggro" && r.depth != 1 {
+			t.Errorf("%s is at depth %d, want it inside the folder", r.name, r.depth)
+		}
+		if r.slug == "loose" && r.depth != 0 {
+			t.Errorf("the root deck is at depth %d, want 0", r.depth)
+		}
+	}
+}
+
+func TestFoldingAFolderHidesItsDecks(t *testing.T) {
+	l := &deckList{collapsed: map[string]bool{}, all: []deckEntry{
+		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
+		{kind: entryLocal, name: "Loose", slug: "loose"},
+	}}
+	l.refresh()
+
+	l.toggleFolder("aggro")
+	for _, r := range l.rows {
+		if r.name == "Mono Red" {
+			t.Error("a collapsed folder still shows its deck")
+		}
+	}
+	// The folder row itself stays, and the cursor is left on it.
+	if e, _ := l.current(); e.kind != entryFolder || e.slug != "aggro" {
+		t.Errorf("cursor left the folder it toggled: %+v", e)
+	}
+
+	l.toggleFolder("aggro")
+	found := false
+	for _, r := range l.rows {
+		if r.name == "Mono Red" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("reopening the folder didn't bring its deck back")
+	}
+}
+
+func TestMovingADeckRenamesItForItsNewFolder(t *testing.T) {
+	// The name carries the folder, so a move has to rewrite the prefix: a deck
+	// in test2 mustn't still call itself test/….
+	seedDeck(t, "mvsrc/thedeck", "name: mvsrc/thedeck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.Delete("mvsrc/thedeck"); deck.Delete("mvdst/thedeck") })
+
+	var m Model
+	cmd := m.putDeck(deckMove{slug: "mvsrc/thedeck", name: "mvsrc/thedeck", cut: true}, "mvdst")
+	if msg := cmd().(noticeMsg); msg.err != nil {
+		t.Fatalf("move failed: %v", msg.err)
+	}
+
+	if deck.Exists("mvsrc/thedeck") {
+		t.Error("the deck is still at its old slug")
+	}
+	d, err := deck.Read("mvdst/thedeck")
+	if err != nil {
+		t.Fatalf("not at the new slug: %v", err)
+	}
+	if d.Name != "mvdst/thedeck" {
+		t.Errorf("name is %q, want mvdst/thedeck", d.Name)
+	}
+}
+
+func TestMovingADeckToTheRootDropsItsFolderFromTheName(t *testing.T) {
+	seedDeck(t, "rootmv/thedeck", "name: rootmv/thedeck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.Delete("rootmv/thedeck"); deck.Delete("thedeck") })
+
+	var m Model
+	cmd := m.putDeck(deckMove{slug: "rootmv/thedeck", name: "rootmv/thedeck", cut: true}, "")
+	if msg := cmd().(noticeMsg); msg.err != nil {
+		t.Fatalf("move failed: %v", msg.err)
+	}
+	d, err := deck.Read("thedeck")
+	if err != nil {
+		t.Fatalf("not at the root: %v", err)
+	}
+	if d.Name != "thedeck" {
+		t.Errorf("name is %q, want thedeck", d.Name)
+	}
+}
+
+func TestCurrentFolderIsWhereAPutLands(t *testing.T) {
+	l := &deckList{collapsed: map[string]bool{}, all: []deckEntry{
+		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
+		{kind: entryLocal, name: "Loose", slug: "loose"},
+	}}
+	l.refresh()
+
+	// On the folder row → into the folder.
+	l.cursor.at = 0
+	if got := l.currentFolder(); got != "aggro" {
+		t.Errorf("on the folder, currentFolder = %q, want aggro", got)
+	}
+	// On a deck inside a folder → that folder.
+	for i, r := range l.rows {
+		if r.slug == "aggro/mono-red" {
+			l.cursor.at = i
+		}
+	}
+	if got := l.currentFolder(); got != "aggro" {
+		t.Errorf("on a deck in aggro, currentFolder = %q, want aggro", got)
+	}
+	// On a root deck → the root.
+	for i, r := range l.rows {
+		if r.slug == "loose" {
+			l.cursor.at = i
+		}
+	}
+	if got := l.currentFolder(); got != "" {
+		t.Errorf("on a root deck, currentFolder = %q, want the root", got)
 	}
 }
 
@@ -176,11 +326,11 @@ func TestDeletingADeckAsksFirst(t *testing.T) {
 	// unfollowing are free, so they just happen.
 	seedDeck(t, "ghen", "name: Ghen\n[mainboard]\n1 Sol Ring\n")
 	m := drive(sized(120, 30), "space", "d")
-	m = drive(m, "x")
+	m = drive(m, "d")
 
 	l := m.ws.current().top().(*deckList)
 	if l.confirming == nil {
-		t.Fatal("x deleted a deck without asking")
+		t.Fatal("d deleted a deck without asking")
 	}
 	if !strings.Contains(stripANSI(m.View()), "delete") {
 		t.Error("nothing on screen asks the question")
@@ -200,7 +350,7 @@ func TestTheConfirmationCannotBeAnsweredByAccident(t *testing.T) {
 	// keystroke meant for the list can't confirm it.
 	seedDeck(t, "ghen", "name: Ghen\n[mainboard]\n1 Sol Ring\n")
 	m := drive(sized(120, 30), "space", "d")
-	m = drive(m, "x")
+	m = drive(m, "d")
 
 	l := m.ws.current().top().(*deckList)
 	before := l.cursor.at
@@ -270,7 +420,7 @@ func TestNewDeckPromptsForAName(t *testing.T) {
 	m = drive(m, "enter")
 
 	// The command runs off the main thread; run it here.
-	if got := newDeckCmd("Elf Ball")().(noticeMsg); got.err != nil {
+	if got := newDeckCmd("", "Elf Ball")().(noticeMsg); got.err != nil {
 		t.Fatalf("making the deck failed: %v", got.err)
 	}
 	if !deck.Exists("elf-ball") {

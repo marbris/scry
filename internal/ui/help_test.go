@@ -87,7 +87,7 @@ func TestTheReferenceDescribesThePanelYouAreIn(t *testing.T) {
 	// Editing keys are listed against the deck they change, and not offered
 	// at all with no deck to change: on a search with nothing being edited,
 	// every one of them would do nothing but explain itself.
-	for _, only := range []string{"tag/retag", "undo"} {
+	for _, only := range []string{"add + tag", "undo"} {
 		if !strings.Contains(deckKeys, only) {
 			t.Errorf("%q is missing from a deck's keys:\n%s", only, deckKeys)
 		}
@@ -187,12 +187,12 @@ func TestTheHintBarSaysWhichDeckTheEditingKeysChange(t *testing.T) {
 	m = withCards(m, "f", sample(), sortArrival)
 	got := footerOf(m)
 	// The name heads the group rather than trailing every key: "edit · Ghen"
-	// over a x, t T and the rest.
+	// over a A, t x and the rest.
 	if !strings.Contains(got, "edit · Ghen") {
 		t.Errorf("the editing keys aren't headed by the deck they change:\n%s", got)
 	}
-	if !strings.Contains(got, "add/remove") {
-		t.Errorf("a and x aren't offered:\n%s", got)
+	if !strings.Contains(got, "add / add + tag") {
+		t.Errorf("a and A aren't offered:\n%s", got)
 	}
 }
 
@@ -201,7 +201,7 @@ func TestNoEditingDeckMeansNoEditingKeys(t *testing.T) {
 	// what is offered instead is the way to choose a deck.
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	got := footerOf(m)
-	for _, gone := range []string{"add/remove", "tag/retag"} {
+	for _, gone := range []string{"add / add + tag", "tag / remove"} {
 		if strings.Contains(got, gone) {
 			t.Errorf("%q offered with no deck being edited:\n%s", gone, got)
 		}

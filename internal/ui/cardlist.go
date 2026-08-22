@@ -150,6 +150,26 @@ func (l *cardList) count() int  { return len(l.rows) }
 func (l *cardList) total() int  { return len(l.all) }
 func (l *cardList) empty() bool { return len(l.all) == 0 }
 
+// cardCount and cardTotal sum quantities rather than rows: a row standing for
+// 20 lands is 20 cards, not one. This is what the header reports, since "how
+// many cards" is the question a deck's size answers. A search result carries
+// no quantity but is still one card, so both floor a row at one — which leaves
+// search totals unchanged, where every row is a single card anyway.
+func (l *cardList) cardCount() int { return sumCopies(l.rows) }
+func (l *cardList) cardTotal() int { return sumCopies(l.all) }
+
+func sumCopies(cards []deck.Card) int {
+	n := 0
+	for _, c := range cards {
+		if c.Qty < 1 {
+			n++
+		} else {
+			n += c.Qty
+		}
+	}
+	return n
+}
+
 // current is the card under the cursor.
 func (l *cardList) current() (deck.Card, bool) {
 	if l.cursor.at < 0 || l.cursor.at >= len(l.rows) {
@@ -356,9 +376,9 @@ func (l *cardList) names() map[string]bool {
 func (l *cardList) title() string { return l.name }
 
 func (l *cardList) subtitle() string {
-	out := itoa(l.count())
+	out := itoa(l.cardCount())
 	if l.count() != l.total() {
-		out += "/" + itoa(l.total())
+		out += "/" + itoa(l.cardTotal())
 	} else if l.matched > l.total() {
 		// Scryfall matched more than one page; say so, or 175 looks like
 		// the whole answer.
@@ -420,7 +440,9 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		m.put(l)
 	case "t":
 		p.ask(askTag, "tag", "")
-	case "T":
+	case "A":
+		// Add + tag with the last tag used. It lives on A, beside a for add,
+		// because it is an add that also tags — not a second kind of tag.
 		m.tagWithLast(l.selection())
 	case "c":
 		return true, m.commander(currentOr(l))
@@ -467,7 +489,7 @@ func (l *cardList) info(width int) []string {
 }
 
 // keys is what this list offers, in two groups: moving about it, and picking
-// cards out of it. The editing keys are not here: a, x, t, T, c and u act on
+// cards out of it. The editing keys are not here: a, A, x, t, c and u act on
 // the editing deck rather than on the list under the cursor, so hintGroups
 // lists them against that deck, under its name.
 func (l *cardList) keys() []hintGroup {
