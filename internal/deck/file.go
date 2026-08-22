@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -326,22 +327,41 @@ func Dir() string {
 	return dir
 }
 
+// Path is where a deck's file lives. A slug may be a path — "aggro/mono-red" —
+// so decks group into folders; filepath.Join turns the slug's forward slashes
+// into whatever the OS uses.
 func Path(slug string) string {
-	return filepath.Join(Dir(), slug+FileExt)
+	return filepath.Join(Dir(), filepath.FromSlash(slug)+FileExt)
 }
 
-// List returns the slugs of the decks on disk, alphabetically.
+// List returns the slugs of the decks on disk, alphabetically. It walks the
+// whole tree, so a slug is the deck's path under the decks directory with the
+// extension trimmed and separators as forward slashes — "aggro/mono-red".
 func List() ([]string, error) {
-	entries, err := os.ReadDir(Dir())
+	root := Dir()
+	var out []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // an unreadable entry is skipped, not fatal
+		}
+		if d.IsDir() {
+			if d.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(d.Name(), FileExt) {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		out = append(out, filepath.ToSlash(strings.TrimSuffix(rel, FileExt)))
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	var out []string
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), FileExt) {
-			continue
-		}
-		out = append(out, strings.TrimSuffix(e.Name(), FileExt))
 	}
 	sort.Strings(out)
 	return out, nil
@@ -373,7 +393,13 @@ func Read(slug string) (*File, error) {
 // can't leave a half-written deck behind — git will be reading these.
 func Write(slug string, d *File) error {
 	path := Path(slug)
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+slug+".*")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	// The temp file's pattern can't carry the slug's own separators, so it is
+	// named from the last segment only — the directory it lands in already
+	// carries the rest.
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(slug)+".*")
 	if err != nil {
 		return err
 	}

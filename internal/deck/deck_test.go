@@ -15,6 +15,13 @@ func TestSlugify(t *testing.T) {
 		"Isshin, Two Heavens as One!!!": "isshin-two-heavens-as-one",
 		"👑-Marchesa d'Amati":            "marchesa-d-amati",
 		"Deck 2":                        "deck-2",
+		// A slash groups decks into folders, one slug per segment.
+		"Aggro / Mono Red":   "aggro/mono-red",
+		"projects/winota v2": "projects/winota-v2",
+		// A stray traversal can't survive: ".." has nothing to slugify.
+		"../escape": "escape",
+		"/leading":  "leading",
+		"a//b":      "a/b",
 	} {
 		if got := Slugify(in); got != want {
 			t.Errorf("Slugify(%q) = %q, want %q", in, got, want)
