@@ -341,6 +341,10 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 		}
 	}
 	dest := uniqueSlug(inFolder(dir, path.Base(mv.slug)))
+	// The deck's name carries its folder — "test/testdeck" — so moving it has to
+	// rewrite that prefix, or a deck in test2 would still call itself test/….
+	// Only the folder part changes; the deck's own name is kept.
+	newName := inFolder(dir, path.Base(mv.name))
 
 	if mv.cut {
 		return func() tea.Msg {
@@ -350,7 +354,10 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 			if err := deck.Move(mv.slug, dest); err != nil {
 				return noticeMsg{err: err}
 			}
-			return noticeMsg{text: "moved " + mv.name + " to " + dest}
+			if err := renameInPlace(dest, newName); err != nil {
+				return noticeMsg{err: err}
+			}
+			return noticeMsg{text: "moved " + mv.name + " to " + newName}
 		}
 	}
 	return func() tea.Msg {
@@ -358,11 +365,28 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 		if err != nil {
 			return noticeMsg{err: err}
 		}
+		d.Name = newName
 		if _, _, err := deck.SaveVersioned(dest, d); err != nil {
 			return noticeMsg{err: err}
 		}
-		return noticeMsg{text: "copied " + mv.name + " to " + dest}
+		return noticeMsg{text: "copied " + mv.name + " to " + newName}
 	}
+}
+
+// renameInPlace updates a deck's name header to match where it now lives,
+// leaving everything else — and its file — where the move put it. A no-op when
+// the name already matches, so a move within one folder doesn't churn git.
+func renameInPlace(slug, name string) error {
+	d, err := deck.Read(slug)
+	if err != nil {
+		return err
+	}
+	if d.Name == name {
+		return nil
+	}
+	d.Name = name
+	_, _, err = deck.SaveVersioned(slug, d)
+	return err
 }
 
 // uniqueSlug finds a free slug at or beside the one asked for, so putting a

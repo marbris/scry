@@ -235,6 +235,48 @@ func TestFoldingAFolderHidesItsDecks(t *testing.T) {
 	}
 }
 
+func TestMovingADeckRenamesItForItsNewFolder(t *testing.T) {
+	// The name carries the folder, so a move has to rewrite the prefix: a deck
+	// in test2 mustn't still call itself test/….
+	seedDeck(t, "mvsrc/thedeck", "name: mvsrc/thedeck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.Delete("mvsrc/thedeck"); deck.Delete("mvdst/thedeck") })
+
+	var m Model
+	cmd := m.putDeck(deckMove{slug: "mvsrc/thedeck", name: "mvsrc/thedeck", cut: true}, "mvdst")
+	if msg := cmd().(noticeMsg); msg.err != nil {
+		t.Fatalf("move failed: %v", msg.err)
+	}
+
+	if deck.Exists("mvsrc/thedeck") {
+		t.Error("the deck is still at its old slug")
+	}
+	d, err := deck.Read("mvdst/thedeck")
+	if err != nil {
+		t.Fatalf("not at the new slug: %v", err)
+	}
+	if d.Name != "mvdst/thedeck" {
+		t.Errorf("name is %q, want mvdst/thedeck", d.Name)
+	}
+}
+
+func TestMovingADeckToTheRootDropsItsFolderFromTheName(t *testing.T) {
+	seedDeck(t, "rootmv/thedeck", "name: rootmv/thedeck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.Delete("rootmv/thedeck"); deck.Delete("thedeck") })
+
+	var m Model
+	cmd := m.putDeck(deckMove{slug: "rootmv/thedeck", name: "rootmv/thedeck", cut: true}, "")
+	if msg := cmd().(noticeMsg); msg.err != nil {
+		t.Fatalf("move failed: %v", msg.err)
+	}
+	d, err := deck.Read("thedeck")
+	if err != nil {
+		t.Fatalf("not at the root: %v", err)
+	}
+	if d.Name != "thedeck" {
+		t.Errorf("name is %q, want thedeck", d.Name)
+	}
+}
+
 func TestCurrentFolderIsWhereAPutLands(t *testing.T) {
 	l := &deckList{collapsed: map[string]bool{}, all: []deckEntry{
 		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
