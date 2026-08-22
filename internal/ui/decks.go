@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"path"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -306,11 +307,12 @@ func uniqueName(base string) string {
 	return base
 }
 
-// newDeck makes an empty one. A deck you've just created is empty by
-// definition, and you fill it by adding cards to it.
-func newDeckCmd(name string) tea.Cmd {
+// newDeck makes an empty one, in the folder the decks panel was pointing at. A
+// deck you've just created is empty by definition, and you fill it by adding
+// cards to it.
+func newDeckCmd(dir, name string) tea.Cmd {
 	return func() tea.Msg {
-		slug, d, err := deck.New(name, deck.DefaultFormat)
+		slug, d, err := deck.New(inFolder(dir, name), deck.DefaultFormat)
 		if err != nil {
 			return noticeMsg{err: err}
 		}
@@ -319,6 +321,63 @@ func newDeckCmd(name string) tea.Cmd {
 		}
 		return noticeMsg{text: "made " + slug}
 	}
+}
+
+// inFolder puts a name inside a folder, for slugifying into a path. A name that
+// already carries its own slashes nests under the folder all the same.
+func inFolder(dir, name string) string {
+	if dir == "" || dir == moxFolder {
+		return name
+	}
+	return dir + "/" + name
+}
+
+// putDeck places a staged deck into a folder: a cut moves it, a yank copies it.
+// The moxfield folder is virtual, so nothing local can be put there.
+func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
+	if dir == moxFolder {
+		return func() tea.Msg {
+			return noticeMsg{err: fmt.Errorf("the moxfield folder is for followed decks, not yours")}
+		}
+	}
+	dest := uniqueSlug(inFolder(dir, path.Base(mv.slug)))
+
+	if mv.cut {
+		return func() tea.Msg {
+			if dest == mv.slug {
+				return noticeMsg{text: mv.name + " is already there"}
+			}
+			if err := deck.Move(mv.slug, dest); err != nil {
+				return noticeMsg{err: err}
+			}
+			return noticeMsg{text: "moved " + mv.name + " to " + dest}
+		}
+	}
+	return func() tea.Msg {
+		d, err := deck.Read(mv.slug)
+		if err != nil {
+			return noticeMsg{err: err}
+		}
+		if _, _, err := deck.SaveVersioned(dest, d); err != nil {
+			return noticeMsg{err: err}
+		}
+		return noticeMsg{text: "copied " + mv.name + " to " + dest}
+	}
+}
+
+// uniqueSlug finds a free slug at or beside the one asked for, so putting a
+// deck where one already lives makes a second rather than an error.
+func uniqueSlug(slug string) string {
+	if !deck.Exists(slug) {
+		return slug
+	}
+	for i := 2; i < 100; i++ {
+		candidate := fmt.Sprintf("%s-%d", slug, i)
+		if !deck.Exists(candidate) {
+			return candidate
+		}
+	}
+	return slug
 }
 
 // renameDeck changes a local deck's title, or what a remote is called in

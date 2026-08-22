@@ -64,7 +64,11 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		switch kind {
 		case askNewDeck:
-			return m, newDeckCmd(answer)
+			dir := ""
+			if l, ok := p.top().(*deckList); ok {
+				dir = l.currentFolder()
+			}
+			return m, newDeckCmd(dir, answer)
 		case askFollow:
 			return m, follow(answer)
 		case askRename:

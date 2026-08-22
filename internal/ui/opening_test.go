@@ -168,7 +168,7 @@ func TestDeletingADeckActuallyDeletesIt(t *testing.T) {
 		t.Fatal("the deck wasn't there to begin with")
 	}
 
-	m = drive(m, "x")
+	m = drive(m, "d")
 	m, cmd := press(m, "y")
 	if cmd == nil {
 		t.Fatal("y did nothing")

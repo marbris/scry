@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ const (
 	entryLocal entryKind = iota
 	entryRemote
 	entryUser
+	entryFolder
 )
 
 func (k entryKind) letter() string {
@@ -46,6 +48,11 @@ func (k entryKind) letter() string {
 	return "L"
 }
 
+// moxFolder is the virtual folder the followed remotes and people live under.
+// It isn't a directory on disk — it's built from the bookmarks each refresh —
+// so the tree can show Moxfield as one branch beside your own folders.
+const moxFolder = "moxfield"
+
 // deckEntry is one row.
 type deckEntry struct {
 	kind entryKind
@@ -57,7 +64,7 @@ type deckEntry struct {
 	user string
 
 	format string
-	count  int // cards for a deck, decks for a user
+	count  int // cards for a deck, decks for a user or a folder
 	// colours is the deck's colour identity, in WUBRG order. Empty for a
 	// remote, whose cards we haven't looked at, and for a person.
 	colours  []string
@@ -66,6 +73,12 @@ type deckEntry struct {
 	// gets to this deck.
 	legal  deck.Legality
 	broken bool
+
+	// depth is how deep in the folder tree this row sits, for indentation. A
+	// folder row also uses slug for its full path and name for its last
+	// segment, and open for whether it is expanded.
+	depth int
+	open  bool
 }
 
 type deckListSort int
@@ -106,14 +119,32 @@ type deckList struct {
 	// confirming is a deletion waiting for a yes, and holds the row it
 	// would delete so that moving the cursor can't redirect it.
 	confirming *deckEntry
+
+	// collapsed is the set of folder paths the tree is holding shut. Folders
+	// are open by default — a folder absent here is expanded — so nothing you
+	// have is hidden until you choose to fold it away.
+	collapsed map[string]bool
+
+	// moving is a deck staged by y (copy) or x (cut), waiting for a p to place
+	// it in a folder. Held here rather than acted on at once so you can move the
+	// cursor to the destination first.
+	moving *deckMove
+}
+
+// deckMove is a deck picked up for a move (cut) or a copy (yank).
+type deckMove struct {
+	slug string
+	name string
+	cut  bool
 }
 
 // newDeckList reads what's on disk and what's bookmarked.
 func newDeckList() *deckList {
 	l := &deckList{
-		order:    byModified,
-		legality: map[string]deck.Legality{},
-		colours:  map[string][]string{},
+		order:     byModified,
+		legality:  map[string]deck.Legality{},
+		colours:   map[string][]string{},
+		collapsed: map[string]bool{},
 	}
 	l.reload()
 	return l
@@ -193,22 +224,118 @@ func (l *deckList) reload() {
 }
 
 func (l *deckList) refresh() {
-	rows := l.all
+	// A filter flattens the tree: fold the folders away and show every leaf
+	// that matches, wherever it lives, so a match can't hide inside a folder
+	// you happen to have shut.
 	if terms := filterTerms(l.filter); len(terms) > 0 {
-		kept := rows[:0:0]
-		for _, e := range rows {
+		var kept []deckEntry
+		for _, e := range l.all {
 			if matchesEntry(e, terms) {
+				e.depth = 0
 				kept = append(kept, e)
 			}
 		}
-		rows = kept
+		sort.SliceStable(kept, func(i, j int) bool { return lessEntry(kept[i], kept[j], l.order) })
+		l.rows = kept
+		l.cursor.clamp(len(l.rows))
+		return
 	}
 
-	sorted := append([]deckEntry(nil), rows...)
-	sort.SliceStable(sorted, func(i, j int) bool { return lessEntry(sorted[i], sorted[j], l.order) })
-	l.rows = sorted
+	l.rows = l.buildTree()
 	l.cursor.clamp(len(l.rows))
 }
+
+// buildTree lays the entries out as a folder tree flattened for display: each
+// folder row, then — unless it is collapsed — its subfolders and the decks
+// inside it, indented one level deeper. Local decks group by the folder part of
+// their slug; the followed remotes and people all sit under one virtual
+// moxfield folder.
+func (l *deckList) buildTree() []deckEntry {
+	type leaf struct {
+		e   deckEntry
+		dir string
+	}
+	var leaves []leaf
+	hasMox := false
+	for _, e := range l.all {
+		switch e.kind {
+		case entryLocal:
+			leaves = append(leaves, leaf{e, folderOf(e.slug)})
+		case entryRemote, entryUser:
+			hasMox = true
+			leaves = append(leaves, leaf{e, moxFolder})
+		}
+	}
+
+	// The leaves each folder holds, and how many there are anywhere beneath it.
+	leavesByDir := map[string][]deckEntry{}
+	count := map[string]int{}
+	for _, lf := range leaves {
+		leavesByDir[lf.dir] = append(leavesByDir[lf.dir], lf.e)
+		for d := lf.dir; d != ""; d = folderOf(d) {
+			count[d]++
+		}
+	}
+
+	// The set of folders, and each one's direct subfolders.
+	subfolders := map[string][]string{}
+	seen := map[string]bool{}
+	addFolder := func(f string) {
+		for f != "" {
+			parent := folderOf(f)
+			if key := parent + "\x00" + f; !seen[key] {
+				seen[key] = true
+				subfolders[parent] = append(subfolders[parent], f)
+			}
+			f = parent
+		}
+	}
+	for _, lf := range leaves {
+		addFolder(lf.dir)
+	}
+	if hasMox {
+		addFolder(moxFolder)
+	}
+
+	var out []deckEntry
+	var walk func(dir string, depth int)
+	walk = func(dir string, depth int) {
+		subs := append([]string(nil), subfolders[dir]...)
+		sort.Strings(subs)
+		for _, f := range subs {
+			open := !l.collapsed[f]
+			out = append(out, deckEntry{
+				kind: entryFolder, name: pathBase(f), slug: f,
+				depth: depth, count: count[f], open: open,
+			})
+			if open {
+				walk(f, depth+1)
+			}
+		}
+		ls := append([]deckEntry(nil), leavesByDir[dir]...)
+		sort.SliceStable(ls, func(i, j int) bool { return lessEntry(ls[i], ls[j], l.order) })
+		for _, e := range ls {
+			e.depth = depth
+			out = append(out, e)
+		}
+	}
+	walk("", 0)
+	return out
+}
+
+// folderOf is the folder a slug or folder path sits in — "aggro" for
+// "aggro/mono-red", "" for a root deck. Slugs use forward slashes, so this is
+// path.Dir with the "." it returns for a bare name folded to "".
+func folderOf(slug string) string {
+	if dir := path.Dir(slug); dir != "." {
+		return dir
+	}
+	return ""
+}
+
+// pathBase is the last segment of a folder path — "mono-red" for
+// "aggro/mono-red".
+func pathBase(p string) string { return path.Base(p) }
 
 func matchesEntry(e deckEntry, terms []string) bool {
 	hay := strings.ToLower(e.name + " " + e.slug + " " + e.format + " " + e.kind.letter())
@@ -266,13 +393,28 @@ func (l *deckList) cycleSort(delta int) {
 func (l *deckList) title() string { return "decks" }
 
 func (l *deckList) subtitle() string {
-	out := itoa(len(l.rows))
-	if len(l.rows) != len(l.all) {
+	leaves := 0
+	for _, r := range l.rows {
+		if r.kind != entryFolder {
+			leaves++
+		}
+	}
+	out := itoa(leaves)
+	if leaves != len(l.all) {
 		out += "/" + itoa(len(l.all))
 	}
 	out += " · " + l.order.String()
 	if l.filter != "" {
 		out += " · /" + l.filter
+	}
+	// A staged deck is invisible otherwise: nothing on the row says it's about
+	// to move, so the subtitle carries it until a p places it.
+	if l.moving != nil {
+		verb := "copy"
+		if l.moving.cut {
+			verb = "move"
+		}
+		out += " · " + verb + " " + l.moving.name
 	}
 	return out
 }
@@ -327,6 +469,9 @@ type deckCols struct {
 func measureDeckCols(rows []deckEntry, width int) deckCols {
 	var c deckCols
 	for _, e := range rows {
+		if e.kind == entryFolder {
+			continue // folders draw their own row, without these columns
+		}
 		c.pips = maxInt(c.pips, textWidth(manaPips(e.colours)))
 		c.count = maxInt(c.count, textWidth(entryCount(e)))
 		c.age = maxInt(c.age, textWidth(shortAge(e.modified)))
@@ -386,6 +531,12 @@ func renderEntryCols(e deckEntry, cols deckCols, width int, under bool) string {
 		return ""
 	}
 
+	indent := strings.Repeat("  ", e.depth)
+
+	if e.kind == entryFolder {
+		return renderFolderRow(e, indent, width, under)
+	}
+
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
 	// The kind letter and its legality mark travel together: two characters
@@ -403,7 +554,7 @@ func renderEntryCols(e deckEntry, cols deckCols, width int, under bool) string {
 	right := strings.Join(slots, " ")
 	tailWidth := textWidth(stripStyles(right))
 
-	name := e.name
+	name := indent + e.name
 	if e.broken {
 		name += " (unreadable)"
 	}
@@ -423,6 +574,32 @@ func renderEntryCols(e deckEntry, cols deckCols, width int, under bool) string {
 	}
 
 	line := nameStyle.Render(left) + " " + right
+	if under {
+		return highlightLine(line, width, theme.SelectionBg)
+	}
+	return line
+}
+
+// renderFolderRow draws a folder: a disclosure marker, its name, and how many
+// decks are under it — no legality or colour columns, since a folder has
+// neither. The count sits on the right the way a deck's size does.
+func renderFolderRow(e deckEntry, indent string, width int, under bool) string {
+	marker := "▸"
+	if e.open {
+		marker = "▾"
+	}
+
+	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
+	count := dim.Render(itoa(e.count))
+	tailWidth := textWidth(itoa(e.count))
+
+	nameStyle := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
+	if under {
+		nameStyle = nameStyle.Foreground(theme.SelectionFg)
+	}
+	left := fit(indent+marker+" "+e.name, maxInt(width-tailWidth-1, 0))
+
+	line := nameStyle.Render(left) + " " + count
 	if under {
 		return highlightLine(line, width, theme.SelectionBg)
 	}
@@ -473,8 +650,16 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	case "/":
 		p.openFilter(l.filter)
 	case "enter":
+		if e, ok := l.current(); ok && e.kind == entryFolder {
+			l.toggleFolder(e.slug)
+			return true, nil
+		}
 		return true, m.openEntry(l, p, false)
 	case "L":
+		if e, ok := l.current(); ok && e.kind == entryFolder {
+			l.toggleFolder(e.slug)
+			return true, nil
+		}
 		return true, m.openEntry(l, p, true)
 
 	case "s":
@@ -487,12 +672,12 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		p.ask(askNewDeck, "name", "")
 
 	case "r":
-		if e, ok := l.current(); ok && e.kind != entryUser {
+		if e, ok := l.current(); ok && (e.kind == entryLocal || e.kind == entryRemote) {
 			p.ask(askRename, "rename", e.name)
 		}
 
 	case "c":
-		if e, ok := l.current(); ok {
+		if e, ok := l.current(); ok && e.kind != entryFolder {
 			return true, copyEntry(e)
 		}
 
@@ -502,10 +687,29 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			return true, copyEntryBoth(e)
 		}
 
+	// ── Moving decks between folders ─────────────────────────────
+	// y picks a deck up to copy, x to move; p drops it into the folder the
+	// cursor is in. Staged rather than immediate so you can navigate first.
+	case "y":
+		if e, ok := l.current(); ok && e.kind == entryLocal {
+			l.moving = &deckMove{slug: e.slug, name: e.name, cut: false}
+		}
+	case "p":
+		if l.moving != nil {
+			mv := *l.moving
+			l.moving = nil
+			return true, m.putDeck(mv, l.currentFolder())
+		}
+
 	case "x":
+		if e, ok := l.current(); ok && e.kind == entryLocal {
+			l.moving = &deckMove{slug: e.slug, name: e.name, cut: true}
+		}
+
+	case "d":
 		e, ok := l.current()
-		if !ok {
-			return true, nil
+		if !ok || e.kind == entryFolder {
+			return true, nil // a folder goes when its last deck does
 		}
 		if e.kind == entryLocal {
 			// A deck file is the only one of the three that loses work.
@@ -521,6 +725,35 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	return true, nil
 }
 
+// toggleFolder opens or shuts a folder, keeping the cursor on it so the row you
+// pressed doesn't slide out from under you.
+func (l *deckList) toggleFolder(slug string) {
+	l.collapsed[slug] = !l.collapsed[slug]
+	l.refresh()
+	for i, r := range l.rows {
+		if r.kind == entryFolder && r.slug == slug {
+			l.cursor.at = i
+			break
+		}
+	}
+}
+
+// currentFolder is where a put would land: the folder under the cursor, or the
+// folder the highlighted deck sits in, or the root.
+func (l *deckList) currentFolder() string {
+	e, ok := l.current()
+	if !ok {
+		return ""
+	}
+	switch e.kind {
+	case entryFolder:
+		return e.slug
+	case entryLocal:
+		return folderOf(e.slug)
+	}
+	return ""
+}
+
 // info describes the highlighted row: what it is, how big, how old.
 func (l *deckList) info(width int) []string {
 	e, ok := l.current()
@@ -533,6 +766,15 @@ func (l *deckList) info(width int) []string {
 
 	out := []string{head.Render(fit(e.name, width)), ""}
 	switch e.kind {
+	case entryFolder:
+		out = append(out, dim.Render(fit("a folder", width)))
+		out = append(out, dim.Render(fit(itoa(e.count)+" decks inside", width)))
+		state := "enter to collapse"
+		if !e.open {
+			state = "enter to expand"
+		}
+		out = append(out, "", mutedLine(state, width),
+			mutedLine("p puts a picked-up deck here", width))
 	case entryLocal:
 		out = append(out, dim.Render(fit("a deck of yours", width)))
 		out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
@@ -614,14 +856,15 @@ func (l *deckList) keys() []hintGroup {
 			{"/", "filter"},
 		}},
 		{"decks", [][2]string{
-			{"enter", "open"},
+			{"enter", "open/fold"},
 			{"L", "beside"},
 			{"n", "new deck"},
 			{"r", "rename"},
 			{"c", "copy/sync"},
-			{"C", "copy + considering"},
-			{"s", "sync to remote"},
-			{"x", "delete"},
+			{"C", "considering"},
+			{"x y p", "cut/yank/put"},
+			{"s", "sync"},
+			{"d", "delete"},
 			{"gv", "versions"},
 		}},
 	}
