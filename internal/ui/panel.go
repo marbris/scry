@@ -72,7 +72,7 @@ func (k Kind) barLabel() string {
 	case KindFind:
 		return "search scryfall"
 	case KindDecks:
-		return "follow a deck or a person"
+		return "search moxfield"
 	case KindRules:
 		return "search the rules"
 	}

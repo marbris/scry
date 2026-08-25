@@ -767,31 +767,33 @@ func (l *deckList) info(width int) []string {
 	out := []string{head.Render(fit(e.name, width)), ""}
 	switch e.kind {
 	case entryFolder:
-		out = append(out, dim.Render(fit("a folder", width)))
+		out = append(out, dim.Render(fit("folder", width)))
 		out = append(out, dim.Render(fit(itoa(e.count)+" decks inside", width)))
-		state := "enter to collapse"
+		state := "enter: collapse"
 		if !e.open {
-			state = "enter to expand"
+			state = "enter: expand"
 		}
 		out = append(out, "", mutedLine(state, width),
-			mutedLine("p puts a picked-up deck here", width))
+			mutedLine("p put", width))
 	case entryLocal:
-		out = append(out, dim.Render(fit("a deck of yours", width)))
+		out = append(out, dim.Render(fit("local deck", width)))
 		out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
 		if age := shortAge(e.modified); age != "" {
 			out = append(out, dim.Render(fit("touched "+age+" ago", width)))
 		}
 		out = append(out, "")
 		out = append(out, legalityLines(e.legal, width)...)
-		out = append(out, "", mutedLine("enter to open · gv for versions", width))
+		out = append(out, "", mutedLine("enter: open", width))
+		out = append(out, "", mutedLine("gv: versions", width))
 	case entryRemote:
-		out = append(out, dim.Render(fit("on Moxfield", width)))
+		out = append(out, dim.Render(fit("Moxfield", width)))
 		out = append(out, "",
-			mutedLine("enter to look · c to take a copy", width),
-			mutedLine("C copies the considering list too", width))
+			mutedLine("enter: look", width),
+			mutedLine("c: copy main list", width),
+			mutedLine("C: copy main + considering lists", width))
 	case entryUser:
-		out = append(out, dim.Render(fit("a person on Moxfield", width)))
-		out = append(out, "", mutedLine("enter for their decks", width))
+		out = append(out, dim.Render(fit("Moxfield User", width)))
+		out = append(out, "", mutedLine("enter: see decks", width))
 	}
 	return out
 }

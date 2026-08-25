@@ -596,3 +596,55 @@ func TestTheRowStaysExactlyAsWideWithPipsAndColour(t *testing.T) {
 		}
 	}
 }
+
+// TestRenamingWithASlashMovesIntoAFolder covers the decks-panel rename that
+// reads a slash as a folder: the deck's file moves under that folder, created
+// if it wasn't there, so a deck lands in a folder by being renamed rather than
+// only when it's made.
+func TestRenamingWithASlashMovesIntoAFolder(t *testing.T) {
+	seedDeck(t, "brew", "name: brew\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.DeleteCommitted("brew"); deck.DeleteCommitted("aggro/brew") })
+
+	e := deckEntry{kind: entryLocal, name: "brew", slug: "brew"}
+	if msg, ok := renameCmd(e, "aggro/brew")().(noticeMsg); !ok || msg.err != nil {
+		t.Fatalf("rename returned %#v", msg)
+	}
+
+	if deck.Exists("brew") {
+		t.Error("the deck is still at its old root slug")
+	}
+	if !deck.Exists("aggro/brew") {
+		t.Fatal("the deck was not moved into the aggro folder")
+	}
+	d, err := deck.Read("aggro/brew")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Name != "aggro/brew" {
+		t.Errorf("name header is %q, want %q", d.Name, "aggro/brew")
+	}
+}
+
+// TestRenamingWithoutAFolderChangeKeepsTheSlug is the other half: a plain
+// title change stays in place, so the file — and the git history keyed to its
+// path — is left where it was.
+func TestRenamingWithoutAFolderChangeKeepsTheSlug(t *testing.T) {
+	seedDeck(t, "old-title", "name: old title\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.DeleteCommitted("old-title") })
+
+	e := deckEntry{kind: entryLocal, name: "old title", slug: "old-title"}
+	if msg, ok := renameCmd(e, "new title")().(noticeMsg); !ok || msg.err != nil {
+		t.Fatalf("rename returned %#v", msg)
+	}
+
+	if !deck.Exists("old-title") {
+		t.Error("the slug changed on a rename that didn't change the folder")
+	}
+	d, err := deck.Read("old-title")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Name != "new title" {
+		t.Errorf("name header is %q, want %q", d.Name, "new title")
+	}
+}

@@ -405,8 +405,11 @@ func uniqueSlug(slug string) string {
 }
 
 // renameDeck changes a local deck's title, or what a remote is called in
-// your list. The slug is left alone: it names a file with a git history, and
-// renaming that would lose the history rather than move it.
+// your list. A slash in the new name reads as a folder: the deck moves into it,
+// created if it doesn't exist yet, so a deck lands in a folder by being renamed
+// rather than only at the moment it's made. A rename that leaves the folder
+// alone leaves the slug alone too — it names a file with a git history, and the
+// history is keyed to that path.
 func renameCmd(e deckEntry, name string) tea.Cmd {
 	return func() tea.Msg {
 		switch e.kind {
@@ -416,7 +419,19 @@ func renameCmd(e deckEntry, name string) tea.Cmd {
 				return noticeMsg{err: err}
 			}
 			d.Name = name
-			if _, _, err := deck.SaveVersioned(e.slug, d); err != nil {
+
+			// Only a change of folder moves the file. The deck keeps its own
+			// base name — the last slug segment — so the move follows the same
+			// rule as dragging a deck between folders, and git mv keeps its
+			// history across the new path.
+			dest := e.slug
+			if folderOf(deck.Slugify(name)) != folderOf(e.slug) {
+				dest = inFolder(folderOf(deck.Slugify(name)), path.Base(e.slug))
+				if err := deck.Move(e.slug, dest); err != nil {
+					return noticeMsg{err: err}
+				}
+			}
+			if _, _, err := deck.SaveVersioned(dest, d); err != nil {
 				return noticeMsg{err: err}
 			}
 			return noticeMsg{text: "renamed to " + name}

@@ -104,7 +104,7 @@ func TestTheDecksPanelHasItsOwnKeys(t *testing.T) {
 	if !strings.Contains(got, "decks") {
 		t.Errorf("headed:\n%s", got)
 	}
-	for _, want := range []string{"follow a deck", "new deck", "rename"} {
+	for _, want := range []string{"search moxfield", "new deck", "rename"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("%q is missing:\n%s", want, got)
 		}
