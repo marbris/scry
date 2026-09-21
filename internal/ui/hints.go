@@ -78,7 +78,10 @@ func (m Model) hintGroups() []hintGroup {
 	// The tail of navigation: between panels, out of the panel, the menu.
 	var tail [][2]string
 	if m.ws.count() > 1 {
-		tail = append(tail, [2]string{"h l", "panel"})
+		tail = append(tail,
+			[2]string{"h l", "next/prev panel"},
+			[2]string{"ctrl+h/l", "move panel"},
+		)
 	}
 	if len(p.stack) > 1 {
 		tail = append(tail, [2]string{"esc", "back"})
