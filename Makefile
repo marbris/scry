@@ -1,5 +1,5 @@
 APP=scry
-VERSION=3.4.0
+VERSION=3.4.1
 LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 
 build:
