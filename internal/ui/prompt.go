@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -68,12 +70,20 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if l, ok := p.top().(*deckList); ok {
 				dir = l.currentFolder()
 			}
+			// A trailing slash means a folder, not a deck: "dirname/" makes the
+			// directory so decks can be filed into it afterwards.
+			if strings.HasSuffix(answer, "/") {
+				return m, newFolderCmd(dir, strings.TrimSuffix(answer, "/"))
+			}
 			return m, newDeckCmd(dir, answer)
 		case askFollow:
 			return m, follow(answer)
 		case askRename:
 			if l, ok := p.top().(*deckList); ok {
 				if e, ok := l.current(); ok {
+					if e.kind == entryFolder {
+						return m, renameFolderCmd(e, answer)
+					}
 					return m, renameCmd(e, answer)
 				}
 			}

@@ -80,13 +80,11 @@ type deckEntry struct {
 	depth int
 	open  bool
 
-	// display is the name as shown in the row. In the grouped tree a local
-	// deck's folder prefix is dropped — the folder is already its branch, so
-	// "ghen/Ghen reanimator" shows as "Ghen reanimator". It's left empty when a
-	// filter flattens the list (no branch is shown, so the full path stays) and
-	// falls back to name; name itself is never rewritten, since rename, filter,
-	// and move all read it.
-	display string
+	// folder is a local deck's location — the folder part of its slug, empty at
+	// the top level. The grouped tree shows it as the branch a deck sits under;
+	// a flattened filter view, where the branch is gone, shows it beside the
+	// name so a match stays locatable.
+	folder string
 }
 
 type deckListSort int
@@ -114,6 +112,11 @@ type deckList struct {
 	cursor
 	all  []deckEntry
 	rows []deckEntry
+
+	// folders is every directory on disk, so a folder shows in the tree even
+	// while it holds no decks yet — the panel mirrors the decks directory
+	// rather than inferring folders only from the decks in them.
+	folders []string
 
 	order  deckListSort
 	filter string
@@ -208,12 +211,15 @@ func (l *deckList) setRemoteMeta(id string, meta moxfield.Meta) {
 func (l *deckList) reload() {
 	var all []deckEntry
 
+	l.folders, _ = deck.Folders()
+
 	summaries, _ := deck.Summaries()
 	for _, s := range summaries {
 		all = append(all, deckEntry{
 			kind: entryLocal, name: s.Name, slug: s.Slug, format: s.Format,
 			count: s.Total, modified: s.Modified, broken: s.Broken,
 			legal: l.legality[s.Slug], colours: l.colours[s.Slug],
+			folder: folderOf(s.Slug),
 		})
 	}
 
@@ -302,6 +308,11 @@ func (l *deckList) buildTree() []deckEntry {
 	for _, lf := range leaves {
 		addFolder(lf.dir)
 	}
+	// Folders on disk that hold no decks yet still get a row, so the tree
+	// mirrors the directory structure rather than only the decks in it.
+	for _, f := range l.folders {
+		addFolder(f)
+	}
 	if hasMox {
 		addFolder(moxFolder)
 	}
@@ -315,8 +326,7 @@ func (l *deckList) buildTree() []deckEntry {
 			open := l.expanded[f]
 			out = append(out, deckEntry{
 				kind: entryFolder, name: pathBase(f), slug: f,
-				display: pathBase(f),
-				depth:   depth, count: count[f], open: open,
+				depth: depth, count: count[f], open: open,
 			})
 			if open {
 				walk(f, depth+1)
@@ -326,13 +336,6 @@ func (l *deckList) buildTree() []deckEntry {
 		sort.SliceStable(ls, func(i, j int) bool { return lessEntry(ls[i], ls[j], l.order) })
 		for _, e := range ls {
 			e.depth = depth
-			// A local deck's name carries its folder — drop it, since the deck
-			// already sits under that folder's branch. Remotes and people group
-			// under the flat moxfield folder by membership, not by name, so
-			// theirs stay intact.
-			if e.kind == entryLocal {
-				e.display = pathBase(e.name)
-			}
 			out = append(out, e)
 		}
 	}
@@ -353,16 +356,6 @@ func folderOf(slug string) string {
 // pathBase is the last segment of a folder path — "mono-red" for
 // "aggro/mono-red".
 func pathBase(p string) string { return path.Base(p) }
-
-// rowLabel is the text a row shows: its display name when the tree has trimmed
-// one, otherwise the full name (the flattened filter view, which keeps the
-// folder prefix since no branch is shown).
-func rowLabel(e deckEntry) string {
-	if e.display != "" {
-		return e.display
-	}
-	return e.name
-}
 
 func matchesEntry(e deckEntry, terms []string) bool {
 	hay := strings.ToLower(e.name + " " + e.slug + " " + e.format + " " + e.kind.letter())
@@ -581,11 +574,21 @@ func renderEntryCols(e deckEntry, cols deckCols, width int, under bool) string {
 	right := strings.Join(slots, " ")
 	tailWidth := textWidth(stripStyles(right))
 
-	name := indent + rowLabel(e)
+	name := indent + e.name
 	if e.broken {
 		name += " (unreadable)"
 	}
-	left := fit(name, maxInt(width-tailWidth-1, 0))
+
+	// A flattened filter view has dropped the folder branches, so a nested
+	// deck (now at depth 0) shows its folder beside the name to stay locatable.
+	// A grouped deck sits under its branch (depth >= 1) and a root deck has no
+	// folder, so neither gets the suffix.
+	suffix := ""
+	if e.depth == 0 && e.folder != "" {
+		suffix = "  " + e.folder
+	}
+	avail := maxInt(width-tailWidth-1, 0)
+	left := fit(name, maxInt(avail-textWidth(suffix), 0))
 
 	nameStyle := lipgloss.NewStyle().Foreground(theme.Text)
 	switch {
@@ -600,7 +603,14 @@ func renderEntryCols(e deckEntry, cols deckCols, width int, under bool) string {
 		nameStyle = nameStyle.Foreground(theme.SelectionFg).Bold(true)
 	}
 
-	line := nameStyle.Render(left) + " " + right
+	// The folder hint rides in the name's style when the row is selected, so it
+	// reads against the highlight; otherwise it's dim, a step back from the name.
+	folderStyle := lipgloss.NewStyle().Foreground(theme.TextDim)
+	if under {
+		folderStyle = nameStyle
+	}
+
+	line := nameStyle.Render(left) + folderStyle.Render(suffix) + " " + right
 	if under {
 		return highlightLine(line, width, theme.SelectionBg)
 	}
@@ -699,8 +709,13 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		p.ask(askNewDeck, "name", "")
 
 	case "r":
-		if e, ok := l.current(); ok && (e.kind == entryLocal || e.kind == entryRemote) {
-			p.ask(askRename, "rename", e.name)
+		if e, ok := l.current(); ok {
+			switch {
+			case e.kind == entryLocal || e.kind == entryRemote:
+				p.ask(askRename, "rename", e.name)
+			case e.kind == entryFolder && e.slug != moxFolder:
+				p.ask(askRename, "rename folder", e.name)
+			}
 		}
 
 	case "c":
@@ -791,7 +806,7 @@ func (l *deckList) info(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
-	out := []string{head.Render(fit(rowLabel(e), width)), ""}
+	out := []string{head.Render(fit(e.name, width)), ""}
 	switch e.kind {
 	case entryFolder:
 		out = append(out, dim.Render(fit("folder", width)))
@@ -804,6 +819,11 @@ func (l *deckList) info(width int) []string {
 			mutedLine("p put", width))
 	case entryLocal:
 		out = append(out, dim.Render(fit("local deck", width)))
+		location := "top level"
+		if e.folder != "" {
+			location = "in " + e.folder
+		}
+		out = append(out, dim.Render(fit(location, width)))
 		out = append(out, dim.Render(fit(itoa(e.count)+" cards", width)))
 		if age := shortAge(e.modified); age != "" {
 			out = append(out, dim.Render(fit("touched "+age+" ago", width)))

@@ -36,7 +36,7 @@ func Summaries() ([]Summary, error) {
 
 	out := make([]Summary, 0, len(slugs))
 	for _, slug := range slugs {
-		s := Summary{Slug: slug, Name: slug}
+		s := Summary{Slug: slug, Name: slugBase(slug)}
 		if info, err := os.Stat(Path(slug)); err == nil {
 			s.Modified = info.ModTime()
 		}

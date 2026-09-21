@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -323,6 +324,19 @@ func newDeckCmd(dir, name string) tea.Cmd {
 	}
 }
 
+// newFolder makes an empty directory in the tree, under the folder the panel is
+// pointing at. Typing "dirname/" at the new prompt lands here — a folder made
+// before it has any decks, so you can file decks into it afterwards.
+func newFolderCmd(dir, name string) tea.Cmd {
+	return func() tea.Msg {
+		slug, err := deck.NewFolder(inFolder(dir, name))
+		if err != nil {
+			return noticeMsg{err: err}
+		}
+		return noticeMsg{text: "made folder " + slug}
+	}
+}
+
 // inFolder puts a name inside a folder, for slugifying into a path. A name that
 // already carries its own slashes nests under the folder all the same.
 func inFolder(dir, name string) string {
@@ -341,10 +355,12 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 		}
 	}
 	dest := uniqueSlug(inFolder(dir, path.Base(mv.slug)))
-	// The deck's name carries its folder — "test/testdeck" — so moving it has to
-	// rewrite that prefix, or a deck in test2 would still call itself test/….
-	// Only the folder part changes; the deck's own name is kept.
-	newName := inFolder(dir, path.Base(mv.name))
+	// Only the file's location changes; the deck keeps its own name, which no
+	// longer carries the folder. The destination folder is where it now lives.
+	where := dir
+	if where == "" {
+		where = "the top level"
+	}
 
 	if mv.cut {
 		return func() tea.Msg {
@@ -354,10 +370,7 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 			if err := deck.Move(mv.slug, dest); err != nil {
 				return noticeMsg{err: err}
 			}
-			if err := renameInPlace(dest, newName); err != nil {
-				return noticeMsg{err: err}
-			}
-			return noticeMsg{text: "moved " + mv.name + " to " + newName}
+			return noticeMsg{text: "moved " + mv.name + " to " + where}
 		}
 	}
 	return func() tea.Msg {
@@ -365,28 +378,11 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 		if err != nil {
 			return noticeMsg{err: err}
 		}
-		d.Name = newName
 		if _, _, err := deck.SaveVersioned(dest, d); err != nil {
 			return noticeMsg{err: err}
 		}
-		return noticeMsg{text: "copied " + mv.name + " to " + newName}
+		return noticeMsg{text: "copied " + mv.name + " to " + where}
 	}
-}
-
-// renameInPlace updates a deck's name header to match where it now lives,
-// leaving everything else — and its file — where the move put it. A no-op when
-// the name already matches, so a move within one folder doesn't churn git.
-func renameInPlace(slug, name string) error {
-	d, err := deck.Read(slug)
-	if err != nil {
-		return err
-	}
-	if d.Name == name {
-		return nil
-	}
-	d.Name = name
-	_, _, err = deck.SaveVersioned(slug, d)
-	return err
 }
 
 // uniqueSlug finds a free slug at or beside the one asked for, so putting a
@@ -404,12 +400,10 @@ func uniqueSlug(slug string) string {
 	return slug
 }
 
-// renameDeck changes a local deck's title, or what a remote is called in
-// your list. A slash in the new name reads as a folder: the deck moves into it,
-// created if it doesn't exist yet, so a deck lands in a folder by being renamed
-// rather than only at the moment it's made. A rename that leaves the folder
-// alone leaves the slug alone too — it names a file with a git history, and the
-// history is keyed to that path.
+// renameDeck changes a local deck's title, or what a remote is called in your
+// list. It changes the name alone: the slug names a file with a git history, so
+// the file stays put and the history stays keyed to that path. A deck moves
+// between folders with cut and put, not by being renamed.
 func renameCmd(e deckEntry, name string) tea.Cmd {
 	return func() tea.Msg {
 		switch e.kind {
@@ -418,20 +412,8 @@ func renameCmd(e deckEntry, name string) tea.Cmd {
 			if err != nil {
 				return noticeMsg{err: err}
 			}
-			d.Name = name
-
-			// Only a change of folder moves the file. The deck keeps its own
-			// base name — the last slug segment — so the move follows the same
-			// rule as dragging a deck between folders, and git mv keeps its
-			// history across the new path.
-			dest := e.slug
-			if folderOf(deck.Slugify(name)) != folderOf(e.slug) {
-				dest = inFolder(folderOf(deck.Slugify(name)), path.Base(e.slug))
-				if err := deck.Move(e.slug, dest); err != nil {
-					return noticeMsg{err: err}
-				}
-			}
-			if _, _, err := deck.SaveVersioned(dest, d); err != nil {
+			d.Name = strings.TrimSpace(name)
+			if _, _, err := deck.SaveVersioned(e.slug, d); err != nil {
 				return noticeMsg{err: err}
 			}
 			return noticeMsg{text: "renamed to " + name}
@@ -444,6 +426,29 @@ func renameCmd(e deckEntry, name string) tea.Cmd {
 			return noticeMsg{text: "renamed to " + name}
 		}
 		return noticeMsg{text: "a person can't be renamed"}
+	}
+}
+
+// renameFolderCmd renames a folder — the folder is a location on disk, so this
+// moves every deck under it to the renamed path, each keeping its own name. The
+// moxfield folder is virtual, built from the bookmarks, so there's nothing to
+// rename there.
+func renameFolderCmd(e deckEntry, name string) tea.Cmd {
+	return func() tea.Msg {
+		if e.slug == moxFolder {
+			return noticeMsg{err: fmt.Errorf("the moxfield folder isn't yours to rename")}
+		}
+		newPath := inFolder(folderOf(e.slug), deck.Slugify(strings.TrimSpace(name)))
+		if newPath == "" {
+			return noticeMsg{err: fmt.Errorf("a folder needs a name")}
+		}
+		if newPath == e.slug {
+			return noticeMsg{text: e.slug + " is already called that"}
+		}
+		if err := deck.MoveFolder(e.slug, newPath); err != nil {
+			return noticeMsg{err: err}
+		}
+		return noticeMsg{text: "renamed folder to " + newPath}
 	}
 }
 

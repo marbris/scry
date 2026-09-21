@@ -186,6 +186,28 @@ func Move(oldSlug, newSlug string) error {
 	return nil
 }
 
+// MoveFolder renames a folder by relocating every deck under it to the new
+// folder path — "aggro/mono-red" becomes "midrange/mono-red" when aggro is
+// renamed to midrange. Each deck keeps its own name; only its file moves, via
+// Move, so git history follows and the emptied folder is swept up.
+func MoveFolder(oldPath, newPath string) error {
+	if oldPath == newPath {
+		return nil
+	}
+	slugs, err := List()
+	if err != nil {
+		return err
+	}
+	for _, s := range slugs {
+		if s == oldPath || strings.HasPrefix(s, oldPath+"/") {
+			if err := Move(s, newPath+strings.TrimPrefix(s, oldPath)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // pruneEmptyDirs removes now-empty folders left by a move or delete, up to but
 // not including the decks directory itself.
 func pruneEmptyDirs(dir string) {

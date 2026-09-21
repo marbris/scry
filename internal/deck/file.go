@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -367,6 +368,53 @@ func List() ([]string, error) {
 	return out, nil
 }
 
+// Folders returns the paths of every directory under the decks directory, so
+// the tree can show a folder even when it holds no decks yet. Paths are relative
+// with forward slashes, like slugs — "aggro", "aggro/mono-red".
+func Folders() ([]string, error) {
+	root := Dir()
+	var out []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() {
+			return nil
+		}
+		if d.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if path == root {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return nil
+		}
+		out = append(out, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// NewFolder makes an empty directory in the decks tree and returns the folder
+// path it settled on. The name is slugified segment by segment, the same as a
+// deck's, so a ".." or a leading slash can't escape the decks directory.
+func NewFolder(name string) (string, error) {
+	slug := Slugify(name)
+	if slug == "" {
+		return "", fmt.Errorf("%q doesn't make a usable folder name", name)
+	}
+	if err := os.MkdirAll(filepath.Join(Dir(), filepath.FromSlash(slug)), 0755); err != nil {
+		return "", err
+	}
+	return slug, nil
+}
+
 func Exists(slug string) bool {
 	_, err := os.Stat(Path(slug))
 	return err == nil
@@ -383,11 +431,35 @@ func Read(slug string) (*File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", slug+FileExt, err)
 	}
-	if d.Name == "" {
-		d.Name = slug
-	}
+	d.Name = displayName(slug, d.Name)
 	return d, nil
 }
+
+// displayName is a deck's name as it should be shown: the folder is the slug's
+// directory, never part of the name. A header is kept as-is once its folder
+// prefix — left over from when a nested deck's name carried its path — is
+// stripped; a deck with no header names itself after its file's last segment.
+func displayName(slug, header string) string {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return slugBase(slug)
+	}
+	if dir := slugDir(slug); dir != "" {
+		return strings.TrimPrefix(header, dir+"/")
+	}
+	return header
+}
+
+// slugDir and slugBase split a slug's folder from its last segment. Slugs use
+// forward slashes whatever the OS, so they go through path, not filepath.
+func slugDir(slug string) string {
+	if dir := path.Dir(slug); dir != "." {
+		return dir
+	}
+	return ""
+}
+
+func slugBase(slug string) string { return path.Base(slug) }
 
 // Write saves a deck, via a temporary file so that a crash mid-write
 // can't leave a half-written deck behind — git will be reading these.
@@ -444,5 +516,15 @@ func New(name, format string) (slug string, d *File, err error) {
 	if format == "" {
 		format = DefaultFormat
 	}
-	return slug, &File{Name: name, Format: format}, nil
+	return slug, &File{Name: baseName(name), Format: format}, nil
+}
+
+// baseName is a deck's own name, without the folder a slash puts it in: the
+// text after the last slash, trimmed. "Aggro / Mono Red" is the Mono Red deck
+// filed under aggro, so its name is "Mono Red".
+func baseName(name string) string {
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	return strings.TrimSpace(name)
 }

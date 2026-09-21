@@ -271,3 +271,49 @@ func TestNewDeckStartsEmptyAndNamed(t *testing.T) {
 		t.Errorf("a new deck came with %d cards", len(d.Entries))
 	}
 }
+
+func TestNewDeckInAFolderKeepsOnlyItsOwnName(t *testing.T) {
+	// A slash files the deck in a folder — that goes to the slug (the path), not
+	// to the name, which is just the deck's own name.
+	isolate(t)
+	slug, d, err := New("Aggro / Mono Red", "commander")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slug != "aggro/mono-red" {
+		t.Errorf("slug is %q, want aggro/mono-red", slug)
+	}
+	if d.Name != "Mono Red" {
+		t.Errorf("name is %q, want just Mono Red", d.Name)
+	}
+}
+
+func TestReadStripsALegacyFolderPrefixFromTheName(t *testing.T) {
+	// Decks made before the folder was split out of the name still carry the
+	// path in their header; reading one shows just the deck's own name.
+	isolate(t)
+	if err := Write("ghen/reanimator", &File{Name: "ghen/Ghen reanimator", Format: "commander"}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := Read("ghen/reanimator")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Name != "Ghen reanimator" {
+		t.Errorf("name is %q, want the folder prefix stripped", d.Name)
+	}
+}
+
+func TestReadNamesANestedHeaderlessDeckAfterItsFile(t *testing.T) {
+	isolate(t)
+	if err := Write("aggro/mono-red", &File{Format: "commander"}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := Read("aggro/mono-red")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Name != "mono-red" {
+		t.Errorf("name is %q, want the last slug segment", d.Name)
+	}
+}

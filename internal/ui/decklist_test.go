@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,30 @@ func seedDeck(t *testing.T, slug, body string) {
 	}
 	if err := deck.Write(slug, d); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// resetDecks empties the shared decks directory (keeping any .git). The ui
+// tests share one directory via TestMain, and the panel now reads folders
+// straight from disk — so a test that leaves a folder behind must sweep it up,
+// or a later test would see it in the tree.
+func resetDecks(t *testing.T) {
+	t.Helper()
+	dir := deck.Dir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() == ".git" {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -237,6 +263,33 @@ func TestFoldingAFolderHidesItsDecks(t *testing.T) {
 	}
 }
 
+func TestAnEmptyFolderStillShowsInTheTree(t *testing.T) {
+	// The panel mirrors the directory tree: a folder on disk with no decks in
+	// it yet is a row of its own, so you can see it and file decks into it.
+	l := &deckList{
+		expanded: map[string]bool{},
+		folders:  []string{"empty", "aggro"},
+		all: []deckEntry{
+			{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
+			{kind: entryLocal, name: "Loose", slug: "loose"},
+		},
+	}
+	l.refresh()
+
+	var emptySeen bool
+	for _, r := range l.rows {
+		if r.kind == entryFolder && r.slug == "empty" {
+			emptySeen = true
+			if r.count != 0 {
+				t.Errorf("the empty folder claims %d decks", r.count)
+			}
+		}
+	}
+	if !emptySeen {
+		t.Error("an empty folder didn't get a row")
+	}
+}
+
 func TestFoldersStartCollapsed(t *testing.T) {
 	// Nothing seeded open, so a folder is shut on first build: its row shows but
 	// its decks don't, until you open it.
@@ -260,51 +313,62 @@ func TestFoldersStartCollapsed(t *testing.T) {
 	}
 }
 
-func TestDeckRowDropsItsFolderPrefix(t *testing.T) {
-	// The name carries the folder ("ghen/…"); grouped under that branch the row
-	// shows only the last segment, while name and slug stay whole for rename,
-	// filter, and move.
+func TestGroupedDeckShowsJustItsName(t *testing.T) {
+	// The name is the name; the folder is the branch it sits under, not part of
+	// the row's text.
 	l := &deckList{expanded: map[string]bool{"ghen": true}, all: []deckEntry{
-		{kind: entryLocal, name: "ghen/Ghen reanimator (active)", slug: "ghen/ghen-reanimator-active"},
+		{kind: entryLocal, name: "Ghen reanimator", slug: "ghen/ghen-reanimator", folder: "ghen"},
 	}}
 	l.refresh()
 
 	var row deckEntry
 	for _, r := range l.rows {
-		if r.slug == "ghen/ghen-reanimator-active" {
+		if r.slug == "ghen/ghen-reanimator" {
 			row = r
 		}
 	}
-	if got := rowLabel(row); got != "Ghen reanimator (active)" {
-		t.Errorf("row shows %q, want %q", got, "Ghen reanimator (active)")
+	if row.depth != 1 {
+		t.Errorf("deck is at depth %d, want it under its folder", row.depth)
 	}
-	if row.name != "ghen/Ghen reanimator (active)" {
-		t.Errorf("name was rewritten to %q; it must stay whole", row.name)
-	}
-
-	// A filter flattens the tree — no folder branch is shown, so the full path
-	// comes back to keep the folder context.
-	l.filter = "reanimator"
-	l.refresh()
-	var flat deckEntry
-	for _, r := range l.rows {
-		if r.slug == "ghen/ghen-reanimator-active" {
-			flat = r
-		}
-	}
-	if got := rowLabel(flat); got != "ghen/Ghen reanimator (active)" {
-		t.Errorf("filtered row shows %q, want the full path", got)
+	got := stripANSI(renderEntry(row, 60, false))
+	if !strings.Contains(got, "Ghen reanimator") || strings.Contains(got, "ghen/") {
+		t.Errorf("grouped row shows %q, want the bare name with no folder", got)
 	}
 }
 
-func TestMovingADeckRenamesItForItsNewFolder(t *testing.T) {
-	// The name carries the folder, so a move has to rewrite the prefix: a deck
-	// in test2 mustn't still call itself test/….
-	seedDeck(t, "mvsrc/thedeck", "name: mvsrc/thedeck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
-	t.Cleanup(func() { deck.Delete("mvsrc/thedeck"); deck.Delete("mvdst/thedeck") })
+func TestFilteredDeckShowsItsFolder(t *testing.T) {
+	// A filter flattens the tree and hides the folder branches, so a nested
+	// deck shows its folder beside the name to stay locatable.
+	l := &deckList{expanded: map[string]bool{}, all: []deckEntry{
+		{kind: entryLocal, name: "Ghen reanimator", slug: "ghen/ghen-reanimator", folder: "ghen"},
+		{kind: entryLocal, name: "Loose", slug: "loose"},
+	}}
+	l.filter = "ghen"
+	l.refresh()
+
+	var row deckEntry
+	for _, r := range l.rows {
+		if r.slug == "ghen/ghen-reanimator" {
+			row = r
+		}
+	}
+	if row.depth != 0 {
+		t.Fatalf("a filtered row is at depth %d, want the tree flattened", row.depth)
+	}
+	got := stripANSI(renderEntry(row, 60, false))
+	if !strings.Contains(got, "Ghen reanimator") || !strings.Contains(got, "ghen") {
+		t.Errorf("filtered row shows %q, want the name and its folder", got)
+	}
+}
+
+func TestMovingADeckKeepsItsName(t *testing.T) {
+	// The folder is the file's location, not part of the name, so a move only
+	// relocates the file — the deck keeps calling itself what it did.
+	seedDeck(t, "mvsrc/thedeck", "name: The Deck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { resetDecks(t) })
 
 	var m Model
-	cmd := m.putDeck(deckMove{slug: "mvsrc/thedeck", name: "mvsrc/thedeck", cut: true}, "mvdst")
+	cmd := m.putDeck(deckMove{slug: "mvsrc/thedeck", name: "The Deck", cut: true}, "mvdst")
 	if msg := cmd().(noticeMsg); msg.err != nil {
 		t.Fatalf("move failed: %v", msg.err)
 	}
@@ -316,17 +380,17 @@ func TestMovingADeckRenamesItForItsNewFolder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("not at the new slug: %v", err)
 	}
-	if d.Name != "mvdst/thedeck" {
-		t.Errorf("name is %q, want mvdst/thedeck", d.Name)
+	if d.Name != "The Deck" {
+		t.Errorf("name is %q, want it unchanged (The Deck)", d.Name)
 	}
 }
 
-func TestMovingADeckToTheRootDropsItsFolderFromTheName(t *testing.T) {
-	seedDeck(t, "rootmv/thedeck", "name: rootmv/thedeck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
-	t.Cleanup(func() { deck.Delete("rootmv/thedeck"); deck.Delete("thedeck") })
+func TestMovingADeckToTheRootKeepsItsName(t *testing.T) {
+	seedDeck(t, "rootmv/thedeck", "name: The Deck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { resetDecks(t) })
 
 	var m Model
-	cmd := m.putDeck(deckMove{slug: "rootmv/thedeck", name: "rootmv/thedeck", cut: true}, "")
+	cmd := m.putDeck(deckMove{slug: "rootmv/thedeck", name: "The Deck", cut: true}, "")
 	if msg := cmd().(noticeMsg); msg.err != nil {
 		t.Fatalf("move failed: %v", msg.err)
 	}
@@ -334,8 +398,60 @@ func TestMovingADeckToTheRootDropsItsFolderFromTheName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("not at the root: %v", err)
 	}
-	if d.Name != "thedeck" {
-		t.Errorf("name is %q, want thedeck", d.Name)
+	if d.Name != "The Deck" {
+		t.Errorf("name is %q, want it unchanged (The Deck)", d.Name)
+	}
+}
+
+func TestRenamingAFolderMovesItsDecks(t *testing.T) {
+	// Renaming a folder relocates the decks under it, each keeping its own name.
+	seedDeck(t, "aggro/mono-red", "name: Mono Red\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { resetDecks(t) })
+
+	e := deckEntry{kind: entryFolder, slug: "aggro", name: "aggro"}
+	if msg := renameFolderCmd(e, "midrange")().(noticeMsg); msg.err != nil {
+		t.Fatalf("rename failed: %v", msg.err)
+	}
+
+	if deck.Exists("aggro/mono-red") {
+		t.Error("the deck is still under the old folder")
+	}
+	d, err := deck.Read("midrange/mono-red")
+	if err != nil {
+		t.Fatalf("deck not under the renamed folder: %v", err)
+	}
+	if d.Name != "Mono Red" {
+		t.Errorf("name is %q, want it unchanged (Mono Red)", d.Name)
+	}
+}
+
+func TestTheMoxfieldFolderCantBeRenamed(t *testing.T) {
+	e := deckEntry{kind: entryFolder, slug: moxFolder, name: moxFolder}
+	if msg := renameFolderCmd(e, "mine")().(noticeMsg); msg.err == nil {
+		t.Error("renaming the moxfield folder should be refused")
+	}
+}
+
+func TestRenamingADeckKeepsItsSlug(t *testing.T) {
+	// A rename changes the name alone; the file stays where it is so its git
+	// history stays keyed to that path.
+	seedDeck(t, "folder/thedeck", "name: The Deck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { resetDecks(t) })
+
+	cmd := renameCmd(deckEntry{kind: entryLocal, slug: "folder/thedeck", name: "The Deck"}, "Renamed / Elsewhere")
+	if msg := cmd().(noticeMsg); msg.err != nil {
+		t.Fatalf("rename failed: %v", msg.err)
+	}
+
+	if !deck.Exists("folder/thedeck") {
+		t.Error("the deck moved; a rename should leave the file where it is")
+	}
+	d, err := deck.Read("folder/thedeck")
+	if err != nil {
+		t.Fatalf("reading back: %v", err)
+	}
+	if d.Name != "Renamed / Elsewhere" {
+		t.Errorf("name is %q, want the new name verbatim", d.Name)
 	}
 }
 
@@ -656,57 +772,5 @@ func TestTheRowStaysExactlyAsWideWithPipsAndColour(t *testing.T) {
 		if textWidth(got) > width {
 			t.Errorf("width %d rendered %d columns: %q", width, textWidth(got), got)
 		}
-	}
-}
-
-// TestRenamingWithASlashMovesIntoAFolder covers the decks-panel rename that
-// reads a slash as a folder: the deck's file moves under that folder, created
-// if it wasn't there, so a deck lands in a folder by being renamed rather than
-// only when it's made.
-func TestRenamingWithASlashMovesIntoAFolder(t *testing.T) {
-	seedDeck(t, "brew", "name: brew\nformat: commander\n[mainboard]\n1 Sol Ring\n")
-	t.Cleanup(func() { deck.DeleteCommitted("brew"); deck.DeleteCommitted("aggro/brew") })
-
-	e := deckEntry{kind: entryLocal, name: "brew", slug: "brew"}
-	if msg, ok := renameCmd(e, "aggro/brew")().(noticeMsg); !ok || msg.err != nil {
-		t.Fatalf("rename returned %#v", msg)
-	}
-
-	if deck.Exists("brew") {
-		t.Error("the deck is still at its old root slug")
-	}
-	if !deck.Exists("aggro/brew") {
-		t.Fatal("the deck was not moved into the aggro folder")
-	}
-	d, err := deck.Read("aggro/brew")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.Name != "aggro/brew" {
-		t.Errorf("name header is %q, want %q", d.Name, "aggro/brew")
-	}
-}
-
-// TestRenamingWithoutAFolderChangeKeepsTheSlug is the other half: a plain
-// title change stays in place, so the file — and the git history keyed to its
-// path — is left where it was.
-func TestRenamingWithoutAFolderChangeKeepsTheSlug(t *testing.T) {
-	seedDeck(t, "old-title", "name: old title\nformat: commander\n[mainboard]\n1 Sol Ring\n")
-	t.Cleanup(func() { deck.DeleteCommitted("old-title") })
-
-	e := deckEntry{kind: entryLocal, name: "old title", slug: "old-title"}
-	if msg, ok := renameCmd(e, "new title")().(noticeMsg); !ok || msg.err != nil {
-		t.Fatalf("rename returned %#v", msg)
-	}
-
-	if !deck.Exists("old-title") {
-		t.Error("the slug changed on a rename that didn't change the folder")
-	}
-	d, err := deck.Read("old-title")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.Name != "new title" {
-		t.Errorf("name header is %q, want %q", d.Name, "new title")
 	}
 }

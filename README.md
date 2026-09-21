@@ -264,7 +264,14 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 
 The panel is a folder tree: local decks group by the folder part of their slug
 (`aggro/mono-red`), and the Moxfield decks and people you follow sit under one
-`moxfield` folder.
+`moxfield` folder. Folders start collapsed; `enter` opens one.
+
+A deck's name is just its name — the folder is where its file lives, not part of
+the name. Renaming a deck only changes its name; `r` on a folder renames the
+folder and takes its decks with it. Move a deck between folders with cut and put
+(`x` then `p`). Naming a new deck into a folder (`aggro/Mono Red`) files it there
+— the folder goes to the location, and the deck is named `Mono Red`. Ending the
+name with a slash (`aggro/`) makes an empty folder to fill later.
 
 | Key | Does |
 | --- | --- |
