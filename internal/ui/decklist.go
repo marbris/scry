@@ -79,6 +79,14 @@ type deckEntry struct {
 	// segment, and open for whether it is expanded.
 	depth int
 	open  bool
+
+	// display is the name as shown in the row. In the grouped tree a local
+	// deck's folder prefix is dropped — the folder is already its branch, so
+	// "ghen/Ghen reanimator" shows as "Ghen reanimator". It's left empty when a
+	// filter flattens the list (no branch is shown, so the full path stays) and
+	// falls back to name; name itself is never rewritten, since rename, filter,
+	// and move all read it.
+	display string
 }
 
 type deckListSort int
@@ -120,10 +128,11 @@ type deckList struct {
 	// would delete so that moving the cursor can't redirect it.
 	confirming *deckEntry
 
-	// collapsed is the set of folder paths the tree is holding shut. Folders
-	// are open by default — a folder absent here is expanded — so nothing you
-	// have is hidden until you choose to fold it away.
-	collapsed map[string]bool
+	// expanded is the set of folder paths the tree is holding open. Folders are
+	// collapsed by default — a folder absent here is shut — so opening the panel
+	// shows folders folded until you open one, and the ones you open stay open
+	// across reloads.
+	expanded map[string]bool
 
 	// moving is a deck staged by y (copy) or x (cut), waiting for a p to place
 	// it in a folder. Held here rather than acted on at once so you can move the
@@ -141,10 +150,10 @@ type deckMove struct {
 // newDeckList reads what's on disk and what's bookmarked.
 func newDeckList() *deckList {
 	l := &deckList{
-		order:     byModified,
-		legality:  map[string]deck.Legality{},
-		colours:   map[string][]string{},
-		collapsed: map[string]bool{},
+		order:    byModified,
+		legality: map[string]deck.Legality{},
+		colours:  map[string][]string{},
+		expanded: map[string]bool{},
 	}
 	l.reload()
 	return l
@@ -246,7 +255,7 @@ func (l *deckList) refresh() {
 }
 
 // buildTree lays the entries out as a folder tree flattened for display: each
-// folder row, then — unless it is collapsed — its subfolders and the decks
+// folder row, then — only when it is expanded — its subfolders and the decks
 // inside it, indented one level deeper. Local decks group by the folder part of
 // their slug; the followed remotes and people all sit under one virtual
 // moxfield folder.
@@ -303,10 +312,11 @@ func (l *deckList) buildTree() []deckEntry {
 		subs := append([]string(nil), subfolders[dir]...)
 		sort.Strings(subs)
 		for _, f := range subs {
-			open := !l.collapsed[f]
+			open := l.expanded[f]
 			out = append(out, deckEntry{
 				kind: entryFolder, name: pathBase(f), slug: f,
-				depth: depth, count: count[f], open: open,
+				display: pathBase(f),
+				depth:   depth, count: count[f], open: open,
 			})
 			if open {
 				walk(f, depth+1)
@@ -316,6 +326,13 @@ func (l *deckList) buildTree() []deckEntry {
 		sort.SliceStable(ls, func(i, j int) bool { return lessEntry(ls[i], ls[j], l.order) })
 		for _, e := range ls {
 			e.depth = depth
+			// A local deck's name carries its folder — drop it, since the deck
+			// already sits under that folder's branch. Remotes and people group
+			// under the flat moxfield folder by membership, not by name, so
+			// theirs stay intact.
+			if e.kind == entryLocal {
+				e.display = pathBase(e.name)
+			}
 			out = append(out, e)
 		}
 	}
@@ -336,6 +353,16 @@ func folderOf(slug string) string {
 // pathBase is the last segment of a folder path — "mono-red" for
 // "aggro/mono-red".
 func pathBase(p string) string { return path.Base(p) }
+
+// rowLabel is the text a row shows: its display name when the tree has trimmed
+// one, otherwise the full name (the flattened filter view, which keeps the
+// folder prefix since no branch is shown).
+func rowLabel(e deckEntry) string {
+	if e.display != "" {
+		return e.display
+	}
+	return e.name
+}
 
 func matchesEntry(e deckEntry, terms []string) bool {
 	hay := strings.ToLower(e.name + " " + e.slug + " " + e.format + " " + e.kind.letter())
@@ -554,7 +581,7 @@ func renderEntryCols(e deckEntry, cols deckCols, width int, under bool) string {
 	right := strings.Join(slots, " ")
 	tailWidth := textWidth(stripStyles(right))
 
-	name := indent + e.name
+	name := indent + rowLabel(e)
 	if e.broken {
 		name += " (unreadable)"
 	}
@@ -728,7 +755,7 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 // toggleFolder opens or shuts a folder, keeping the cursor on it so the row you
 // pressed doesn't slide out from under you.
 func (l *deckList) toggleFolder(slug string) {
-	l.collapsed[slug] = !l.collapsed[slug]
+	l.expanded[slug] = !l.expanded[slug]
 	l.refresh()
 	for i, r := range l.rows {
 		if r.kind == entryFolder && r.slug == slug {
@@ -764,7 +791,7 @@ func (l *deckList) info(width int) []string {
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextDim)
 
-	out := []string{head.Render(fit(e.name, width)), ""}
+	out := []string{head.Render(fit(rowLabel(e), width)), ""}
 	switch e.kind {
 	case entryFolder:
 		out = append(out, dim.Render(fit("folder", width)))

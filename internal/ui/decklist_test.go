@@ -48,7 +48,9 @@ func TestLocalRemoteAndPeopleShareOneList(t *testing.T) {
 	}
 	t.Cleanup(func() { deck.SaveBookmarks(deck.Bookmarks{}) })
 
-	m := drive(sized(120, 30), "space", "d")
+	// The remotes and people sit under the moxfield folder, which starts
+	// collapsed; enter on it (the first row) opens it to reveal them.
+	m := drive(sized(120, 30), "space", "d", "enter")
 	view := stripANSI(m.View())
 
 	for _, want := range []string{"Ghen", "Someone's brew", "MarBri"} {
@@ -184,7 +186,7 @@ func TestFollowedThingsLiveUnderTheMoxfieldFolder(t *testing.T) {
 }
 
 func TestDecksGroupIntoFoldersByTheirSlug(t *testing.T) {
-	l := &deckList{collapsed: map[string]bool{}, all: []deckEntry{
+	l := &deckList{expanded: map[string]bool{"aggro": true}, all: []deckEntry{
 		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
 		{kind: entryLocal, name: "Budget", slug: "aggro/budget"},
 		{kind: entryLocal, name: "Loose", slug: "loose"},
@@ -206,7 +208,7 @@ func TestDecksGroupIntoFoldersByTheirSlug(t *testing.T) {
 }
 
 func TestFoldingAFolderHidesItsDecks(t *testing.T) {
-	l := &deckList{collapsed: map[string]bool{}, all: []deckEntry{
+	l := &deckList{expanded: map[string]bool{"aggro": true}, all: []deckEntry{
 		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
 		{kind: entryLocal, name: "Loose", slug: "loose"},
 	}}
@@ -232,6 +234,66 @@ func TestFoldingAFolderHidesItsDecks(t *testing.T) {
 	}
 	if !found {
 		t.Error("reopening the folder didn't bring its deck back")
+	}
+}
+
+func TestFoldersStartCollapsed(t *testing.T) {
+	// Nothing seeded open, so a folder is shut on first build: its row shows but
+	// its decks don't, until you open it.
+	l := &deckList{expanded: map[string]bool{}, all: []deckEntry{
+		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
+		{kind: entryLocal, name: "Loose", slug: "loose"},
+	}}
+	l.refresh()
+
+	var sawFolder bool
+	for _, r := range l.rows {
+		if r.kind == entryFolder && r.slug == "aggro" {
+			sawFolder = true
+		}
+		if r.name == "Mono Red" {
+			t.Error("a folder is expanded by default; it should start collapsed")
+		}
+	}
+	if !sawFolder {
+		t.Fatal("the aggro folder row is missing")
+	}
+}
+
+func TestDeckRowDropsItsFolderPrefix(t *testing.T) {
+	// The name carries the folder ("ghen/…"); grouped under that branch the row
+	// shows only the last segment, while name and slug stay whole for rename,
+	// filter, and move.
+	l := &deckList{expanded: map[string]bool{"ghen": true}, all: []deckEntry{
+		{kind: entryLocal, name: "ghen/Ghen reanimator (active)", slug: "ghen/ghen-reanimator-active"},
+	}}
+	l.refresh()
+
+	var row deckEntry
+	for _, r := range l.rows {
+		if r.slug == "ghen/ghen-reanimator-active" {
+			row = r
+		}
+	}
+	if got := rowLabel(row); got != "Ghen reanimator (active)" {
+		t.Errorf("row shows %q, want %q", got, "Ghen reanimator (active)")
+	}
+	if row.name != "ghen/Ghen reanimator (active)" {
+		t.Errorf("name was rewritten to %q; it must stay whole", row.name)
+	}
+
+	// A filter flattens the tree — no folder branch is shown, so the full path
+	// comes back to keep the folder context.
+	l.filter = "reanimator"
+	l.refresh()
+	var flat deckEntry
+	for _, r := range l.rows {
+		if r.slug == "ghen/ghen-reanimator-active" {
+			flat = r
+		}
+	}
+	if got := rowLabel(flat); got != "ghen/Ghen reanimator (active)" {
+		t.Errorf("filtered row shows %q, want the full path", got)
 	}
 }
 
@@ -278,7 +340,7 @@ func TestMovingADeckToTheRootDropsItsFolderFromTheName(t *testing.T) {
 }
 
 func TestCurrentFolderIsWhereAPutLands(t *testing.T) {
-	l := &deckList{collapsed: map[string]bool{}, all: []deckEntry{
+	l := &deckList{expanded: map[string]bool{"aggro": true}, all: []deckEntry{
 		{kind: entryLocal, name: "Mono Red", slug: "aggro/mono-red"},
 		{kind: entryLocal, name: "Loose", slug: "loose"},
 	}}
