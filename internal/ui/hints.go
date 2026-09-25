@@ -64,13 +64,15 @@ func (m Model) hintGroups() []hintGroup {
 
 	// b clears the narrowings, but only earns a hint while there is one to
 	// clear — otherwise it is a key that does nothing, offered next to esc.
-	if m.focusNarrowed() {
+	// The statistics offer their own b.
+	if m.focusNarrowed() && !statsUp {
 		groups = addHints(groups, "navigation", [2]string{"b", "clear filter"})
 	}
 
 	// The editing keys, against the deck they change — which is routinely
-	// not the list under the cursor.
-	if title, keys := m.editGroup(p); len(keys) > 0 {
+	// not the list under the cursor. Not while the statistics have the
+	// keys: a, x and t mean something else there.
+	if title, keys := m.editGroup(p); len(keys) > 0 && !statsUp {
 		groups = append(groups, hintGroup{title, keys})
 	}
 

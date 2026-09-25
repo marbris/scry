@@ -445,3 +445,21 @@ func TestADeckStillCountsItsCopies(t *testing.T) {
 	}
 	t.Fatal("no Land row")
 }
+
+func TestTheStatisticsHintsDontOfferTheEditingKeys(t *testing.T) {
+	// a, x and t filter the bars while the statistics have the keys, so the
+	// hints for adding, removing and tagging would be offering keys that
+	// don't do that.
+	m, _, _ := editing(t)
+	m = drive(m, "s")
+	for _, g := range m.hintGroups() {
+		if strings.HasPrefix(g.title, "edit") {
+			t.Errorf("the %q group is on offer in the statistics", g.title)
+		}
+		for _, k := range g.keys {
+			if g.title != "statistics" && (k[0] == "b" || strings.HasPrefix(k[0], "a") || k[0] == "x") {
+				t.Errorf("%q %q is offered outside the statistics group", k[0], k[1])
+			}
+		}
+	}
+}
