@@ -196,15 +196,19 @@ func (m *Model) addStat(op stats.Op) {
 	l.refresh()
 }
 
-// dropStatGroup takes the highlighted category's whole group out of the
-// narrowing. x.
-func (m *Model) dropStatGroup() {
+// dropStat takes the highlighted category out of the narrowing, leaving
+// the others — x on mana value 1 keeps mana value 2. x.
+func (m *Model) dropStat() {
 	l := m.statList()
 	r, ok := m.statUnder()
 	if l == nil || !ok {
 		return
 	}
-	l.statFilter = l.statFilter.WithoutGroup(r.Group)
+	if !l.statFilter.Has(r) {
+		m.notice = r.Label + " isn't in the filter"
+		return
+	}
+	l.statFilter = l.statFilter.Without(r)
 	l.refresh()
 }
 
@@ -283,7 +287,7 @@ func (m *Model) statsKey(key string) bool {
 	case "o":
 		m.addStat(stats.Or)
 	case "x":
-		m.dropStatGroup()
+		m.dropStat()
 	case "b":
 		clearStatFilter(m.statList())
 	case "p":
@@ -429,7 +433,7 @@ func (m Model) renderStats(width int) []string {
 		out = append(out, lipgloss.NewStyle().Foreground(theme.Marked).
 			Render(fit("filter: "+expr.String(), width)))
 	}
-	out = append(out, dim.Render(fit("a/o and/or · x clear category · p odds · s back", width)))
+	out = append(out, dim.Render(fit("a/o and/or · x remove · p odds · s back", width)))
 	return out
 }
 

@@ -76,12 +76,13 @@ func (e Expr) Add(op Op, r Row) (Expr, bool) {
 	return append(append(Expr(nil), e...), Clause{Op: op, Row: r}), true
 }
 
-// WithoutGroup drops every clause from one group. If that takes the first
-// clause, whatever is left starts afresh and its own op is simply ignored.
-func (e Expr) WithoutGroup(group string) Expr {
+// Without drops one category from the narrowing, leaving the rest as they
+// were. If it was the first, the next one starts afresh and its own op is
+// simply ignored.
+func (e Expr) Without(r Row) Expr {
 	var out Expr
 	for _, cl := range e {
-		if cl.Row.Group != group {
+		if !cl.Row.Same(&r) {
 			out = append(out, cl)
 		}
 	}

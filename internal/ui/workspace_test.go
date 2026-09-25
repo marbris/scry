@@ -443,8 +443,8 @@ func TestEveryListFlagsWhatTheEditingDeckHolds(t *testing.T) {
 
 func TestOtherListsGetTheWeakerMark(t *testing.T) {
 	m := sized(200, 30)
-	m = withCards(m, "f", sample(), sortArrival)     // a search
-	m = withCards(m, "f", sample()[2:], sortArrival) // another: Sol Ring, Forest
+	m = withCards(m, "f", sample(), sortArrival)      // a search
+	m = withCards(m, "f", sample()[2:], sortArrival)  // another: Sol Ring, Forest
 	m = withCards(m, "d", sample()[1:2], sortArrival) // the deck: the elves
 	m.ws.editing = 2
 

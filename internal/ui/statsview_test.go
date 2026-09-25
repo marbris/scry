@@ -166,10 +166,14 @@ func TestAddingCategoriesFoldsAndAndOr(t *testing.T) {
 		t.Error("the filter isn't shown")
 	}
 
-	// x takes the highlighted category's whole group out.
+	// x takes out the highlighted category alone: Artifact goes, Creature
+	// from the same group stays.
 	m = drive(m, "x")
-	if got := l.statFilter.String(); got != "1" {
-		t.Errorf("after x on Type: %q", got)
+	if got := l.statFilter.String(); got != "Creature ∧ 1" {
+		t.Errorf("after x on Artifact: %q", got)
+	}
+	if l.count() != 2 {
+		t.Errorf("creatures ∧ 1: %d cards", l.count())
 	}
 	// b clears the rest.
 	m = drive(m, "b")

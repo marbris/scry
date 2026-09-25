@@ -72,14 +72,14 @@ func TestExprFirstOpDoesntMatterAndDuplicatesArentAdded(t *testing.T) {
 	}
 }
 
-func TestWithoutGroupDropsTheWholeCategory(t *testing.T) {
+func TestWithoutDropsOnlyThatCategory(t *testing.T) {
 	var e Expr
-	e, _ = e.Add(And, find(t, colorRows(), "Black"))
-	e, _ = e.Add(Or, find(t, colorRows(), "Red"))
+	e, _ = e.Add(And, find(t, cmcRows(), "1"))
+	e, _ = e.Add(Or, find(t, cmcRows(), "2"))
 	e, _ = e.Add(And, find(t, typeRows(), "Creature"))
-	e = e.WithoutGroup("Color")
-	if got := e.String(); got != "Creature" {
-		t.Errorf("after dropping colours: %q", got)
+	e = e.Without(find(t, cmcRows(), "1"))
+	if got := e.String(); got != "2 ∧ Creature" {
+		t.Errorf("after dropping 1: %q", got)
 	}
 }
 

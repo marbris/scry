@@ -202,7 +202,7 @@ var statsHints = [][2]string{
 	{"j k", "category"},
 	{"J K", "turn groups"},
 	{"a o", "filter and/or"},
-	{"x", "clear category"},
+	{"x", "remove from filter"},
 	{"b", "clear filter"},
 	{"p P", "odds"},
 	{"esc", "back"},

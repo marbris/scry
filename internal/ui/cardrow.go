@@ -41,9 +41,9 @@ const (
 
 // rowState is what the list knows about a card that the card doesn't.
 type rowState struct {
-	selected bool // picked out with v
+	selected bool       // picked out with v
 	member   membership // where else on screen the card is — see membersFor
-	cursor   bool // under the cursor
+	cursor   bool       // under the cursor
 }
 
 // renderRow draws one card to exactly width columns.
