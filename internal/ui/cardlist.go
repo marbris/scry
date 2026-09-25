@@ -29,10 +29,10 @@ type cardList struct {
 
 	cursor // where you are in rows, and how far it has scrolled
 
-	// statFilter is the statistics category the list is narrowed to, set by
-	// walking the bars in the information panel. Separate from the text
+	// statFilter is the statistics categories the list is narrowed to,
+	// added from the bars in the information panel. Separate from the text
 	// filter because they compose: filter to "elf", then narrow to lands.
-	statFilter *stats.Row
+	statFilter stats.Expr
 
 	// filter is a literal narrowing. Terms are substrings, all of them have
 	// to appear, and they're matched against the name and the rules text —
@@ -125,7 +125,7 @@ func (l *cardList) refresh() {
 // never disagree.
 func (l *cardList) narrowed() []deck.Card {
 	rows := l.all
-	if l.statFilter != nil {
+	if len(l.statFilter) > 0 {
 		kept := make([]deck.Card, 0, len(rows))
 		for _, c := range rows {
 			if l.statFilter.Match(c) {
@@ -394,8 +394,8 @@ func (l *cardList) subtitle() string {
 	if l.filter != "" {
 		out += " · /" + l.filter
 	}
-	if l.statFilter != nil {
-		out += " · [" + l.statFilter.Label + "]"
+	if len(l.statFilter) > 0 {
+		out += " · [" + l.statFilter.String() + "]"
 	}
 	return out
 }

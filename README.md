@@ -62,7 +62,7 @@ Narrow a list with `/`, select what's left with `V`, and tag them together with 
 
 ### Statistics that answer questions
 
-Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Highlighting a category filters the list to it, and the histograms recompute for that subset. Moxfield shows you stats; here you can interrogate them.
+Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Add categories with AND (`a`) and OR (`o`) to filter the list, and the histograms recompute for that subset. `p` swaps the counts for opening-hand odds. Moxfield shows you stats; here you can interrogate them.
 
 ![The statistics panel: histograms of the deck, filtered to a selected category](screenshots/stats-filter.png)
 
@@ -184,7 +184,7 @@ Open panels straight to what you want:
 2. `space f` and run a Scryfall query.
 3. Scroll the results; the info panel shows each card. Press `a` to add the highlighted card, or select several with `v`/`V` and add them together.
 4. `/` filters what's on screen, `o`/`O` re-sorts it (mana value, type, colour, power/toughness, EDHREC rank…), `t` tags the selection.
-5. `s` opens statistics for the list; walk the categories to filter and see the curve.
+5. `s` opens statistics for the list; walk the categories with `j`/`k` and add them to the filter with `a`/`o`.
 6. `w` saves the deck (and commits it to git). `space w` saves the editing deck from anywhere.
 
 ## Command line
@@ -298,7 +298,7 @@ name with a slash (`aggro/`) makes an empty folder to fill later.
 | --- | --- |
 | `space f` `space d` `space r` | new search / decks / rules panel |
 | `space n` | new blank panel (`tab` picks its target) |
-| `space s` | statistics across every visible list |
+| `space s` | statistics for the editing deck |
 | `space c` `space o` | close this panel / close the others |
 | `space h` `space l` | move this panel left / right |
 

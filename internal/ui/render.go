@@ -164,7 +164,8 @@ func (m Model) viewInfo(width, height int) string {
 		// rather than remembering a position: the category *is* the
 		// position, so deriving it can't drift out of step with it. J past
 		// the bottom used to move a cursor you could no longer see.
-		offset = scrollTo(statLine(m.statGroups(), m.stats.row),
+		groups := m.statGroups()
+		offset = scrollTo(statLine(groups, m.statCursor(groups)),
 			offset, maxInt(height-4, 1), len(body))
 	}
 	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
@@ -205,10 +206,7 @@ func (m Model) viewInfo(width, height int) string {
 func (m Model) infoTitle() string {
 	switch m.info.mode {
 	case infoStats:
-		if m.stats.global {
-			return "statistics · everything"
-		}
-		return "statistics"
+		return m.statTitle()
 	case infoVersions:
 		return "printed text"
 	}

@@ -76,7 +76,7 @@ func New() Model {
 	return Model{
 		ws:        newWorkspace(),
 		history:   LoadQueryHistory(),
-		stats:     statsState{row: -1},
+		stats:     statsState{},
 		histories: map[string]*cardHistory{},
 	}
 }

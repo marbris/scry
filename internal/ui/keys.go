@@ -42,7 +42,7 @@ var leaderMenu = []leaderCmd{
 	{"d", "decks", nil}, // opens the list and checks it, so it needs a command
 	{"r", "rules", nil}, // needs a command, so it is run below
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
-	{"s", "stats (everything)", func(m *Model) { m.toggleStats(true) }},
+	{"s", "stats (editing deck)", func(m *Model) { m.toggleStats(true) }},
 	{"b", "clear all filters", func(m *Model) { m.clearAllFilters() }},
 	{"w", "save the editing deck", nil}, // hands back a command, so it is run below
 	{"c", "close", func(m *Model) { m.ws.close() }},
@@ -167,8 +167,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// The view has first refusal on anything that isn't the workspace's.
-	if v := p.top(); v != nil {
+	// While the statistics are up they have the keys, and the list behind
+	// them gets none: j and k walk the bars, not the cards. What they don't
+	// claim — h and l, the leader, i — goes on to the workspace. Moved onto
+	// something that isn't a list of cards, there's nothing to count, and
+	// the view there has its keys back — all but s, which still closes.
+	statsUp := m.info.mode == infoStats && (m.statList() != nil || key == "s")
+	if statsUp {
+		if m.statsKey(key) {
+			return m, nil
+		}
+	} else if v := p.top(); v != nil {
+		// The view has first refusal on anything that isn't the workspace's.
 		if handled, cmd := v.key(key, &m, p); handled {
 			// The cursor may have moved, so start the clock on whatever is
 			// under it now.
@@ -212,29 +222,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ws.cycleEditing(-1)
 
 	case "K", "shift+up":
-		if m.info.mode == infoStats {
-			m.moveStat(-1)
-		} else {
-			m.info.move(-1)
-		}
+		m.info.move(-1)
 	case "J", "shift+down":
-		if m.info.mode == infoStats {
-			m.moveStat(1)
-		} else {
-			m.info.move(1)
-		}
+		m.info.move(1)
 	case "ctrl+k":
-		if m.info.mode == infoStats {
-			m.jumpStat(-1)
-		} else {
-			m.scrollInfoParagraph(-1)
-		}
+		m.scrollInfoParagraph(-1)
 	case "ctrl+j":
-		if m.info.mode == infoStats {
-			m.jumpStat(1)
-		} else {
-			m.scrollInfoParagraph(1)
-		}
+		m.scrollInfoParagraph(1)
 
 	case "s":
 		m.toggleStats(false)
@@ -255,8 +249,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// so you can leave the statistics or a sub-view and go on reading the
 		// cards it left. b clears a filter, space b clears them all.
 		switch {
-		case m.info.mode == infoStats:
-			m.toggleStats(m.stats.global)
 		// A printed history was put on the information panel from here, so
 		// it comes off from here too, before esc starts taking the panel
 		// itself apart.
@@ -534,24 +526,4 @@ func (m Model) saveEverything() tea.Cmd {
 		}
 	}
 	return tea.Batch(cmds...)
-}
-
-// toggleStats turns the statistics on or off. The narrowing it imposed lives
-// on the list, not on the view, so turning the bars off leaves it in place —
-// you can read the cards it left with the statistics gone, and the panel's
-// subtitle still names the category. b is what clears it. Only a change of
-// scope — focused to everything, or back — starts fresh, since a category from
-// one scope's rows means nothing against the other's.
-func (m *Model) toggleStats(global bool) {
-	if m.info.mode == infoStats && m.stats.global == global {
-		m.info.mode = infoCard
-		return
-	}
-	if m.stats.global != global {
-		m.stats.row = -1
-		m.clearStatFilter()
-	}
-	m.info.mode = infoStats
-	m.stats.global = global
-	m.info.offset = 0
 }

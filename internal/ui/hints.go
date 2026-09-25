@@ -50,8 +50,12 @@ func (m Model) hintGroups() []hintGroup {
 	}
 
 	// The view's own groups first — navigation, and whatever the view does.
+	// While the statistics have the keys, they are the view.
 	var groups []hintGroup
-	if v := p.top(); v != nil {
+	statsUp := m.info.mode == infoStats && m.statList() != nil
+	if statsUp {
+		groups = append(groups, hintGroup{"statistics", statsHints})
+	} else if v := p.top(); v != nil {
 		groups = append(groups, v.keys()...)
 	}
 
@@ -71,7 +75,7 @@ func (m Model) hintGroups() []hintGroup {
 	}
 
 	// The information panel, when it holds something these keys move within.
-	if keys := m.infoKeys(p); len(keys) > 0 {
+	if keys := m.infoKeys(p); len(keys) > 0 && !statsUp {
 		groups = addHints(groups, "info panel", keys...)
 	}
 
@@ -106,7 +110,7 @@ func (m Model) focusNarrowed() bool {
 		return false
 	}
 	if l := p.cardsView(); l != nil {
-		return l.filter != "" || l.statFilter != nil
+		return l.filter != "" || len(l.statFilter) > 0
 	}
 	switch v := p.top().(type) {
 	case *deckList:
@@ -189,17 +193,22 @@ func (m Model) infoKeys(p *panel) [][2]string {
 	if p.cardsView() == nil {
 		return nil
 	}
-	out := [][2]string{{"s", "stats"}}
-	if m.info.mode == infoStats {
-		return append(out,
-			[2]string{"K J", "category"},
-			[2]string{"ctrl+k/j", "group"},
-		)
-	}
-	return append(out,
+	return append([][2]string{{"s", "stats"}},
 		[2]string{"K J", "up/down"},
 		[2]string{"ctrl+k/j", "paragraph"},
 	)
+}
+
+// statsHints are the keys while the statistics have them.
+var statsHints = [][2]string{
+	{"j k", "category"},
+	{"J K", "turn groups"},
+	{"a o", "filter and/or"},
+	{"x", "clear category"},
+	{"b", "clear filter"},
+	{"p P", "odds"},
+	{"esc", "back"},
+	{"s", "close"},
 }
 
 // editingLabel says what e and E will do, which depends on whether there is

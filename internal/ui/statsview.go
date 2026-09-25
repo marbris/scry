@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -12,32 +13,45 @@ import (
 
 // Statistics, in the information panel.
 //
-// Not a panel of its own: it is a way of reading a list, and it needs the
-// list beside it to be any use. K and J walk the categories and the list
-// narrows to whichever one you are on, so the bars and the cards can never
-// disagree — the bar you are standing on is exactly the cards in front of
-// you.
+// s takes you there and s brings you back: while the statistics are up they
+// have the keys, and j/k walk the categories without touching the list. A
+// category narrows the list only when you add it — a to add it with AND, o
+// with OR — so reading the bars and filtering by them are separate acts, and
+// several categories can narrow at once. h and l still move between lists,
+// and the bars follow.
 //
 // The bars all share one scale, so a glance compares them. Scaling each
 // group to its own widest bar would make a deck with two of something look
 // like a deck full of it.
 
-// statsState is what the information panel is showing while in statistics
-// mode, and what the list is narrowed to because of it.
-// statsState is deliberately only the two facts a frame can't work out for
-// itself. The bars themselves are derived when they are drawn, never stored:
-// they are a function of the cards, and a stored copy goes stale the moment
-// a search finishes — which is exactly what it did, leaving "nothing to
-// count" standing over a panel full of cards.
+// statsState is only the facts a frame can't work out for itself. The bars
+// themselves are derived when they are drawn, never stored: they are a
+// function of the cards, and a stored copy goes stale the moment a search
+// finishes.
 type statsState struct {
-	// row is the flattened index of the highlighted category, or -1 when
-	// the panel is showing totals and the list is unnarrowed.
-	row int
-	// global is <space>s: every list on screen at once, rather than one.
-	global bool
+	// group and label name the highlighted category. A name rather than an
+	// index, so the highlight survives the rows being recounted, reordered
+	// or swapped for another list's; when the name isn't there any more it
+	// falls back to the first row.
+	group, label string
+	// top is the group drawn first. J and K turn the order over, so the
+	// group you want to read sits at the top rather than off the bottom.
+	top string
+	// editing is <space>s: the deck you're editing, wherever you are.
+	editing bool
+	// odds is 0 for counts, or n for the chance of at least n in the
+	// opening hand. p and P step it.
+	odds int
 }
 
-// statRows flattens the groups into the rows K and J step through.
+// groupOrder is the order the groups are drawn in before J or K turns it.
+var groupOrder = []string{
+	"Tags", "Type", "Color (excl. lands)", "Mana Value (excl. lands)", "Rarity", "Price (USD)",
+}
+
+const maxOdds = 4
+
+// statRows flattens the groups into the rows j and k step through.
 func statRows(groups []stats.Group) []stats.Row {
 	var out []stats.Row
 	for _, g := range groups {
@@ -46,175 +60,253 @@ func statRows(groups []stats.Group) []stats.Row {
 	return out
 }
 
-// statGroups counts the cards. The source decides which categories exist and
-// in what order — the whole list — while the counted set is what the numbers
-// describe. The two differ once a category is chosen: the rows hold still
-// while the numbers beside them describe what's left, so a category with
-// nothing in it stays put and reads zero rather than vanishing under the
-// cursor.
+// statGroups counts the cards, in the order they're drawn. The source decides
+// which categories exist — the whole list — while the counted set is what the
+// numbers describe, so a category the narrowing has emptied stays put and
+// reads zero rather than vanishing under the cursor.
 func (m Model) statGroups() []stats.Group {
 	counted, source := m.statCards()
-	return stats.Groups(source, counted)
+	return rotateGroups(stats.Groups(source, counted), m.stats.top)
 }
 
-// statCards is what the statistics describe: the focused list, or every list
-// on screen when <space>s asked for all of them.
-func (m *Model) statCards() (counted, source []deck.Card) {
-	lists := m.statLists()
-	for _, l := range lists {
-		source = append(source, l.all...)
-		counted = append(counted, l.narrowed()...)
+// rotateGroups turns the groups over so top comes first, the rest following
+// in their usual order and wrapping round. A top that isn't there — a list
+// with no tags has no Tags — starts at the next group that is.
+func rotateGroups(groups []stats.Group, top string) []stats.Group {
+	if len(groups) == 0 || top == "" {
+		return groups
 	}
-	return counted, source
-}
-
-func (m *Model) statLists() []*cardList {
-	if !m.stats.global {
-		p := m.ws.current()
-		if p == nil {
-			return nil
-		}
-		if l := p.cardsView(); l != nil {
-			return []*cardList{l}
-		}
-		return nil
+	start := groupIndex(top)
+	if start < 0 {
+		return groups
 	}
-
-	var out []*cardList
-	for _, p := range m.ws.panels {
-		if l := p.cardsView(); l != nil {
-			out = append(out, l)
+	var out []stats.Group
+	for i := range groupOrder {
+		title := groupOrder[(start+i)%len(groupOrder)]
+		for _, g := range groups {
+			if g.Title == title {
+				out = append(out, g)
+			}
 		}
 	}
 	return out
 }
 
-// applyStatFilter narrows every list the statistics are counting to the
-// highlighted category — which is what makes walking the bars a way of
-// reading the deck rather than a report about it.
-func (m *Model) applyStatFilter() {
-	rows := statRows(m.statGroups())
-	var chosen *stats.Row
-	if m.stats.row >= 0 && m.stats.row < len(rows) {
-		chosen = &rows[m.stats.row]
-	}
-	for _, l := range m.statLists() {
-		l.statFilter = chosen
-		l.refresh()
-	}
-}
-
-// clearStatFilter puts every list back.
-func (m *Model) clearStatFilter() {
-	for _, p := range m.ws.panels {
-		if l := p.cardsView(); l != nil && l.statFilter != nil {
-			l.statFilter = nil
-			l.refresh()
+func groupIndex(title string) int {
+	for i, t := range groupOrder {
+		if t == title {
+			return i
 		}
 	}
+	return -1
+}
+
+// statCards is what the statistics describe: the focused list, or the
+// editing deck when <space>s asked for it.
+func (m Model) statCards() (counted, source []deck.Card) {
+	if l := m.statList(); l != nil {
+		return l.narrowed(), l.all
+	}
+	return nil, nil
+}
+
+// statList is the list the statistics describe and narrow.
+func (m Model) statList() *cardList {
+	if m.stats.editing {
+		return m.ws.editingList()
+	}
+	p := m.ws.current()
+	if p == nil {
+		return nil
+	}
+	return p.cardsView()
+}
+
+// statCursor is the flattened index of the highlighted category in the rows
+// as drawn — the first row when the highlight names one that isn't there.
+func (m Model) statCursor(groups []stats.Group) int {
+	for i, r := range statRows(groups) {
+		if r.Group == m.stats.group && r.Label == m.stats.label {
+			return i
+		}
+	}
+	return 0
+}
+
+// statUnder is the highlighted category, if there's anything to highlight.
+func (m Model) statUnder() (stats.Row, bool) {
+	rows := statRows(m.statGroups())
+	if len(rows) == 0 {
+		return stats.Row{}, false
+	}
+	return rows[m.statCursor(m.statGroups())], true
+}
+
+func (m *Model) pointAt(r stats.Row) {
+	m.stats.group, m.stats.label = r.Group, r.Label
+}
+
+// moveStat walks the categories. Only moving; nothing narrows until you add.
+func (m *Model) moveStat(delta int) {
+	groups := m.statGroups()
+	rows := statRows(groups)
+	if len(rows) == 0 {
+		return
+	}
+	at := m.statCursor(groups) + delta
+	m.pointAt(rows[max(0, min(at, len(rows)-1))])
+}
+
+// rotateStat turns the group order over by one: J brings the next group to
+// the top, K the one before. The highlight goes with it, to the new top.
+func (m *Model) rotateStat(delta int) {
+	counted, source := m.statCards()
+	groups := stats.Groups(source, counted)
+	if len(groups) == 0 {
+		return
+	}
+	// Where the present top sits among the groups this list has.
+	cur := 0
+	if top := rotateGroups(groups, m.stats.top); len(top) > 0 {
+		for i, g := range groups {
+			if g.Title == top[0].Title {
+				cur = i
+			}
+		}
+	}
+	next := groups[((cur+delta)%len(groups)+len(groups))%len(groups)]
+	m.stats.top = next.Title
+	m.pointAt(next.Rows[0])
+}
+
+// addStat narrows the list by the highlighted category, joined to whatever
+// already narrows it with op.
+func (m *Model) addStat(op stats.Op) {
+	l := m.statList()
+	r, ok := m.statUnder()
+	if l == nil || !ok {
+		return
+	}
+	expr, added := l.statFilter.Add(op, r)
+	if !added {
+		m.notice = r.Label + " is already in the filter"
+		return
+	}
+	l.statFilter = expr
+	l.refresh()
+}
+
+// dropStatGroup takes the highlighted category's whole group out of the
+// narrowing. x.
+func (m *Model) dropStatGroup() {
+	l := m.statList()
+	r, ok := m.statUnder()
+	if l == nil || !ok {
+		return
+	}
+	l.statFilter = l.statFilter.WithoutGroup(r.Group)
+	l.refresh()
+}
+
+// clearStatFilter drops the statistics narrowing from one list.
+func clearStatFilter(l *cardList) bool {
+	if l == nil || len(l.statFilter) == 0 {
+		return false
+	}
+	l.statFilter = nil
+	l.refresh()
+	return true
 }
 
 // clearActiveFilters drops the narrowings on the focused list alone: its text
-// filter and the statistics category. b. The statistics category is a single
-// selection shown in the bars, so clearing it steps the highlight back to no
-// category rather than leaving a bar lit over an unfiltered list.
+// filter and the statistics categories. b.
 func (m *Model) clearActiveFilters() {
 	p := m.ws.current()
 	if p == nil {
 		return
 	}
-	if m.stats.row >= 0 {
-		m.stats.row = -1
-		m.applyStatFilter()
-	}
-	if l := p.cardsView(); l != nil && l.statFilter != nil {
-		l.statFilter = nil
-		l.refresh()
-	}
+	clearStatFilter(p.cardsView())
 	if v, ok := p.top().(filterable); ok {
 		v.setFilter("")
 	}
 }
 
-// clearAllFilters drops every narrowing on every list — text filters and the
-// statistics category alike. space b, for when you've narrowed several panels
-// and want them all back at once.
+// clearAllFilters drops every narrowing on every list — the statistics
+// categories and the text filters alike. <space>b.
 func (m *Model) clearAllFilters() {
-	m.stats.row = -1
-	m.clearStatFilter()
 	for _, p := range m.ws.panels {
+		clearStatFilter(p.cardsView())
 		if v, ok := p.top().(filterable); ok {
 			v.setFilter("")
 		}
 	}
 }
 
-// moveStat walks the categories. Stepping off the top goes back to no
-// category at all, which is how you get the whole list back without
-// remembering which key clears it.
-func (m *Model) moveStat(delta int) {
-	rows := statRows(m.statGroups())
-	if len(rows) == 0 {
-		return
-	}
-	m.stats.row += delta
-	if m.stats.row < -1 {
-		m.stats.row = -1
-	}
-	if m.stats.row >= len(rows) {
-		m.stats.row = len(rows) - 1
-	}
-	m.applyStatFilter()
+// stepOdds moves between counts and the opening-hand odds: counts, then at
+// least one, two, three, four, and round to counts again.
+func (m *Model) stepOdds(delta int) {
+	m.stats.odds = ((m.stats.odds+delta)%(maxOdds+1) + maxOdds + 1) % (maxOdds + 1)
 }
 
-// jumpStat moves to the first category of the next group, or the previous
-// one. Tags, then types, then colours, then the curve: with five groups of a
-// dozen rows, walking row by row to reach the curve is a lot of J.
-func (m *Model) jumpStat(delta int) {
-	groups := m.statGroups()
-	starts := groupStarts(groups)
-	if len(starts) == 0 {
+// toggleStats opens the statistics or closes them. The narrowing lives on
+// the list, so closing leaves it in place and the panel's subtitle still
+// names it.
+func (m *Model) toggleStats(editing bool) {
+	if m.info.mode == infoStats && m.stats.editing == editing {
+		m.info.mode = infoCard
 		return
 	}
+	if editing && m.ws.editingList() == nil {
+		m.notice = "no deck is being edited — e chooses one"
+		return
+	}
+	m.info.mode = infoStats
+	m.stats.editing = editing
+	m.info.offset = 0
+}
 
-	switch {
-	case delta > 0:
-		for _, at := range starts {
-			if at > m.stats.row {
-				m.stats.row = at
-				m.applyStatFilter()
-				return
-			}
+// statsKey is the keymap while the statistics are up. It returns false for
+// anything it leaves to the workspace — h and l among them, which still move
+// between lists.
+func (m *Model) statsKey(key string) bool {
+	switch key {
+	case "j", "down":
+		m.moveStat(1)
+	case "k", "up":
+		m.moveStat(-1)
+	case "J", "shift+down":
+		m.rotateStat(1)
+	case "K", "shift+up":
+		m.rotateStat(-1)
+	case "a":
+		m.addStat(stats.And)
+	case "o":
+		m.addStat(stats.Or)
+	case "x":
+		m.dropStatGroup()
+	case "b":
+		clearStatFilter(m.statList())
+	case "p":
+		m.stepOdds(1)
+	case "P":
+		m.stepOdds(-1)
+	case "s":
+		m.info.mode = infoCard
+	case "esc":
+		// Back, a step at a time: the categories, then the text filter,
+		// then out of the statistics.
+		l := m.statList()
+		switch {
+		case clearStatFilter(l):
+		case l != nil && l.filter != "":
+			l.setFilter("")
+		default:
+			m.info.mode = infoCard
 		}
-		// Past the last group: on to the last row, so J always moves.
-		m.stats.row = len(statRows(groups)) - 1
 	default:
-		for i := len(starts) - 1; i >= 0; i-- {
-			if starts[i] < m.stats.row {
-				m.stats.row = starts[i]
-				m.applyStatFilter()
-				return
-			}
-		}
-		// Past the first group: back to no category, which is the whole
-		// list — the same place stepping off the top lands.
-		m.stats.row = -1
+		return false
 	}
-	m.applyStatFilter()
-}
-
-// groupStarts is the flattened index of each group's first row.
-func groupStarts(groups []stats.Group) []int {
-	var out []int
-	at := 0
-	for _, g := range groups {
-		if len(g.Rows) == 0 {
-			continue
-		}
-		out = append(out, at)
-		at += len(g.Rows)
-	}
-	return out
+	return true
 }
 
 // ── Drawing ─────────────────────────────────────────────────────
@@ -246,11 +338,33 @@ func statLine(groups []stats.Group, row int) int {
 	return line
 }
 
+// statOdds is the chance of at least n of a category in the opening hand,
+// drawn from the whole list.
+func statOdds(r stats.Row, pop, n int) float64 {
+	return stats.AtLeast(pop, r.Base, n, stats.HandSize)
+}
+
+// statPop is how many cards the odds are drawn from: the whole list,
+// unnarrowed.
+func (m Model) statPop() int {
+	_, source := m.statCards()
+	n := 0
+	for _, c := range source {
+		n += max(c.Qty, 1)
+	}
+	return n
+}
+
 // renderStats draws the groups as horizontal bars.
 func (m Model) renderStats(width int) []string {
 	groups := m.statGroups()
 	if len(groups) == 0 {
 		return []string{mutedLine("nothing to count", width)}
+	}
+
+	var expr stats.Expr
+	if l := m.statList(); l != nil {
+		expr = l.statFilter
 	}
 
 	// One scale across every group, so a glance compares them.
@@ -277,11 +391,17 @@ func (m Model) renderStats(width int) []string {
 	labelWidth = minInt(labelWidth, maxInt(width/2, 6))
 
 	countWidth := textWidth(itoa(widest))
-	barWidth := maxInt(width-labelWidth-countWidth-2, 1)
+	if m.stats.odds > 0 {
+		countWidth = len("100%")
+	}
+	// Two columns for the and/or mark, beside the label.
+	barWidth := maxInt(width-labelWidth-countWidth-4, 1)
 
 	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
+	pop := m.statPop()
+	cursor := m.statCursor(groups)
 	var out []string
 	at := 0
 	for _, g := range groups {
@@ -290,34 +410,71 @@ func (m Model) renderStats(width int) []string {
 		}
 		out = append(out, head.Render(fit(g.Title, width)))
 		for _, r := range g.Rows {
-			out = append(out, statBar(r, at == m.stats.row, labelWidth, barWidth, countWidth, widest))
+			bar := statBar{row: r, under: at == cursor, mark: statMark(expr, r),
+				labelWidth: labelWidth, barWidth: barWidth, countWidth: countWidth}
+			if m.stats.odds > 0 {
+				bar.fraction = statOdds(r, pop, m.stats.odds)
+				bar.value = fmt.Sprintf("%.0f%%", bar.fraction*100)
+			} else {
+				bar.fraction = float64(r.Count) / float64(widest)
+				bar.value = itoa(r.Count)
+			}
+			out = append(out, bar.render())
 			at++
 		}
 	}
 
-	out = append(out, "", dim.Render(fit("K/J to narrow · esc to clear", width)))
+	out = append(out, "")
+	if len(expr) > 0 {
+		out = append(out, lipgloss.NewStyle().Foreground(theme.Marked).
+			Render(fit("filter: "+expr.String(), width)))
+	}
+	out = append(out, dim.Render(fit("a/o and/or · x clear category · p odds · s back", width)))
 	return out
 }
 
-func statBar(r stats.Row, under bool, labelWidth, barWidth, countWidth, scale int) string {
-	filled := r.Count * barWidth / scale
-	if r.Count > 0 && filled == 0 {
+// statMark is the and/or beside a category that's part of the narrowing.
+func statMark(expr stats.Expr, r stats.Row) string {
+	i := expr.Index(r)
+	switch {
+	case i < 0:
+		return " "
+	case i == 0:
+		return "•"
+	default:
+		return expr[i].Op.Symbol()
+	}
+}
+
+type statBar struct {
+	row                              stats.Row
+	under                            bool
+	mark                             string
+	fraction                         float64
+	value                            string
+	labelWidth, barWidth, countWidth int
+}
+
+func (b statBar) render() string {
+	filled := int(b.fraction * float64(b.barWidth))
+	if b.fraction > 0 && filled == 0 {
 		filled = 1 // one card should never read as none
 	}
+	filled = min(filled, b.barWidth)
 
-	bar := lipgloss.NewStyle().Foreground(r.Color).Render(strings.Repeat("█", filled)) +
-		lipgloss.NewStyle().Foreground(theme.BarEmpty).Render(strings.Repeat("─", maxInt(barWidth-filled, 0)))
+	bar := lipgloss.NewStyle().Foreground(b.row.Color).Render(strings.Repeat("█", filled)) +
+		lipgloss.NewStyle().Foreground(theme.BarEmpty).Render(strings.Repeat("─", maxInt(b.barWidth-filled, 0)))
 
 	labelStyle := lipgloss.NewStyle().Foreground(theme.Text)
-	if under {
+	if b.under {
 		labelStyle = labelStyle.Foreground(theme.SelectionFg).Bold(true)
 	}
 
-	line := labelStyle.Render(fit(r.Label, labelWidth)) + " " + bar + " " +
-		lipgloss.NewStyle().Foreground(theme.TextDim).
-			Render(pad(itoa(r.Count), countWidth))
+	line := lipgloss.NewStyle().Foreground(theme.Marked).Bold(true).Render(b.mark) + " " +
+		labelStyle.Render(fit(b.row.Label, b.labelWidth)) + " " + bar + " " +
+		lipgloss.NewStyle().Foreground(theme.TextDim).Render(pad(b.value, b.countWidth))
 
-	if under {
+	if b.under {
 		return lipgloss.NewStyle().Background(theme.SelectionBg).Render(line)
 	}
 	return line
@@ -328,6 +485,18 @@ func statBar(r stats.Row, under bool, labelWidth, barWidth, countWidth, scale in
 // without drawing.
 func (m Model) statOffset(height int) int {
 	groups := m.statGroups()
-	return scrollTo(statLine(groups, m.stats.row), 0,
+	return scrollTo(statLine(groups, m.statCursor(groups)), 0,
 		maxInt(height, 1), len(m.renderStats(30)))
+}
+
+// statTitle heads the panel: what's being counted, and how.
+func (m Model) statTitle() string {
+	t := "statistics"
+	if m.stats.editing {
+		t += " · editing deck"
+	}
+	if m.stats.odds > 0 {
+		t += fmt.Sprintf(" · P(≥%d in opening %d)", m.stats.odds, stats.HandSize)
+	}
+	return t
 }
