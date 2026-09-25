@@ -115,8 +115,6 @@ func (m Model) focusNarrowed() bool {
 	switch v := p.top().(type) {
 	case *deckList:
 		return v.filter != ""
-	case *userDeckList:
-		return v.filter != ""
 	case *versionList:
 		return v.filter != ""
 	case *rulesView:

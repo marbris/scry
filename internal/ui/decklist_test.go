@@ -93,7 +93,8 @@ func TestEachKindOfRowSaysWhatItIs(t *testing.T) {
 	}{
 		{entryLocal, "L"},
 		{entryRemote, "R"},
-		{entryUser, "U"},
+		{entryUserDeck, "R"},
+		{entryUser, "▸"}, // a person is a folder of their decks
 	} {
 		got := stripANSI(renderEntry(deckEntry{kind: c.kind, name: "thing"}, 30, false))
 		if !strings.Contains(got, c.want) {
@@ -183,15 +184,17 @@ func TestThingsWithNoDateSortLastNotFirst(t *testing.T) {
 }
 
 func TestFollowedThingsLiveUnderTheMoxfieldFolder(t *testing.T) {
-	l := &deckList{all: []deckEntry{
+	l := &deckList{expanded: map[string]bool{moxFolder: true, userFolder("alice"): true}, all: []deckEntry{
 		{kind: entryLocal, name: "Ghen", slug: "ghen"},
-		{kind: entryUser, name: "alice", user: "alice"},
+		{kind: entryUser, name: "alice", user: "alice", slug: userFolder("alice")},
+		{kind: entryUserDeck, name: "alices deck", id: "def", user: "alice"},
 		{kind: entryRemote, name: "someones brew", id: "abc"},
 	}}
 	l.refresh()
 
-	// The moxfield folder is a row of its own, with the two followed things
-	// indented under it and the local deck at the root.
+	// The moxfield folder is a row of its own, with the followed things
+	// indented under it — a person a folder of their decks — and the local
+	// deck at the root.
 	var folder *deckEntry
 	for i := range l.rows {
 		if l.rows[i].kind == entryFolder && l.rows[i].slug == moxFolder {
@@ -202,11 +205,14 @@ func TestFollowedThingsLiveUnderTheMoxfieldFolder(t *testing.T) {
 		t.Fatal("no moxfield folder")
 	}
 	if folder.count != 2 {
-		t.Errorf("moxfield folder holds %d, want the remote and the user", folder.count)
+		t.Errorf("moxfield folder holds %d, want the remote and alice's deck", folder.count)
 	}
 	for _, r := range l.rows {
 		if (r.kind == entryRemote || r.kind == entryUser) && r.depth != 1 {
 			t.Errorf("%s is at depth %d, want it under moxfield", r.name, r.depth)
+		}
+		if r.kind == entryUserDeck && r.depth != 2 {
+			t.Errorf("%s is at depth %d, want it under alice", r.name, r.depth)
 		}
 	}
 }
@@ -773,14 +779,14 @@ func TestPipsAreAlwaysInWUBRGOrder(t *testing.T) {
 }
 
 func TestTheKindLetterLinesUpDownTheList(t *testing.T) {
-	// A user carries only their letter, where a local deck carries a whole
-	// tail — but U still has to sit under L and R, so the columns are sized
-	// once for the list and held fixed per row.
+	// A person's deck carries little more than its letter, where a local
+	// deck carries a whole tail — but it still has to sit under L, so the
+	// columns are sized once for the list and held fixed per row.
 	rows := []deckEntry{
 		{kind: entryLocal, name: "Local", count: 100, colours: []string{"G"},
 			legal: deck.Legality{Known: true, Legal: true}},
 		{kind: entryRemote, name: "Remote", count: 60, colours: []string{"U"}},
-		{kind: entryUser, name: "Person"},
+		{kind: entryUserDeck, name: "Person's"},
 	}
 	const width = 40
 	cols := measureDeckCols(rows, width)

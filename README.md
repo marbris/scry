@@ -80,7 +80,7 @@ Press `gv` on a card to see its printed wording across every printing — the er
 
 ### Your decks, and Moxfield's
 
-The decks panel lists your local decks alongside the Moxfield decks and users you follow, with colour identity, card counts, legality, and age. Follow a deck by pasting its URL; browse a person's decks by typing their username.
+The decks panel lists your local decks alongside the Moxfield decks and users you follow, with colour identity, card counts, legality, and age. Follow a deck by pasting its URL; follow a person by typing their username, and their public decks drop down under them like a folder.
 
 ![The decks panel listing local and followed Moxfield decks with colours and legality flags](screenshots/decks.png)
 
@@ -264,7 +264,9 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 
 The panel is a folder tree: local decks group by the folder part of their slug
 (`aggro/mono-red`), and the Moxfield decks and people you follow sit under one
-`moxfield` folder. Folders start collapsed; `enter` opens one.
+`moxfield` folder, listed first. Folders start collapsed; `enter` opens one. A
+person you follow is a folder of their public decks, cached so the `/` filter
+finds them without opening anything.
 
 A deck's name is just its name — the folder is where its file lives, not part of
 the name. Renaming a deck changes its name; renaming it to `dirname/deckname`
@@ -278,13 +280,14 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 
 | Key | Does |
 | --- | --- |
-| `enter` | fold/unfold a folder, or open the deck/person |
+| `enter` | fold/unfold a folder or person, or open the deck |
 | `L` | open beside, in a new panel |
 | `i` | follow a Moxfield deck URL or a username |
-| `n` `r` `c` | new (in the current folder) · rename · copy |
+| `n` `r` | new (in the current folder) · rename |
+| `c` `C` | copy deck · copy deck & its considering list |
 | `y` `x` `p` | yank (copy) · cut (move) · put into the folder you're on |
 | `d` | delete |
-| `s` | sync your decks to their git remote |
+| `s` | git push: sync your decks with their git remote |
 | `gv` | git versions of the deck |
 
 **The editing deck**

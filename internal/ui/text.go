@@ -183,3 +183,11 @@ func stripStyles(s string) string {
 	}
 	return b.String()
 }
+
+// plural is the same six lines as in deck and moxfield; see the note there.
+func plural(word string, n int) string {
+	if n == 1 {
+		return word
+	}
+	return word + "s"
+}

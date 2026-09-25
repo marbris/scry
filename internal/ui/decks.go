@@ -30,12 +30,10 @@ type deckOpenedMsg struct {
 	uncommitted bool
 }
 
-type userDecksMsg struct {
-	panel   int
-	newPane bool
-	user    string
-	decks   []moxfield.UserDeck
-	err     error
+// userDecksFetchedMsg is a person's public decks, fetched and cached.
+type userDecksFetchedMsg struct {
+	user string
+	err  error
 }
 
 // reloadDecksMsg tells every decks panel to read the directory again, after
@@ -81,11 +79,13 @@ func (m *Model) openEntry(l *deckList, p *panel, newPane bool) tea.Cmd {
 		return openLocalDeck(target.id, newPane, e.slug)
 	case entryRemote:
 		target.title = e.name
-		return openRemoteDeck(target.id, newPane, e.id)
-	case entryUser:
-		target.title = e.user
-		return openUserDecks(target.id, newPane, e.user)
+		return openRemoteDeck(target.id, newPane, e.id, true)
+	case entryUserDeck:
+		// Already listed under its author, so looking doesn't follow it.
+		target.title = e.name
+		return openRemoteDeck(target.id, newPane, e.id, false)
 	}
+	target.loading = false
 	return nil
 }
 
@@ -97,10 +97,10 @@ func openLocalDeck(panelID int, newPane bool, slug string) tea.Cmd {
 	}
 }
 
-func openRemoteDeck(panelID int, newPane bool, id string) tea.Cmd {
+func openRemoteDeck(panelID int, newPane bool, id string, follow bool) tea.Cmd {
 	return func() tea.Msg {
 		info, cards, err := moxfield.Load(id)
-		if err == nil {
+		if err == nil && follow {
 			// Looking at somebody's deck is how you decide to follow it, so
 			// following happens by looking. It costs a line in a file, and
 			// the alternative is finding your way back to a deck you saw
@@ -113,14 +113,52 @@ func openRemoteDeck(panelID int, newPane bool, id string) tea.Cmd {
 	}
 }
 
-func openUserDecks(panelID int, newPane bool, user string) tea.Cmd {
+// fetchUserDecks fetches a person's public decks and caches them, which is
+// what their folder in the decks list is drawn from.
+func fetchUserDecks(user string) tea.Cmd {
 	return func() tea.Msg {
-		name, decks, err := moxfield.UserDecks(user)
-		if name == "" {
-			name = user
+		_, decks, err := moxfield.UserDecks(user)
+		if err != nil {
+			return userDecksFetchedMsg{user: user, err: err}
 		}
-		return userDecksMsg{panel: panelID, newPane: newPane, user: name, decks: decks, err: err}
+		out := make([]deck.UserDeck, 0, len(decks))
+		for _, d := range decks {
+			out = append(out, deck.UserDeck{
+				Name: deck.ImportName(d.Name), ID: d.PublicID, URL: d.PublicURL,
+				Format: d.Format, Colors: d.Colors, Cards: d.Cards, Legal: d.Legal,
+				Updated: d.UpdatedAt(),
+			})
+		}
+		return userDecksFetchedMsg{user: user, err: deck.SaveUserDecks(user, out)}
 	}
+}
+
+// fetchUserIfStale fetches a person's decks when their folder opens, unless
+// the cached list is fresh enough to go on with.
+func (l *deckList) fetchUserIfStale(user string) tea.Cmd {
+	if list, ok := deck.CachedUserDecks(deck.LoadUserDecks(), user); ok && !list.Stale() {
+		return nil
+	}
+	if l.fetching[strings.ToLower(user)] {
+		return nil
+	}
+	l.fetching[strings.ToLower(user)] = true
+	l.refresh()
+	return fetchUserDecks(user)
+}
+
+func (m Model) handleUserDecksFetched(msg userDecksFetchedMsg) (tea.Model, tea.Cmd) {
+	for _, p := range m.ws.panels {
+		for _, v := range p.stack {
+			if l, ok := v.(*deckList); ok {
+				delete(l.fetching, strings.ToLower(msg.user))
+			}
+		}
+	}
+	if msg.err != nil {
+		m.notice = "couldn't fetch " + msg.user + "'s decks: " + msg.err.Error()
+	}
+	return m, reloadDecks
 }
 
 // handleDeckOpened files a resolved deck.
@@ -160,27 +198,6 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	return m, reloadDecks
 }
 
-func (m Model) handleUserDecks(msg userDecksMsg) (tea.Model, tea.Cmd) {
-	p := m.ws.byID(msg.panel)
-	if p == nil {
-		return m, nil
-	}
-	p.loading = false
-	if msg.err != nil {
-		p.err = msg.err
-		return m, nil
-	}
-
-	v := newUserDeckList(msg.user, msg.decks)
-	if msg.newPane || p.top() == nil {
-		p.show(v)
-	} else {
-		p.push(v)
-		p.title = v.title()
-	}
-	return m, nil
-}
-
 // ── Changing things ─────────────────────────────────────────────
 
 // deleteEntry removes whatever the row stands for: a deck file, a remote
@@ -207,7 +224,8 @@ func (m *Model) deleteEntry(l *deckList, e deckEntry) tea.Cmd {
 			if err := deck.SaveBookmarks(b); err != nil {
 				return noticeMsg{err: err}
 			}
-			return noticeMsg{text: "removed " + e.user}
+			deck.ForgetUserDecks(e.user)
+			return noticeMsg{text: "stopped following " + e.user}
 		}
 		return nil
 	}
@@ -234,7 +252,7 @@ func copyEntry(e deckEntry) tea.Cmd {
 			}
 			return noticeMsg{text: "copied to " + slug}
 
-		case entryRemote:
+		case entryRemote, entryUserDeck:
 			d, err := moxfield.Import(e.id)
 			if err != nil {
 				return noticeMsg{err: err}
@@ -263,7 +281,7 @@ func copyEntry(e deckEntry) tea.Cmd {
 // the more interesting half to borrow.
 func copyEntryBoth(e deckEntry) tea.Cmd {
 	return func() tea.Msg {
-		if e.kind != entryRemote {
+		if e.kind != entryRemote && e.kind != entryUserDeck {
 			return noticeMsg{text: "only a Moxfield deck has a considering list"}
 		}
 
@@ -288,19 +306,6 @@ func copyEntryBoth(e deckEntry) tea.Cmd {
 			return noticeMsg{err: err}
 		}
 		return noticeMsg{text: "copied to " + mainSlug + " and " + consSlug}
-	}
-}
-
-// followRemote bookmarks a Moxfield deck without taking a copy of it — the r
-// on somebody's decks, which saves the deck as a remote you can come back to.
-func followRemote(name, id, url string) tea.Cmd {
-	return func() tea.Msg {
-		b := deck.LoadBookmarks()
-		b.AddRemote(deck.Remote{Name: name, ID: id, URL: url})
-		if err := deck.SaveBookmarks(b); err != nil {
-			return noticeMsg{err: err}
-		}
-		return noticeMsg{text: "following " + name}
 	}
 }
 
@@ -533,6 +538,11 @@ func follow(input string) tea.Cmd {
 		b.AddUser(user)
 		if err := deck.SaveBookmarks(b); err != nil {
 			return noticeMsg{err: err}
+		}
+		// Their decks are fetched now, so the folder has something in it and
+		// the / filter can find them before it's ever been opened.
+		if msg := fetchUserDecks(user)().(userDecksFetchedMsg); msg.err != nil {
+			return noticeMsg{text: "following " + user + " — couldn't fetch their decks: " + msg.err.Error()}
 		}
 		return noticeMsg{text: "following " + user}
 	}

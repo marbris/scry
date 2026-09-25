@@ -242,8 +242,6 @@ func (m Model) infoTitle() string {
 		return "rule"
 	case *versionList:
 		return "version"
-	case *userDeckList:
-		return "deck"
 	}
 	return "card"
 }

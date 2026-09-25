@@ -110,7 +110,7 @@ func NewWithRemote(id string) (Model, tea.Cmd) {
 	p.search.Blur()
 	p.loading = true
 	p.title = id
-	return m, openRemoteDeck(p.id, true, id)
+	return m, openRemoteDeck(p.id, true, id, true)
 }
 
 // NewWithRules opens straight onto the rules — over a query, or on an empty
@@ -186,8 +186,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case deckOpenedMsg:
 		return m.handleDeckOpened(msg)
 
-	case userDecksMsg:
-		return m.handleUserDecks(msg)
+	case userDecksFetchedMsg:
+		return m.handleUserDecksFetched(msg)
 
 	case noticeMsg:
 		if msg.err != nil {

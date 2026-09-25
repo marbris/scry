@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"scry/internal/deck"
-	"scry/internal/moxfield"
 	"scry/internal/mtg"
 )
 
@@ -132,35 +131,6 @@ func TestOpeningADeckWhoseCardsAreUnknownStillOpensIt(t *testing.T) {
 	}
 }
 
-func TestAPersonsDecksOpenAsASubView(t *testing.T) {
-	m := sized(160, 30)
-	p := m.ws.open(KindDecks)
-	p.show(newDeckList())
-
-	next, _ := m.Update(userDecksMsg{
-		panel: p.id, user: "MarBri",
-		decks: []moxfield.UserDeck{
-			{Name: "Hinata", PublicID: "abc", Cards: 100},
-			{Name: "Elf Ball", PublicID: "def", Cards: 100},
-		},
-	})
-	m = next.(Model)
-
-	if len(p.stack) != 2 {
-		t.Fatalf("the decks went somewhere other than on top: %d views", len(p.stack))
-	}
-	view := stripANSI(m.View())
-	if !strings.Contains(view, "Hinata") || !strings.Contains(view, "MarBri") {
-		t.Errorf("got:\n%s", view)
-	}
-
-	// esc comes back to your own decks.
-	m = drive(m, "esc")
-	if _, ok := m.ws.current().top().(*deckList); !ok {
-		t.Errorf("esc left the panel showing %T", m.ws.current().top())
-	}
-}
-
 func TestDeletingADeckActuallyDeletesIt(t *testing.T) {
 	m, l := decksPanel(t)
 	l.cursor.at = 0
@@ -259,69 +229,6 @@ func TestSaveEverythingWritesEveryDeckWithOutstandingEdits(t *testing.T) {
 	}
 }
 
-func TestAPersonsDecksCanBeNarrowed(t *testing.T) {
-	// Somebody with two hundred decks is exactly who / is for.
-	m := sized(160, 30)
-	p := m.ws.open(KindDecks)
-	p.show(newDeckList())
-
-	next, _ := m.Update(userDecksMsg{
-		panel: p.id, user: "MarBri",
-		decks: []moxfield.UserDeck{
-			{Name: "Elf Ball", PublicID: "a", Cards: 100},
-			{Name: "Goblin Rush", PublicID: "b", Cards: 100},
-			{Name: "Elfball Redux", PublicID: "c", Cards: 100},
-		},
-	})
-	m = next.(Model)
-
-	m = drive(m, "/", "e", "l", "f", "enter")
-	v := p.top().(*userDeckList)
-	if len(v.decks) != 2 {
-		t.Errorf("filtering to 'elf' left %d decks", len(v.decks))
-	}
-
-	// b clears the filter; esc would step back to your own decks instead.
-	m = drive(m, "b")
-	if len(v.decks) != 3 {
-		t.Errorf("b left %d decks", len(v.decks))
-	}
-}
-
-func TestFollowingFromAUsersDecksReachesTheListBeneath(t *testing.T) {
-	// A user's decks sit on top of your own decks in the same panel, so a
-	// reload has to walk the whole stack — otherwise a deck followed or copied
-	// from up there isn't in the list esc steps back down to.
-	t.Cleanup(func() { deck.SaveBookmarks(deck.Bookmarks{}) })
-
-	m := sized(160, 30)
-	p := m.ws.open(KindDecks)
-	dl := newDeckList()
-	p.show(dl)
-	p.push(newUserDeckList("MarBri", []moxfield.UserDeck{
-		{Name: "Elf Ball", PublicID: "a", Cards: 100},
-	}))
-
-	// Following writes the bookmark, then asks for a reload.
-	var b deck.Bookmarks
-	b.AddRemote(deck.Remote{Name: "Elf Ball", ID: "a"})
-	if err := deck.SaveBookmarks(b); err != nil {
-		t.Fatal(err)
-	}
-	next, _ := m.Update(reloadDecksMsg{})
-	m = next.(Model)
-
-	found := false
-	for _, e := range dl.all {
-		if e.kind == entryRemote && e.id == "a" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("the reload did not reach the decks list under the sub-view: %v", dl.all)
-	}
-}
-
 func TestOpeningARemoteDeckFollowsIt(t *testing.T) {
 	// Looking at somebody's deck is how you decide to follow it, and the
 	// alternative is finding your way back to a deck you saw once and can't
@@ -347,5 +254,145 @@ func TestOpeningARemoteDeckFollowsIt(t *testing.T) {
 	}
 	if got := stripANSI(renderEntry(deckEntry{kind: entryRemote, name: "Hinata", id: "abc"}, 30, false)); !strings.Contains(got, "R") {
 		t.Errorf("it is not marked as remote: %q", got)
+	}
+}
+
+// followed sets up someone followed, with their decks already cached.
+func followed(t *testing.T, user string, decks ...deck.UserDeck) {
+	t.Helper()
+	t.Cleanup(func() {
+		deck.SaveBookmarks(deck.Bookmarks{})
+		deck.ForgetUserDecks(user)
+	})
+	var b deck.Bookmarks
+	b.AddUser(user)
+	if err := deck.SaveBookmarks(b); err != nil {
+		t.Fatal(err)
+	}
+	if err := deck.SaveUserDecks(user, decks); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func rowNames(l *deckList) []string {
+	var out []string
+	for _, r := range l.rows {
+		out = append(out, r.name)
+	}
+	return out
+}
+
+func TestAPersonIsAFolderOfTheirDecks(t *testing.T) {
+	followed(t, "MarBri",
+		deck.UserDeck{Name: "Hinata", ID: "abc", Cards: 100},
+		deck.UserDeck{Name: "Elf Ball", ID: "def", Cards: 100},
+	)
+	l := newDeckList()
+	l.expanded[moxFolder] = true
+	l.refresh()
+
+	var person *deckEntry
+	for i, r := range l.rows {
+		if r.kind == entryUser {
+			person = &l.rows[i]
+		}
+		if r.kind == entryUserDeck {
+			t.Errorf("%s shows before the person's folder is opened", r.name)
+		}
+	}
+	if person == nil {
+		t.Fatalf("no row for the person: %v", rowNames(l))
+	}
+	if person.count != 2 {
+		t.Errorf("the person's folder counts %d decks", person.count)
+	}
+
+	// Opening them drops their decks down beneath, from the cache — no fetch.
+	for i, r := range l.rows {
+		if r.kind == entryUser {
+			l.cursor.at = i
+		}
+	}
+	m := sized(160, 30)
+	p := m.ws.open(KindDecks)
+	p.show(l)
+	handled, cmd := l.key("enter", &m, p)
+	if !handled || cmd != nil {
+		t.Errorf("opening a freshly cached person fetched again (cmd %v)", cmd != nil)
+	}
+	got := strings.Join(rowNames(l), ",")
+	if !strings.Contains(got, "Hinata") || !strings.Contains(got, "Elf Ball") {
+		t.Errorf("their decks didn't drop down: %s", got)
+	}
+	if len(p.stack) != 1 {
+		t.Error("the person's decks opened somewhere else rather than in the tree")
+	}
+}
+
+func TestAPersonWithNoListIsFetchedWhenTheFolderOpens(t *testing.T) {
+	followed(t, "MarBri", deck.UserDeck{Name: "Hinata", ID: "abc"})
+	l := newDeckList()
+	if cmd := l.fetchUserIfStale("MarBri"); cmd != nil {
+		t.Error("a fresh list was fetched again")
+	}
+	if cmd := l.fetchUserIfStale("nobody"); cmd == nil {
+		t.Error("a person with no cached list wasn't fetched")
+	}
+	if !l.fetching["nobody"] {
+		t.Error("the fetch isn't marked as under way")
+	}
+	if cmd := l.fetchUserIfStale("nobody"); cmd != nil {
+		t.Error("a second open fetched again while the first was under way")
+	}
+}
+
+func TestAPersonsDecksAreFoundByTheFilter(t *testing.T) {
+	// Without opening their folder, and by their name too.
+	followed(t, "MarBri",
+		deck.UserDeck{Name: "Elf Ball", ID: "a"},
+		deck.UserDeck{Name: "Goblin Rush", ID: "b"},
+	)
+	l := newDeckList()
+	l.setFilter("elf")
+	if got := rowNames(l); len(got) != 1 || got[0] != "Elf Ball" {
+		t.Errorf("filtering to elf: %v", got)
+	}
+	l.setFilter("marbri goblin")
+	if got := rowNames(l); len(got) != 1 || got[0] != "Goblin Rush" {
+		t.Errorf("filtering by the person: %v", got)
+	}
+}
+
+func TestAFollowedDeckInAPersonsListIsListedOnce(t *testing.T) {
+	followed(t, "MarBri", deck.UserDeck{Name: "Elf Ball", ID: "a"})
+	b := deck.LoadBookmarks()
+	b.AddRemote(deck.Remote{Name: "Elf Ball", ID: "a"})
+	b.AddRemote(deck.Remote{Name: "Other", ID: "z"})
+	if err := deck.SaveBookmarks(b); err != nil {
+		t.Fatal(err)
+	}
+	l := newDeckList()
+	n := 0
+	for _, e := range l.all {
+		if e.id == "a" {
+			n++
+			if e.kind != entryUserDeck {
+				t.Errorf("listed as %v, want under the person", e.kind)
+			}
+		}
+	}
+	if n != 1 {
+		t.Errorf("listed %d times", n)
+	}
+}
+
+func TestTheMoxfieldFolderComesFirst(t *testing.T) {
+	seedDeck(t, "aaa/first", "name: First\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { resetDecks(t) })
+	followed(t, "MarBri")
+
+	l := newDeckList()
+	if len(l.rows) == 0 || l.rows[0].slug != moxFolder {
+		t.Errorf("rows start %v", rowNames(l))
 	}
 }
