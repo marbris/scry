@@ -42,7 +42,7 @@ const (
 // rowState is what the list knows about a card that the card doesn't.
 type rowState struct {
 	selected bool // picked out with v
-	member   bool // also in the editing deck, or — in the editing deck — also in a list on screen
+	member   membership // where else on screen the card is — see membersFor
 	cursor   bool // under the cursor
 }
 
@@ -377,8 +377,10 @@ func marker(c deck.Card, st rowState) (string, lipgloss.Style) {
 		return "▸", lipgloss.NewStyle().Foreground(theme.Marked).Bold(true)
 	case c.Commander:
 		return "★", lipgloss.NewStyle().Foreground(theme.Accent)
-	case st.member:
+	case st.member == inTarget:
 		return "•", lipgloss.NewStyle().Foreground(theme.Member)
+	case st.member == inOther:
+		return "◦", lipgloss.NewStyle().Foreground(theme.TextDim)
 	}
 	return " ", lipgloss.NewStyle()
 }

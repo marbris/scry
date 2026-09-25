@@ -55,6 +55,8 @@ func (l *userDeckList) refresh() {
 	l.cursor.clamp(len(l.decks))
 }
 
+func (l *userDeckList) filterText() string { return l.filter }
+
 func (l *userDeckList) setFilter(s string) {
 	l.filter = s
 	l.refresh()

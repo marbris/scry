@@ -131,8 +131,10 @@ type panel struct {
 	previewing bool
 
 	// filtering is the / prompt, open only while you're typing in it.
-	filtering   bool
-	filterInput textinput.Model
+	filtering bool
+	// filterBefore is the filter the prompt opened on, which esc puts back.
+	filterBefore string
+	filterInput  textinput.Model
 
 	// asking is the one-line prompt — a new deck's name, a rename, a URL
 	// to follow — open only while you're answering it.
@@ -235,6 +237,7 @@ func (p *panel) cardsView() *cardList {
 // can be narrowed now says so in its own file.
 type filterable interface {
 	setFilter(string)
+	filterText() string
 }
 
 // setFilter narrows whatever the panel is showing. A view that can't be
@@ -245,9 +248,21 @@ func (p *panel) setFilter(s string) {
 	}
 }
 
+// clearFilter drops the text filter on whatever is showing, reporting
+// whether there was one to drop.
+func (p *panel) clearFilter() bool {
+	v, ok := p.top().(filterable)
+	if !ok || v.filterText() == "" {
+		return false
+	}
+	v.setFilter("")
+	return true
+}
+
 // openFilter raises the / prompt over whatever is showing.
 func (p *panel) openFilter(current string) {
 	p.filtering = true
+	p.filterBefore = current
 	p.filterInput.SetValue(current)
 	p.filterInput.CursorEnd()
 	p.filterInput.Focus()

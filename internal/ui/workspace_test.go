@@ -187,16 +187,19 @@ func TestTheSearchBarTakesTypingRatherThanCommands(t *testing.T) {
 	}
 }
 
-func TestEscClosesAFilteredPanelRatherThanClearingIt(t *testing.T) {
-	// esc is the way out now, not a filter-clearer: a filtered panel with
-	// nothing transient in it closes on the first esc, and b is what would
-	// have kept it open by clearing the filter instead.
+func TestEscTakesTheFilterBeforeClosingThePanel(t *testing.T) {
+	// esc is "back": a filtered panel loses its filter first, and only the
+	// next esc closes it.
 	m := withCards(sized(120, 40), "f", sample(), sortArrival)
 	m = drive(m, "/", "e", "l", "f", "enter")
 
 	m = drive(m, "esc")
+	if m.ws.count() != 1 || m.ws.current().cardsView().filter != "" {
+		t.Fatal("the first esc should clear the filter and keep the panel")
+	}
+	m = drive(m, "esc")
 	if m.ws.count() != 0 {
-		t.Error("esc did not close the panel; it should no longer stop to clear a filter")
+		t.Error("the second esc did not close the panel")
 	}
 }
 
@@ -366,21 +369,39 @@ func TestEscAbandonsTheFilterPrompt(t *testing.T) {
 
 func TestTheEscCascadeInAList(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	l := m.ws.current().cardsView()
 	m = drive(m, "/", "e", "l", "f", "enter")
-	m = drive(m, "v") // pick one out
+	m = drive(m, "s", "a", "s") // and a statistics filter on top
+	m = drive(m, "v")           // pick one out
 
 	m = drive(m, "esc") // the selection is transient, so it goes first
-	if m.ws.current().cardsView().markCount() != 0 {
+	if l.markCount() != 0 {
 		t.Error("the first esc did not clear the selection")
 	}
-	// The filter is not transient: esc leaves it so you can carry on reading
-	// the cards it left. b clears it, esc steps past it.
-	if m.ws.current().cardsView().filter == "" {
-		t.Error("esc cleared the filter, which it should leave for b")
+	if l.filter == "" || len(l.statFilter) == 0 {
+		t.Fatal("the first esc took a filter too")
 	}
-	m = drive(m, "esc") // nothing transient left, so the panel goes
+	m = drive(m, "esc")
+	if l.filter != "" || len(l.statFilter) == 0 {
+		t.Error("the second esc should take the text filter, and only that")
+	}
+	m = drive(m, "esc")
+	if len(l.statFilter) != 0 || m.ws.count() != 1 {
+		t.Error("the third esc should take the statistics filter and keep the panel")
+	}
+	m = drive(m, "esc")
 	if m.ws.count() != 0 {
-		t.Error("esc did not close the panel once the selection was gone")
+		t.Error("esc did not close the panel once the filters were gone")
+	}
+}
+
+func TestEscInThePromptPutsBackTheFilterItOpenedOn(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	l := m.ws.current().cardsView()
+	m = drive(m, "/", "e", "l", "enter")
+	m = drive(m, "/", "f", "esc")
+	if l.filter != "el" {
+		t.Errorf("abandoning an edit left the filter at %q, want the %q it had", l.filter, "el")
 	}
 }
 
@@ -412,11 +433,47 @@ func TestEveryListFlagsWhatTheEditingDeckHolds(t *testing.T) {
 	m.ws.editing = 1
 
 	members := m.membersFor(m.ws.panels[0].cardsView())
-	if members["sol ring"] {
+	if members["sol ring"] != notElsewhere {
 		t.Error("Sol Ring is not in the deck but was flagged")
 	}
-	if !members["llanowar elves"] {
+	if members["llanowar elves"] != inTarget {
 		t.Error("Llanowar Elves is in the deck and should be flagged in the search")
+	}
+}
+
+func TestOtherListsGetTheWeakerMark(t *testing.T) {
+	m := sized(200, 30)
+	m = withCards(m, "f", sample(), sortArrival)     // a search
+	m = withCards(m, "f", sample()[2:], sortArrival) // another: Sol Ring, Forest
+	m = withCards(m, "d", sample()[1:2], sortArrival) // the deck: the elves
+	m.ws.editing = 2
+
+	members := m.membersFor(m.ws.panels[0].cardsView())
+	if members["sol ring"] != inOther {
+		t.Errorf("Sol Ring is in the other search: %v, want the weak mark", members["sol ring"])
+	}
+	if members["llanowar elves"] != inTarget {
+		t.Error("the deck's card should keep the strong mark")
+	}
+	if members["dwynen, gilt-leaf daen"] != notElsewhere {
+		t.Error("a card nowhere else was flagged")
+	}
+}
+
+func TestTheEditingDeckMarksTheFocusedListStrongly(t *testing.T) {
+	m := sized(200, 30)
+	m = withCards(m, "f", sample()[2:3], sortArrival) // Sol Ring
+	m = withCards(m, "f", sample()[3:], sortArrival)  // Forest
+	m = withCards(m, "d", sample(), sortArrival)
+	m = focusOn(m, 1)
+	m.ws.editing = 2
+
+	members := m.membersFor(m.ws.panels[2].cardsView())
+	if members["forest"] != inTarget {
+		t.Error("the focused list's card should be marked strongly in the deck")
+	}
+	if members["sol ring"] != inOther {
+		t.Error("another list's card should be marked weakly in the deck")
 	}
 }
 
@@ -427,10 +484,10 @@ func TestTheEditingDeckFlagsWhatTheListsHaveTurnedUp(t *testing.T) {
 	m.ws.editing = 1
 
 	members := m.membersFor(m.ws.panels[1].cardsView())
-	if !members["sol ring"] {
+	if members["sol ring"] == notElsewhere {
 		t.Error("the deck should flag the card the search turned up")
 	}
-	if members["dwynen, gilt-leaf daen"] {
+	if members["dwynen, gilt-leaf daen"] != notElsewhere {
 		t.Error("a card no list is showing was flagged in the deck")
 	}
 }

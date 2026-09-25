@@ -198,6 +198,8 @@ func (l *cardList) cycleSort(delta int) {
 	}
 }
 
+func (l *cardList) filterText() string { return l.filter }
+
 func (l *cardList) setFilter(s string) {
 	on, had := l.current()
 	l.filter = s
@@ -335,7 +337,7 @@ func filterTerms(s string) []string {
 
 // render draws the visible rows. members says which cards to flag as living
 // in the editing deck as well as here.
-func (l *cardList) render(width, height int, members map[string]bool, focused bool) []string {
+func (l *cardList) render(width, height int, members map[string]membership, focused bool) []string {
 	l.cursor.scrollInto(height, len(l.rows))
 
 	// When the column beside the name is a type line it can be long enough to

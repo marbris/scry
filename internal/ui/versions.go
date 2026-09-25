@@ -148,6 +148,8 @@ func (l *versionList) lines(width, height int, focused bool, m *Model) []string 
 	return fillTo(lines, width, height)
 }
 
+func (l *versionList) filterText() string { return l.filter }
+
 func (l *versionList) setFilter(s string) {
 	l.filter = s
 	l.commits = l.all

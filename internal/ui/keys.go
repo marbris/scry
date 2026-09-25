@@ -240,14 +240,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.hintsExpanded = !m.hintsExpanded
 
 	case "esc":
-		// The cascade, outward one step at a time: step off the information
-		// panel's modes, drop a transient selection, step back out of a
-		// sub-view, close the panel. Closing the last one lands on the splash
-		// rather than quitting — esc *from* the splash is what leaves.
-		//
-		// esc no longer clears a filter: a narrowing outlives the step back,
-		// so you can leave the statistics or a sub-view and go on reading the
-		// cards it left. b clears a filter, space b clears them all.
+		// The cascade, outward one step at a time — esc is "back": step off
+		// the information panel's modes, drop a transient selection, then
+		// the narrowings one at a time — the text filter, the statistics
+		// filter — then step back out of a sub-view, and close the panel.
+		// Closing the last one lands on the splash rather than quitting —
+		// esc *from* the splash is what leaves.
 		switch {
 		// A printed history was put on the information panel from here, so
 		// it comes off from here too, before esc starts taking the panel
@@ -256,6 +254,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.info.mode = infoCard
 			m.info.cursor, m.info.offset = 0, 0
 		case p.top() != nil && p.top().clear():
+		case p.clearFilter():
+		case clearStatFilter(p.cardsView()):
 		case p.pop():
 		default:
 			m.ws.close()
@@ -263,9 +263,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "b":
 		// Clear the narrowings on the list in front of you — the text filter
-		// and the statistics category both — leaving the panel and the
-		// statistics view where they are. esc used to do this, which is why
-		// you couldn't step back out of the bars without losing your place.
+		// and the statistics categories both — at once, where esc takes them
+		// a step at a time.
 		m.clearActiveFilters()
 
 	case "q", "ctrl+c":
@@ -425,7 +424,7 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// opened, rather than leaving a half-typed narrowing in place.
 		p.filtering = false
 		p.filterInput.Blur()
-		p.setFilter("")
+		p.setFilter(p.filterBefore)
 		return m, nil
 
 	case "ctrl+c":

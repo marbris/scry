@@ -397,6 +397,8 @@ func (l *deckList) current() (deckEntry, bool) {
 	return l.rows[l.cursor.at], true
 }
 
+func (l *deckList) filterText() string { return l.filter }
+
 func (l *deckList) setFilter(s string) {
 	l.filter = s
 	l.refresh()

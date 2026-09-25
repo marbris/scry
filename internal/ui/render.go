@@ -114,34 +114,54 @@ func fillTo(lines []string, width, height int) []string {
 	return lines
 }
 
+// membership is how a card in one list relates to the others on screen.
+type membership int
+
+const (
+	notElsewhere membership = iota
+	// inOther is in some other list on screen — the weaker mark.
+	inOther
+	// inTarget is in the list that matters most from here: the editing
+	// deck, seen from any other list; the focused list, seen from the deck.
+	inTarget
+)
+
 // membersFor is what a panel should flag as living somewhere else too.
 //
-// The relation runs one way and out from the editing deck: every list marks
-// the cards that are already in the deck you're building, and the deck marks
-// the cards that any list on screen has turned up. With five panels open,
-// "in my deck" is the only comparison that means the same thing in all of
-// them.
-func (m Model) membersFor(l *cardList) map[string]bool {
+// Two marks, a strong and a weak. Every other list marks what's already in
+// the deck you're building, strongly, and what any other list on screen has
+// too, weakly. The editing deck turns it round: it marks strongly what the
+// list you're looking at has, and weakly what any other list has.
+func (m Model) membersFor(l *cardList) map[string]membership {
 	editing := m.ws.editingList()
-	if editing == nil {
-		return nil
+	var focused *cardList
+	if p := m.ws.current(); p != nil {
+		focused = p.cardsView()
 	}
 
-	if l == editing {
-		// The deck itself: flag what the other panels are showing.
-		out := map[string]bool{}
-		for _, other := range m.ws.panels {
-			l := other.cardsView()
-			if l == nil || l == editing {
-				continue
-			}
-			for name := range l.names() {
-				out[name] = true
-			}
+	out := map[string]membership{}
+	for _, other := range m.ws.panels {
+		o := other.cardsView()
+		if o == nil || o == l || o == editing {
+			continue
 		}
-		return out
+		for name := range o.names() {
+			out[name] = inOther
+		}
 	}
-	return editing.names()
+
+	// The deck is a list on screen too, but seen from elsewhere it's the
+	// strong mark, never the weak one — which is why it was skipped above.
+	target := editing
+	if l == editing {
+		target = focused
+	}
+	if target != nil && target != l {
+		for name := range target.names() {
+			out[name] = inTarget
+		}
+	}
+	return out
 }
 
 // viewInfo draws the information panel.
