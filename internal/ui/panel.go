@@ -356,7 +356,7 @@ func (p *panel) subtitleWithState() string {
 		if out != "" {
 			out += " · "
 		}
-		out += "unsaved"
+		out += "uncommitted"
 	}
 	return out
 }

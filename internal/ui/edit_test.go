@@ -284,8 +284,8 @@ func TestEditsMarkTheDeckUnsaved(t *testing.T) {
 	if !target.dirty {
 		t.Error("the edit did not mark the deck unsaved")
 	}
-	if !strings.Contains(stripANSI(m.View()), "unsaved") {
-		t.Error("the panel does not say it needs saving")
+	if !strings.Contains(stripANSI(m.View()), "uncommitted") {
+		t.Error("the panel does not say it needs committing")
 	}
 }
 
@@ -305,7 +305,7 @@ func TestQuittingAsksAboutUnsavedEdits(t *testing.T) {
 	if !m.quitting {
 		t.Fatal("q did not raise the question")
 	}
-	if !strings.Contains(stripANSI(m.View()), "unsaved edits") {
+	if !strings.Contains(stripANSI(m.View()), "uncommitted edits") {
 		t.Error("the question is not on screen")
 	}
 }

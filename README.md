@@ -157,7 +157,7 @@ scry
 
 You'll land on a splash screen. Everything is discoverable from three keys:
 
-- **`space`** opens the menu of things you can do (create panels, close them, save).
+- **`space`** opens the menu of things you can do (create panels, close them, commit).
 - **`?`** grows the hint bar at the bottom to the full list of keys for wherever you are. `?` again shrinks it back.
 - **`q`** quits.
 
@@ -185,7 +185,7 @@ Open panels straight to what you want:
 3. Scroll the results; the info panel shows each card. Press `a` to add the highlighted card, or select several with `v`/`V` and add them together.
 4. `/` filters what's on screen, `o`/`O` re-sorts it (mana value, type, colour, power/toughness, EDHREC rank…), `t` tags the selection.
 5. `s` opens statistics for the list; walk the categories with `j`/`k` and add them to the filter with `a`/`o`.
-6. `w` saves the deck (and commits it to git). `space w` saves the editing deck from anywhere.
+6. Every edit is written to the deck file as you make it; `w` commits it to git. `space w` commits the editing deck from anywhere.
 
 ## Command line
 
@@ -258,7 +258,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `y` `p` | yank the selection · put it into this list |
 | `s` | statistics for this list |
 | `gv` | how this card's printed text has changed |
-| `w` `W` | save this list as a deck (here / in a new panel) |
+| `w` `W` | commit this deck · save a search or remote deck as a deck of yours (here / in a new panel) |
 
 **In the decks panel**
 
@@ -290,7 +290,7 @@ name with a slash (`aggro/`) makes an empty folder to fill later.
 | --- | --- |
 | `e` `E` | choose which deck to edit |
 | `gd` | jump to the editing deck |
-| `space w` | save the editing deck from anywhere |
+| `space w` | commit the editing deck from anywhere |
 
 **Panels**
 

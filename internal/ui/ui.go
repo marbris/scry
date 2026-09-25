@@ -175,7 +175,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// history belongs to, rather than a check in every key that moves.
 		if updated, ok := next.(Model); ok {
 			updated.info.leaveVersions(updated.focusedOracle())
-			return updated, cmd
+			// And one place to write whatever the key changed.
+			return updated, tea.Batch(cmd, updated.autosave())
 		}
 		return next, cmd
 
@@ -198,6 +199,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case deckSavedMsg:
 		return m.handleDeckSaved(msg)
+
+	case deckAutosavedMsg:
+		if msg.err != nil {
+			m.notice = "couldn't write " + msg.slug + ": " + msg.err.Error()
+		}
+		return m, nil
 
 	case deckWrittenMsg:
 		return m.handleDeckWritten(msg)

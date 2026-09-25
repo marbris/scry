@@ -44,7 +44,7 @@ var leaderMenu = []leaderCmd{
 	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
 	{"s", "stats (editing deck)", func(m *Model) { m.toggleStats(true) }},
 	{"b", "clear all filters", func(m *Model) { m.clearAllFilters() }},
-	{"w", "save the editing deck", nil}, // hands back a command, so it is run below
+	{"w", "commit the editing deck", nil}, // hands back a command, so it is run below
 	{"c", "close", func(m *Model) { m.ws.close() }},
 	{"u", "undo close", func(m *Model) { m.ws.restoreClosed() }},
 	{"o", "only", func(m *Model) { m.ws.only() }},
@@ -502,10 +502,9 @@ func (m *Model) versions(p *panel) tea.Cmd {
 	return nil
 }
 
-// tryQuit leaves, unless something would be lost by leaving.
-//
-// Saving is explicit, so this is the price of that: a deck edited and not
-// written is only safe if the way out asks about it.
+// tryQuit leaves, unless a deck has edits that were never committed. They're
+// written, so nothing is lost either way; but committing is explicit, and a
+// history with a gap in it is worth one question on the way out.
 func (m Model) tryQuit() (tea.Model, tea.Cmd) {
 	if len(m.dirtyDecks()) == 0 {
 		return m, m.quit()
@@ -514,8 +513,8 @@ func (m Model) tryQuit() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// saveEverything writes every deck with unsaved edits, for the w in the
-// quit question.
+// saveEverything commits every deck with uncommitted edits, for the w in
+// the quit question.
 func (m Model) saveEverything() tea.Cmd {
 	var cmds []tea.Cmd
 	for _, p := range m.ws.panels {

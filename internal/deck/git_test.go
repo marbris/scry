@@ -198,6 +198,54 @@ func TestSaveDeckVersioned(t *testing.T) {
 	}
 }
 
+func TestCommitDescribesTheChangeSinceTheLastCommit(t *testing.T) {
+	// scry writes the file on every edit, so by the time w commits, the file
+	// already holds the change. The message has to come from the last
+	// commit, or every commit would say nothing changed.
+	gitRepo(t)
+	if _, _, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
+		t.Fatal(err)
+	}
+
+	step1 := deckOf(t, strings.Replace(gitBaseDeck, "1 Sol Ring [ramp]", "1 Mana Crypt [ramp]", 1))
+	if err := Write("ghen", step1); err != nil {
+		t.Fatal(err)
+	}
+	if !HasUncommittedEdits("ghen") {
+		t.Fatal("the autosave should leave the deck uncommitted")
+	}
+	step2 := deckOf(t, strings.Replace(gitBaseDeck, "1 Sol Ring [ramp]", "1 Mana Crypt [ramp]\n1 Mana Vault", 1))
+	if err := Write("ghen", step2); err != nil {
+		t.Fatal(err)
+	}
+
+	subject, warning, err := CommitDeck("ghen", step2)
+	if err != nil || warning != "" {
+		t.Fatalf("CommitDeck: %v %q", err, warning)
+	}
+	if subject != "+Mana Crypt, +Mana Vault, -Sol Ring" {
+		t.Errorf("subject = %q", subject)
+	}
+	if HasUncommittedEdits("ghen") {
+		t.Error("still uncommitted after CommitDeck")
+	}
+	commits, _ := History("ghen", 10)
+	if len(commits) != 2 {
+		t.Errorf("got %d commits, want 2", len(commits))
+	}
+}
+
+func TestCommitANewDeck(t *testing.T) {
+	gitRepo(t)
+	subject, _, err := CommitDeck("ghen", deckOf(t, gitBaseDeck))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if subject != "Add Ghen" {
+		t.Errorf("subject = %q", subject)
+	}
+}
+
 func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 	dir := gitRepo(t)
 

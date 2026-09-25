@@ -25,6 +25,9 @@ type deckOpenedMsg struct {
 	info    deck.Info
 	cards   []deck.Card
 	err     error
+	// uncommitted is a deck of yours whose file has changes since its last
+	// commit — edits from last time, written but never committed.
+	uncommitted bool
 }
 
 type userDecksMsg struct {
@@ -83,7 +86,8 @@ func (m *Model) openEntry(l *deckList, p *panel, newPane bool) tea.Cmd {
 func openLocalDeck(panelID int, newPane bool, slug string) tea.Cmd {
 	return func() tea.Msg {
 		info, cards, err := deck.Open(slug)
-		return deckOpenedMsg{panel: panelID, newPane: newPane, info: info, cards: cards, err: err}
+		return deckOpenedMsg{panel: panelID, newPane: newPane, info: info, cards: cards, err: err,
+			uncommitted: deck.HasUncommittedEdits(slug)}
 	}
 }
 
@@ -134,6 +138,7 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	l := newCardList(msg.cards, sortArrival, "decklist")
 	l.name = msg.info.Name
 	l.deck = &msg.info
+	l.dirty = msg.uncommitted
 	l.recheck()
 
 	// A deck opened in its own panel replaces what was there; one opened

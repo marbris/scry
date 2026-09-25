@@ -15,8 +15,10 @@ import (
 // cursor. That rule lives in cardList.selection, so none of these has to
 // decide what an empty selection means.
 //
-// Nothing here writes to disk. Edits are held in the panel until w, which is
-// the whole of the saving model: explicit, and one git commit per press.
+// Nothing here writes to disk itself. An edit marks the list, and the
+// model writes the file after the key that made it (see autosave). w is
+// the other half: one git commit per press, describing everything since
+// the last one.
 
 // undoStep is the deck as it stood before an edit, and what that edit was.
 // Whole copies rather than a diff: a deck is a hundred rows, the edits are
@@ -47,7 +49,16 @@ func (l *cardList) pushUndo(what string) {
 	if len(l.undo) > undoDepth {
 		l.undo = l.undo[len(l.undo)-undoDepth:]
 	}
+	l.edited()
+}
+
+// edited notes a change to the deck: uncommitted, and not yet written.
+func (l *cardList) edited() {
+	if !l.dirty {
+		l.wasClean = true
+	}
 	l.dirty = true
+	l.unwritten = true
 }
 
 // indexOfCard finds a card in the deck by name. Names rather than ids: a
@@ -334,6 +345,7 @@ func (m *Model) undo() {
 	step := l.undo[n-1]
 	l.undo = l.undo[:n-1]
 	l.all = step.cards
+	l.edited()
 	l.refresh()
 	l.recheck()
 	m.notice = "undid " + step.what

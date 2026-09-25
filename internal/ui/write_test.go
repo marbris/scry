@@ -1,6 +1,7 @@
 package ui
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"testing"
 
@@ -134,6 +135,78 @@ func TestSavingTwiceDoesNotOverwriteTheFirst(t *testing.T) {
 	}
 }
 
+func TestAnEditIsWrittenStraightAwayButNotCommitted(t *testing.T) {
+	if !deck.GitAvailable() {
+		t.Skip("git not installed")
+	}
+	seedDeck(t, "ghen", "name: Ghen\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	if _, _, err := deck.SaveVersioned("ghen", mustRead(t, "ghen")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { deck.Delete("ghen") })
+
+	m, l := openDeckPanel(t, sized(160, 24), "ghen", "Ghen", []deck.Card{
+		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}},
+	})
+	m.add([]deck.Card{{Card: mtg.Card{Name: "Llanowar Elves"}}})
+	runCmd(m.autosave())
+
+	d := mustRead(t, "ghen")
+	if !strings.Contains(d.String(), "Llanowar Elves") {
+		t.Errorf("the edit wasn't written:\n%s", d.String())
+	}
+	if !deck.HasUncommittedEdits("ghen") {
+		t.Error("the edit was committed without w")
+	}
+	if !l.dirty {
+		t.Error("the deck isn't marked uncommitted")
+	}
+
+	// w commits it, describing the change against the last commit.
+	msg := saveDeck(m.ws.current().id, *l.deck, l.all)().(deckSavedMsg)
+	if msg.subject != "+Llanowar Elves" {
+		t.Errorf("commit subject %q", msg.subject)
+	}
+	if deck.HasUncommittedEdits("ghen") {
+		t.Error("w left the deck uncommitted")
+	}
+}
+
+func TestAnOlderAutosaveNeverLandsOverANewerOne(t *testing.T) {
+	seedDeck(t, "ghen", "name: Ghen\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { deck.Delete("ghen") })
+	info := deck.Info{Name: "Ghen", Slug: "ghen", Format: "commander"}
+
+	older := autosaveDeck(info, []deck.Card{{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}}}, false)
+	newer := autosaveDeck(info, []deck.Card{{Qty: 1, Card: mtg.Card{Name: "Mana Crypt"}}}, false)
+	newer()
+	older()
+	if d := mustRead(t, "ghen"); !strings.Contains(d.String(), "Mana Crypt") {
+		t.Errorf("the older write landed last:\n%s", d.String())
+	}
+}
+
+func mustRead(t *testing.T, slug string) *deck.File {
+	t.Helper()
+	d, err := deck.Read(slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+// runCmd runs a command and whatever batch it hands back, synchronously.
+func runCmd(cmd tea.Cmd) {
+	if cmd == nil {
+		return
+	}
+	if batch, ok := cmd().(tea.BatchMsg); ok {
+		for _, c := range batch {
+			runCmd(c)
+		}
+	}
+}
+
 func TestWritingAnUnchangedDeckSaysSoRatherThanCommitting(t *testing.T) {
 	seedDeck(t, "ghen", "name: Ghen\nformat: commander\n[mainboard]\n1 Sol Ring\n")
 	t.Cleanup(func() { deck.Delete("ghen") })
@@ -142,7 +215,7 @@ func TestWritingAnUnchangedDeckSaysSoRatherThanCommitting(t *testing.T) {
 		{Qty: 1, Card: mtg.Card{Name: "Sol Ring"}},
 	})
 	m = drive(m, "w")
-	if !strings.Contains(stripANSI(m.View()), "already up to date") {
+	if !strings.Contains(stripANSI(m.View()), "nothing to commit") {
 		t.Errorf("got:\n%s", stripANSI(m.View()))
 	}
 }

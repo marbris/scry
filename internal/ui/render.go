@@ -371,7 +371,9 @@ func (m Model) viewFooter(l layout) string {
 	return m.viewHint(l)
 }
 
-// viewQuitQuestion is what stands between an unsaved deck and losing it.
+// viewQuitQuestion asks about decks with edits that were written but never
+// committed. Nothing is lost by quitting; the question is whether the
+// history should have them.
 func (m Model) viewQuitQuestion() string {
 	decks := m.dirtyDecks()
 	what := decks[0]
@@ -385,9 +387,9 @@ func (m Model) viewQuitQuestion() string {
 	text := lipgloss.NewStyle().Foreground(theme.Text)
 	return lipgloss.NewStyle().
 		Background(theme.SurfaceAlt).Width(m.width).MaxWidth(m.width).
-		Render(" " + text.Render(what+" unsaved edits — ") +
-			key.Render("w") + text.Render(" save and quit · ") +
-			key.Render("y") + text.Render(" quit anyway · any other key stays"))
+		Render(" " + text.Render(what+" uncommitted edits — ") +
+			key.Render("w") + text.Render(" commit and quit · ") +
+			key.Render("y") + text.Render(" quit, leaving them uncommitted · any other key stays"))
 }
 
 // viewLeaderBar is the menu the leader raises, so it never has to be

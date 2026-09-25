@@ -65,10 +65,17 @@ type cardList struct {
 	// changes the answer.
 	legality *deck.Legality
 
-	// dirty means there are edits not yet written. Saving is explicit, so
-	// this is the only thing standing between an edit and losing it — which
-	// is why quitting asks.
+	// dirty means there are edits not yet committed. Every edit is written
+	// to the file straight away, so nothing is lost by quitting; w is what
+	// records the change in the deck's history, and quitting asks about it.
 	dirty bool
+	// unwritten is an edit the file hasn't had yet — picked up after the
+	// key that made it, and written off the main thread.
+	unwritten bool
+	// wasClean is set by the first edit since the last commit, which is
+	// when edits made in another editor get committed before scry writes
+	// over them.
+	wasClean bool
 	// undo holds the deck as it stood before each edit.
 	undo []undoStep
 
@@ -512,7 +519,7 @@ func (l *cardList) keys() []hintGroup {
 		sel = append(sel, [2]string{"p", "put"})
 	}
 	if l.deck != nil && l.deck.Local() {
-		sel = append(sel, [2]string{"w", "save"})
+		sel = append(sel, [2]string{"w", "commit"})
 	} else {
 		// Not yours, so writing it asks for a name and makes it yours.
 		sel = append(sel, [2]string{"w W", "save as deck"})

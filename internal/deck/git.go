@@ -308,9 +308,7 @@ func SaveVersioned(slug string, d *File) (subject, warning string, err error) {
 	// edits are only ever committed the next time scry writes. Record them
 	// first, or writing over them would lose them for good — the one thing
 	// keeping the history is supposed to prevent.
-	if HasUncommittedEdits(slug) {
-		_ = record(slug, "Edit "+slug+" outside scry")
-	}
+	RecordOutsideEdits(slug)
 
 	if err := Write(slug, d); err != nil {
 		return "", "", err
@@ -324,6 +322,35 @@ func SaveVersioned(slug string, d *File) (subject, warning string, err error) {
 		return subject, "saved, but not committed: " + err.Error(), nil
 	}
 	return subject, "", nil
+}
+
+// CommitDeck writes a deck and commits it, describing the change against the
+// last commit rather than against the file — which scry has been writing on
+// every edit, so the file already holds the change and says nothing about it.
+// Like SaveVersioned, the write is the only thing that can fail it.
+func CommitDeck(slug string, d *File) (subject, warning string, err error) {
+	before, _ := At(slug, "HEAD") // nil when the deck was never committed
+
+	if err := Write(slug, d); err != nil {
+		return "", "", err
+	}
+
+	subject = commitSubject(before, d)
+	if !GitAvailable() {
+		return subject, GitNotInstalled, nil
+	}
+	if err := record(slug, commitMessage(before, d)); err != nil {
+		return subject, "written, but not committed: " + err.Error(), nil
+	}
+	return subject, "", nil
+}
+
+// RecordOutsideEdits commits whatever was done to a deck in another editor
+// since it was last committed, so the next write over it can't lose it.
+func RecordOutsideEdits(slug string) {
+	if HasUncommittedEdits(slug) {
+		_ = record(slug, "Edit "+slug+" outside scry")
+	}
 }
 
 // ── Describing a change ─────────────────────────────────────────
