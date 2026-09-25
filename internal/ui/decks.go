@@ -47,6 +47,12 @@ type reloadDecksMsg struct{}
 type noticeMsg struct {
 	text string
 	err  error
+	// moved is a deck or folder that now lives somewhere else, [from, to],
+	// and renamed a deck's new name keyed by where it lives now — so a
+	// deck open in a panel follows, rather than being written back to where
+	// it was, under the name it had.
+	moved   [2]string
+	renamed [2]string
 }
 
 // ── Opening ─────────────────────────────────────────────────────
@@ -375,7 +381,7 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 			if err := deck.Move(mv.slug, dest); err != nil {
 				return noticeMsg{err: err}
 			}
-			return noticeMsg{text: "moved " + mv.name + " to " + where}
+			return noticeMsg{text: "moved " + mv.name + " to " + where, moved: [2]string{mv.slug, dest}}
 		}
 	}
 	return func() tea.Msg {
@@ -406,9 +412,10 @@ func uniqueSlug(slug string) string {
 }
 
 // renameDeck changes a local deck's title, or what a remote is called in your
-// list. It changes the name alone: the slug names a file with a git history, so
-// the file stays put and the history stays keyed to that path. A deck moves
-// between folders with cut and put, not by being renamed.
+// list. A name with a slash in it moves the deck too: "dirname/deckname" puts
+// it in dirname — beside it, in the folder it's in now, made if it isn't
+// there — as deckname.deck, called deckname. A leading slash means the top
+// level. The move is a git mv, so the history follows the file.
 func renameCmd(e deckEntry, name string) tea.Cmd {
 	return func() tea.Msg {
 		switch e.kind {
@@ -417,11 +424,31 @@ func renameCmd(e deckEntry, name string) tea.Cmd {
 			if err != nil {
 				return noticeMsg{err: err}
 			}
-			d.Name = strings.TrimSpace(name)
-			if _, _, err := deck.SaveVersioned(e.slug, d); err != nil {
+			name = strings.TrimSpace(name)
+			slug := e.slug
+			var moved [2]string
+			if strings.Contains(name, "/") {
+				dest, base, err := renameDest(e.slug, name)
+				if err != nil {
+					return noticeMsg{err: err}
+				}
+				if dest != e.slug {
+					if err := deck.Move(e.slug, dest); err != nil {
+						return noticeMsg{err: err}
+					}
+					moved = [2]string{e.slug, dest}
+				}
+				slug, name = dest, base
+			}
+			d.Name = name
+			if _, _, err := deck.SaveVersioned(slug, d); err != nil {
 				return noticeMsg{err: err}
 			}
-			return noticeMsg{text: "renamed to " + name}
+			text := "renamed to " + name
+			if moved[1] != "" {
+				text = "moved to " + slug
+			}
+			return noticeMsg{text: text, moved: moved, renamed: [2]string{slug, name}}
 		case entryRemote:
 			b := deck.LoadBookmarks()
 			b.RenameRemote(e.id, name)
@@ -432,6 +459,29 @@ func renameCmd(e deckEntry, name string) tea.Cmd {
 		}
 		return noticeMsg{text: "a person can't be renamed"}
 	}
+}
+
+// renameDest is where "dirname/deckname" puts a deck that lives at slug, and
+// the name it ends up with.
+func renameDest(slug, name string) (dest, base string, err error) {
+	top := strings.HasPrefix(name, "/")
+	name = strings.Trim(name, "/ ")
+	base = strings.TrimSpace(path.Base(name))
+	if name == "" || base == "" || base == "." {
+		return "", "", fmt.Errorf("a deck needs a name")
+	}
+	dir := folderOf(slug)
+	if top {
+		dir = ""
+	}
+	if sub := path.Dir(name); sub != "." {
+		dir = inFolder(dir, sub)
+	}
+	dest = deck.Slugify(inFolder(dir, base))
+	if dest == slug {
+		return dest, base, nil
+	}
+	return uniqueSlug(dest), base, nil
 }
 
 // renameFolderCmd renames a folder — the folder is a location on disk, so this
@@ -453,7 +503,7 @@ func renameFolderCmd(e deckEntry, name string) tea.Cmd {
 		if err := deck.MoveFolder(e.slug, newPath); err != nil {
 			return noticeMsg{err: err}
 		}
-		return noticeMsg{text: "renamed folder to " + newPath}
+		return noticeMsg{text: "renamed folder to " + newPath, moved: [2]string{e.slug, newPath}}
 	}
 }
 

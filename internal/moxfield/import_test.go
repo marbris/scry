@@ -188,3 +188,14 @@ func TestUserAcceptsAURLOrABareName(t *testing.T) {
 		}
 	}
 }
+
+func TestAnImportedNameLosesItsSlashes(t *testing.T) {
+	// Somebody's "Aggro/Mono Red" is a title, not a folder.
+	d, err := ToFile(moxDeck("Aggro/Mono Red", nil, map[string]int{"Mountain": 30}, nil), "Y8dZ7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Name != "Aggro Mono Red" {
+		t.Errorf("name is %q", d.Name)
+	}
+}

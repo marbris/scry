@@ -317,3 +317,19 @@ func TestReadNamesANestedHeaderlessDeckAfterItsFile(t *testing.T) {
 		t.Errorf("name is %q, want the last slug segment", d.Name)
 	}
 }
+
+func TestImportNameDropsSlashes(t *testing.T) {
+	for in, want := range map[string]string{
+		"Aggro/Mono Red":     "Aggro Mono Red",
+		"Aggro / Mono Red":   "Aggro Mono Red",
+		"/leading/trailing/": "leading trailing",
+		"Plain":              "Plain",
+	} {
+		if got := ImportName(in); got != want {
+			t.Errorf("ImportName(%q) = %q, want %q", in, got, want)
+		}
+		if strings.Contains(Slugify(ImportName(in)), "/") {
+			t.Errorf("%q still files into a folder", in)
+		}
+	}
+}

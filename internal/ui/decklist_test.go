@@ -432,26 +432,74 @@ func TestTheMoxfieldFolderCantBeRenamed(t *testing.T) {
 	}
 }
 
-func TestRenamingADeckKeepsItsSlug(t *testing.T) {
-	// A rename changes the name alone; the file stays where it is so its git
-	// history stays keyed to that path.
+func TestRenamingADeckWithoutASlashKeepsItsSlug(t *testing.T) {
+	// A plain rename changes the name alone; the file stays where it is so
+	// its git history stays keyed to that path.
 	seedDeck(t, "folder/thedeck", "name: The Deck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
 	t.Cleanup(func() { resetDecks(t) })
 
-	cmd := renameCmd(deckEntry{kind: entryLocal, slug: "folder/thedeck", name: "The Deck"}, "Renamed / Elsewhere")
+	cmd := renameCmd(deckEntry{kind: entryLocal, slug: "folder/thedeck", name: "The Deck"}, "Renamed")
 	if msg := cmd().(noticeMsg); msg.err != nil {
 		t.Fatalf("rename failed: %v", msg.err)
 	}
-
-	if !deck.Exists("folder/thedeck") {
-		t.Error("the deck moved; a rename should leave the file where it is")
-	}
 	d, err := deck.Read("folder/thedeck")
 	if err != nil {
-		t.Fatalf("reading back: %v", err)
+		t.Fatalf("the deck moved: %v", err)
 	}
-	if d.Name != "Renamed / Elsewhere" {
-		t.Errorf("name is %q, want the new name verbatim", d.Name)
+	if d.Name != "Renamed" {
+		t.Errorf("name is %q", d.Name)
+	}
+}
+
+func TestRenamingADeckWithASlashMovesItIntoThatFolder(t *testing.T) {
+	// dirname/deckname: dirname is a folder, made if it isn't there, beside
+	// the deck; deckname is the file and the name.
+	seedDeck(t, "folder/thedeck", "name: The Deck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { resetDecks(t) })
+
+	cmd := renameCmd(deckEntry{kind: entryLocal, slug: "folder/thedeck", name: "The Deck"}, "New Dir/Mono Red")
+	msg := cmd().(noticeMsg)
+	if msg.err != nil {
+		t.Fatalf("rename failed: %v", msg.err)
+	}
+	if deck.Exists("folder/thedeck") {
+		t.Error("the old file is still there")
+	}
+	d, err := deck.Read("folder/new-dir/mono-red")
+	if err != nil {
+		t.Fatalf("not at folder/new-dir/mono-red: %v", err)
+	}
+	if d.Name != "Mono Red" {
+		t.Errorf("name is %q, want just the deck's own part", d.Name)
+	}
+	if msg.moved != [2]string{"folder/thedeck", "folder/new-dir/mono-red"} {
+		t.Errorf("moved = %v", msg.moved)
+	}
+}
+
+func TestRenamingWithALeadingSlashGoesToTheTop(t *testing.T) {
+	seedDeck(t, "folder/thedeck", "name: The Deck\nformat: commander\n[mainboard]\n1 Sol Ring\n")
+	t.Cleanup(func() { resetDecks(t) })
+
+	cmd := renameCmd(deckEntry{kind: entryLocal, slug: "folder/thedeck", name: "The Deck"}, "/Other/The Deck")
+	if msg := cmd().(noticeMsg); msg.err != nil {
+		t.Fatalf("rename failed: %v", msg.err)
+	}
+	if !deck.Exists("other/the-deck") {
+		t.Error("a leading slash should start from the top level")
+	}
+}
+
+func TestAnOpenDeckFollowsItsRename(t *testing.T) {
+	// Or the next autosave would put it back where it was, under its old
+	// name.
+	m, l := openDeckPanel(t, sized(160, 24), "folder/thedeck", "The Deck", nil)
+	m.Update(noticeMsg{
+		moved:   [2]string{"folder/thedeck", "folder/new/mono-red"},
+		renamed: [2]string{"folder/new/mono-red", "Mono Red"},
+	})
+	if l.deck.Slug != "folder/new/mono-red" || l.deck.Name != "Mono Red" {
+		t.Errorf("the open deck is %q %q", l.deck.Slug, l.deck.Name)
 	}
 }
 

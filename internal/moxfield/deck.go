@@ -181,7 +181,7 @@ func Import(id string) (*deck.File, error) {
 // ToFile is the conversion itself, kept apart from the fetch so it
 // can be exercised without the network.
 func ToFile(d Deck, id string) (*deck.File, error) {
-	out := &deck.File{Name: d.Name, Format: d.Format, Source: d.PublicURL}
+	out := &deck.File{Name: deck.ImportName(d.Name), Format: d.Format, Source: d.PublicURL}
 	if out.Source == "" {
 		out.Source = "https://moxfield.com/decks/" + id
 	}
@@ -232,7 +232,7 @@ func ImportConsidering(id string) (*deck.File, error) {
 		return nil, err
 	}
 
-	out := &deck.File{Name: d.Name + " (considering)", Format: d.Format, Source: d.PublicURL}
+	out := &deck.File{Name: deck.ImportName(d.Name) + " (considering)", Format: d.Format, Source: d.PublicURL}
 	if out.Source == "" {
 		out.Source = "https://moxfield.com/decks/" + id
 	}

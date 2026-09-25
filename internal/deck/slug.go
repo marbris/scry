@@ -38,3 +38,10 @@ func slugifySegment(name string) string {
 	}
 	return strings.Trim(b.String(), "-")
 }
+
+// ImportName is a deck name from somewhere else, made safe to file: a slash
+// in someone's deck title is punctuation to them, but here it would file the
+// deck in folders, so it goes — "Aggro/Mono Red" becomes "Aggro Mono Red".
+func ImportName(name string) string {
+	return strings.Join(strings.Fields(strings.ReplaceAll(name, "/", " ")), " ")
+}

@@ -267,11 +267,14 @@ The panel is a folder tree: local decks group by the folder part of their slug
 `moxfield` folder. Folders start collapsed; `enter` opens one.
 
 A deck's name is just its name — the folder is where its file lives, not part of
-the name. Renaming a deck only changes its name; `r` on a folder renames the
-folder and takes its decks with it. Move a deck between folders with cut and put
+the name. Renaming a deck changes its name; renaming it to `dirname/deckname`
+also moves it into `dirname` (made if it isn't there, beside the deck; a leading
+`/` starts from the top). `r` on a folder renames the folder and takes its decks
+with it. Move a deck between folders with cut and put
 (`x` then `p`). Naming a new deck into a folder (`aggro/Mono Red`) files it there
 — the folder goes to the location, and the deck is named `Mono Red`. Ending the
-name with a slash (`aggro/`) makes an empty folder to fill later.
+name with a slash (`aggro/`) makes an empty folder to fill later. A deck copied
+from Moxfield never lands in a folder: a slash in its title becomes a space.
 
 | Key | Does |
 | --- | --- |

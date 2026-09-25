@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -43,7 +44,8 @@ func (m *Model) write(l *cardList, p *panel, newPane bool) tea.Cmd {
 	// Not yours yet, so it needs a name before it can be.
 	name := l.name
 	if l.deck != nil && l.deck.Name != "" {
-		name = l.deck.Name
+		// Someone else's title; a slash in it would file the copy in folders.
+		name = deck.ImportName(l.deck.Name)
 	}
 	p.ask(askWrite, "save as", name)
 	p.writeToNewPane = newPane
@@ -246,4 +248,33 @@ func (m Model) dirtyDecks() []string {
 		}
 	}
 	return out
+}
+
+// followMove points decks open in panels at where they live now, and gives
+// them their new name, so the next write lands in the right file under the
+// right name. A folder move carries every deck under it.
+func (m Model) followMove(moved, renamed [2]string) {
+	for _, p := range m.ws.panels {
+		for _, v := range p.stack {
+			l, ok := v.(*cardList)
+			if !ok || l.deck == nil || !l.deck.Local() {
+				continue
+			}
+			if from, to := moved[0], moved[1]; from != "" {
+				switch {
+				case l.deck.Slug == from:
+					l.deck.Slug = to
+				case strings.HasPrefix(l.deck.Slug, from+"/"):
+					l.deck.Slug = to + strings.TrimPrefix(l.deck.Slug, from)
+				}
+			}
+			if renamed[0] != "" && l.deck.Slug == renamed[0] {
+				l.deck.Name = renamed[1]
+				l.name = renamed[1]
+				if p.top() == v {
+					p.title = renamed[1]
+				}
+			}
+		}
+	}
 }

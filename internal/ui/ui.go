@@ -195,6 +195,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.notice = msg.text
 		}
+		m.followMove(msg.moved, msg.renamed)
 		return m, reloadDecks
 
 	case deckSavedMsg:
