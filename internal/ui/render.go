@@ -212,9 +212,7 @@ func (m Model) viewInfo(width, height int) string {
 		// rather than remembering a position: the category *is* the
 		// position, so deriving it can't drift out of step with it. J past
 		// the bottom used to move a cursor you could no longer see.
-		groups := m.statGroups()
-		offset = scrollTo(statLine(groups, m.statCursor(groups)),
-			offset, maxInt(height-4, 1), len(body))
+		offset = m.statScroll(offset, maxInt(height-4, 1), len(body))
 	}
 	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
 	// read, never focused.

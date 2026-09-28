@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"scry/internal/deck"
 	"scry/internal/mtg"
 	"scry/internal/stats"
@@ -471,5 +473,42 @@ func TestTheStatisticsHintsDontOfferTheKeysTheyTake(t *testing.T) {
 		if !offered[want] {
 			t.Errorf("%q isn't offered while the statistics are up", want)
 		}
+	}
+}
+
+func TestTurningAGroupOverShowsItsHeading(t *testing.T) {
+	// After ctrl+j had scrolled the statistics, J put the next group on top
+	// but scrolled only as far as its first category, so the heading saying
+	// what the bars count sat one line above the top edge.
+	m := withCards(sized(110, 22), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlJ})
+	m = next.(Model)
+	for _, key := range []string{"J", "J", "K"} {
+		m = drive(m, key)
+		want := m.statGroups()[0].Title
+		lines := strings.Split(stripANSI(m.View()), "\n")
+		if !strings.Contains(lines[3], want) {
+			t.Errorf("after %s the panel starts %q, want the %q heading", key, lines[3], want)
+		}
+	}
+}
+
+func TestStatHeadingIsTheGroupsFirstLine(t *testing.T) {
+	m := withCards(sized(110, 22), "d", deckSample(), sortArrival)
+	groups := m.statGroups()
+	row := 0
+	for _, g := range groups {
+		for range g.Rows {
+			if got, line := statHeading(groups, row), statLine(groups, row); got >= line {
+				t.Errorf("row %d on line %d has its heading on %d", row, line, got)
+			}
+			row++
+		}
+	}
+	// The first row of the second group: its heading is the line above it.
+	first := len(groups[0].Rows)
+	if statHeading(groups, first) != statLine(groups, first)-1 {
+		t.Error("a group's first category isn't directly under its heading")
 	}
 }

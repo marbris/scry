@@ -345,6 +345,44 @@ func statLine(groups []stats.Group, row int) int {
 	return line
 }
 
+// statHeading is which rendered line the heading of a category's group sits
+// on.
+func statHeading(groups []stats.Group, row int) int {
+	line, at := 0, 0
+	for _, g := range groups {
+		if len(g.Rows) == 0 {
+			continue
+		}
+		if line > 0 {
+			line++
+		}
+		heading := line
+		line += 1 + len(g.Rows)
+		if row < at+len(g.Rows) {
+			return heading
+		}
+		at += len(g.Rows)
+	}
+	return 0
+}
+
+// statScroll is where the statistics are scrolled to: far enough to show the
+// highlighted category, and far enough back to show its group's heading
+// too, whenever the two fit together. J and K turn a group to the top and
+// put the highlight on its first category; scrolling only as far as the
+// category left the heading — the one line saying what the bars count —
+// just above the top edge.
+func (m Model) statScroll(offset, height, total int) int {
+	groups := m.statGroups()
+	row := m.statCursor(groups)
+	line := statLine(groups, row)
+	offset = scrollTo(line, offset, height, total)
+	if head := statHeading(groups, row); head < offset && line-head < height {
+		offset = head
+	}
+	return offset
+}
+
 // statOdds is the chance of at least n of a category in the opening hand,
 // drawn from the whole list.
 func statOdds(r stats.Row, pop, n int) float64 {
@@ -496,9 +534,7 @@ func (b statBar) render() string {
 // which is the same arithmetic the render does. Exposed so a test can ask
 // without drawing.
 func (m Model) statOffset(height int) int {
-	groups := m.statGroups()
-	return scrollTo(statLine(groups, m.statCursor(groups)), 0,
-		maxInt(height, 1), len(m.renderStats(30)))
+	return m.statScroll(0, maxInt(height, 1), len(m.renderStats(30)))
 }
 
 // statTitle heads the panel: what's being counted, and how.
