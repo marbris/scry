@@ -359,7 +359,7 @@ func (m Model) infoKeys(p *panel) [][2]string {
 	return [][2]string{
 		hint("stats", keymap.Global, keymap.GlobalStats),
 		{leaderHint(keymap.LeaderStats), "editing deck stats"},
-		hint("up/down", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown),
+		hint("half page", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown),
 		hint("paragraph", keymap.Global, keymap.GlobalInfoParaUp, keymap.GlobalInfoParaDn),
 	}
 }

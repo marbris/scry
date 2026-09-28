@@ -241,7 +241,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `ctrl+h` `ctrl+l` | move the focused panel along the row |
 | `j` `k` | up / down in the list |
 | `gg` `G` | first / last row |
-| `K` `J` | move within the info panel |
+| `K` `J` | scroll the info panel half a screen |
 | `ctrl+k` `ctrl+j` | info panel, a paragraph at a time |
 | `space` | the menu · `?` show keys in the panels · `q` quit |
 

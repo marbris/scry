@@ -2,14 +2,13 @@ package ui
 
 // The information panel, pinned to the right.
 //
-// It is never focused. K and J move within it and ctrl+k / ctrl+j scroll it,
-// from wherever you happen to be — which is what keeps it a panel you read
-// rather than a place you have to go and come back from. The cost is four
-// keys in the shift and control spaces; the saving is a whole mode.
+// It is never focused. K and J scroll it half a screen and ctrl+k / ctrl+j a
+// paragraph, from wherever you happen to be — which is what keeps it a panel
+// you read rather than a place you have to go and come back from. The cost
+// is four keys in the shift and control spaces; the saving is a whole mode.
 //
-// In statistics the same four keys walk the breakdown: a category at a time,
-// then a group at a time. Same keys, same axis, one level coarser — which is
-// what ctrl means everywhere else here too.
+// In statistics J and K turn the groups over instead, and j and k walk the
+// categories.
 
 type infoMode int
 
@@ -36,9 +35,7 @@ func (i infoMode) String() string {
 
 type infoPanel struct {
 	mode infoMode
-	// cursor is the row within the panel — a statistics category, a
-	// revision — and offset is how far the view is scrolled.
-	cursor int
+	// offset is how far the view is scrolled.
 	offset int
 	// oracle is the card infoVersions was opened on. The printed-text
 	// history is about one card, so it lasts exactly as long as the cursor
@@ -59,7 +56,7 @@ type infoPanel struct {
 func (p *infoPanel) leaveVersions(oracle string) {
 	if p.mode == infoVersions && oracle != p.oracle {
 		p.mode = infoCard
-		p.cursor, p.offset = 0, 0
+		p.offset = 0
 	}
 }
 
@@ -71,12 +68,5 @@ func (p *infoPanel) toggle(mode infoMode) {
 	} else {
 		p.mode = mode
 	}
-	p.cursor, p.offset = 0, 0
-}
-
-func (p *infoPanel) move(delta int) {
-	p.cursor += delta
-	if p.cursor < 0 {
-		p.cursor = 0
-	}
+	p.offset = 0
 }

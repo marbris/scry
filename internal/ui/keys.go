@@ -244,9 +244,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ws.cycleEditing(-1)
 
 	case keymap.GlobalInfoUp:
-		m.info.move(-1)
+		m.scrollInfoHalf(-1)
 	case keymap.GlobalInfoDown:
-		m.info.move(1)
+		m.scrollInfoHalf(1)
 	case keymap.GlobalInfoParaUp:
 		m.scrollInfoParagraph(-1)
 	case keymap.GlobalInfoParaDn:
@@ -295,7 +295,7 @@ func (m *Model) escStep(p *panel) (string, func()) {
 	case m.info.mode == infoVersions:
 		return "close printed text", func() {
 			m.info.mode = infoCard
-			m.info.cursor, m.info.offset = 0, 0
+			m.info.offset = 0
 		}
 	case p.cardsView() != nil && p.cardsView().markCount() > 0:
 		return "drop picks", func() { p.top().clear() }

@@ -188,7 +188,7 @@ func (m Model) membersFor(l *cardList) map[string]membership {
 
 // viewInfo draws the information panel.
 func (m Model) viewInfo(width, height int) string {
-	inner := maxInt(width-2, 1)
+	inner, hints, room := m.infoFrame(width, height)
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	title := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).
@@ -199,10 +199,6 @@ func (m Model) viewInfo(width, height int) string {
 		lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)),
 	}
 
-	var hints []string
-	if m.hintsExpanded {
-		hints = hintFooter(m.infoHintGroups(), inner, height-2-len(lines))
-	}
 	height -= len(hints) // the body scrolls in what the keys leave it
 
 	body := m.infoContent(inner)
@@ -212,11 +208,10 @@ func (m Model) viewInfo(width, height int) string {
 		// rather than remembering a position: the category *is* the
 		// position, so deriving it can't drift out of step with it. J past
 		// the bottom used to move a cursor you could no longer see.
-		offset = m.statScroll(offset, maxInt(height-4, 1), len(body))
+		offset = m.statScroll(offset, room, len(body))
 	}
-	// Scrolled with ctrl+j and ctrl+k, from wherever you are — the panel is
-	// read, never focused.
-	room := maxInt(height-2-len(lines), 1)
+	// Scrolled with K and J, and ctrl+k and ctrl+j, from wherever you are —
+	// the panel is read, never focused.
 	if offset > maxInt(len(body)-room, 0) {
 		offset = maxInt(len(body)-room, 0)
 	}
@@ -289,39 +284,77 @@ func (m Model) infoContent(inner int) []string {
 	}
 }
 
-// scrollInfoParagraph moves the information panel by a paragraph rather than
-// a line — the same idea as ctrl+k / ctrl+j jumping a whole group in
-// statistics, one level coarser than K and J. A card's rulings run to
-// several paragraphs, and a line at a time is a lot of pressing to walk them.
-func (m *Model) scrollInfoParagraph(delta int) {
-	l := m.ws.layout()
-	if l.info == 0 {
-		return // no information panel on a terminal this narrow
+// infoFrame is the information panel's geometry at a size: the width its
+// text is drawn at, the key hints along its bottom, and how many lines of
+// body it shows between them and its title. One function for drawing and
+// for scrolling, so the two agree on where the bottom is.
+func (m Model) infoFrame(width, height int) (inner int, hints []string, room int) {
+	inner = maxInt(width-2, 1)
+	const title = 2 // the title and the rule under it
+	if m.hintsExpanded {
+		hints = hintFooter(m.infoHintGroups(), inner, height-2-title)
 	}
-	starts := paragraphStarts(m.infoContent(maxInt(l.info-2, 1)))
-	if len(starts) == 0 {
+	return inner, hints, maxInt(height-len(hints)-2-title, 1)
+}
+
+// infoSpan is what scrolling the information panel works within: the width
+// its body is drawn at, how many lines it shows, and the furthest it can
+// scroll. False when the terminal is too narrow to have one.
+func (m Model) infoSpan() (inner, room, most int, ok bool) {
+	ws := m.ws // a copy: layout records the scroll position
+	l := ws.layoutWithFooter(m.footerHeight())
+	if l.info == 0 {
+		return 0, 0, 0, false
+	}
+	inner, _, room = m.infoFrame(l.info, l.height)
+	return inner, room, maxInt(len(m.infoContent(inner))-room, 0), true
+}
+
+// scrollInfoHalf moves the information panel half its height, K up and J
+// down. A card's text and rulings are read, not walked a line at a time.
+func (m *Model) scrollInfoHalf(dir int) {
+	_, room, most, ok := m.infoSpan()
+	if !ok {
 		return
 	}
+	at := minInt(m.info.offset, most) + dir*maxInt(room/2, 1)
+	m.info.offset = maxInt(minInt(at, most), 0)
+}
 
-	cur := m.info.offset
-	switch {
-	case delta > 0:
+// scrollInfoParagraph moves the information panel by a paragraph — the
+// same idea as ctrl+k / ctrl+j jumping a whole group in statistics. A
+// card's rulings run to several paragraphs.
+//
+// Never past the furthest the panel can scroll. It used to go on to the
+// last paragraph's start however far down that was, while the drawing
+// stopped at the bottom: the extra presses built up an offset nobody could
+// see, and ctrl+k then had to unwind all of it before anything moved.
+func (m *Model) scrollInfoParagraph(delta int) {
+	inner, _, most, ok := m.infoSpan()
+	if !ok {
+		return // no information panel on a terminal this narrow
+	}
+	starts := paragraphStarts(m.infoContent(inner))
+	cur := minInt(m.info.offset, most)
+
+	next := 0
+	if delta > 0 {
+		next = most
 		for _, s := range starts {
 			if s > cur {
-				m.info.offset = s
-				return
+				next = s
+				break
 			}
 		}
-		m.info.offset = starts[len(starts)-1]
-	default:
+	} else {
 		for i := len(starts) - 1; i >= 0; i-- {
 			if starts[i] < cur {
-				m.info.offset = starts[i]
-				return
+				next = starts[i]
+				break
 			}
 		}
-		m.info.offset = 0
 	}
+	m.info.offset = minInt(next, most)
 }
 
 // paragraphStarts is the line index each paragraph begins on: a non-blank
