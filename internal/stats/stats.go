@@ -97,13 +97,26 @@ func colorRows() []Row {
 	return rows
 }
 
-func rarityRows(entries []deck.Card) []Row {
-	color := map[string]lipgloss.Color{
-		"common": theme.RarityCommon, "uncommon": theme.RarityUncommon,
-		"rare": theme.RarityRare, "mythic": theme.RarityMythic,
-		"special": theme.RaritySpecial,
+// RarityColour is the colour a rarity is drawn in — its bar here, and a
+// card list's names and column when the list is sorted by rarity. Read at
+// call time rather than kept in a table, so a theme switch carries through.
+func RarityColour(rarity string) lipgloss.Color {
+	switch strings.ToLower(rarity) {
+	case "common":
+		return theme.RarityCommon
+	case "uncommon":
+		return theme.RarityUncommon
+	case "rare":
+		return theme.RarityRare
+	case "mythic":
+		return theme.RarityMythic
+	case "special":
+		return theme.RaritySpecial
 	}
+	return theme.TextMuted
+}
 
+func rarityRows(entries []deck.Card) []Row {
 	// The usual rarities in their usual order, then anything unexpected.
 	order := []string{"common", "uncommon", "rare", "mythic", "special", "bonus"}
 	known := map[string]bool{}
@@ -126,12 +139,8 @@ func rarityRows(entries []deck.Card) []Row {
 	rows := make([]Row, 0, len(order)+len(extra))
 	for _, r := range append(order, extra...) {
 		rarity := r
-		col, ok := color[rarity]
-		if !ok {
-			col = theme.TextMuted
-		}
 		rows = append(rows, Row{
-			Group: "Rarity", Label: rarity, Color: col,
+			Group: "Rarity", Label: rarity, Color: RarityColour(rarity),
 			Match: func(ci deck.Card) bool {
 				got := ci.Card.Rarity
 				if got == "" {
@@ -196,23 +205,38 @@ func typeRows() []Row {
 // of staples in the tens, the odd reserved-list card off on its own. A card
 // Scryfall has no price for is counted in none of them, the way a land is left
 // out of the curve — a bar it can't be placed in is worse than no bar.
-func priceRows() []Row {
-	bands := []struct {
-		label  string
-		lo, hi float64 // [lo, hi); hi of 0 means no upper bound
-	}{
-		{"<$1", 0, 1},
-		{"$1–5", 1, 5},
-		{"$5–10", 5, 10},
-		{"$10–20", 10, 20},
-		{"$20–50", 20, 50},
-		{"$50–100", 50, 100},
-		{"$100–500", 100, 500},
-		{">$500", 500, 0},
+// PriceBand is which of the price bands a dollar value falls in, cheapest
+// first — the same bands the statistics count, so a card list coloured by
+// price and the bars agree about where the lines are.
+func PriceBand(v float64) int {
+	for i, b := range priceBands {
+		if v >= b.lo && (b.hi == 0 || v < b.hi) {
+			return i
+		}
 	}
+	return 0
+}
 
-	rows := make([]Row, 0, len(bands))
-	for _, band := range bands {
+// PriceBands is how many bands there are.
+func PriceBands() int { return len(priceBands) }
+
+var priceBands = []struct {
+	label  string
+	lo, hi float64 // [lo, hi); hi of 0 means no upper bound
+}{
+	{"<$1", 0, 1},
+	{"$1–5", 1, 5},
+	{"$5–10", 5, 10},
+	{"$10–20", 10, 20},
+	{"$20–50", 20, 50},
+	{"$50–100", 50, 100},
+	{"$100–500", 100, 500},
+	{">$500", 500, 0},
+}
+
+func priceRows() []Row {
+	rows := make([]Row, 0, len(priceBands))
+	for _, band := range priceBands {
 		lo, hi := band.lo, band.hi
 		rows = append(rows, Row{
 			Group: "Price (USD)", Label: band.label, Color: theme.Special,

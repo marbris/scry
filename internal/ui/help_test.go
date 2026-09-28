@@ -104,7 +104,7 @@ func TestTheDecksPanelHasItsOwnKeys(t *testing.T) {
 	if !strings.Contains(got, "decks") {
 		t.Errorf("headed:\n%s", got)
 	}
-	for _, want := range []string{"search moxfield", "new deck", "rename"} {
+	for _, want := range []string{"search moxfield", "new", "rename", "git push"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("%q is missing:\n%s", want, got)
 		}
@@ -145,16 +145,18 @@ func TestTheExpandedBarFitsTheScreen(t *testing.T) {
 	}
 }
 
-// keyText is the expanded hint bar as plain text — what ? grows the bar to.
+// keyText is the screen with ? on, as plain text — the keys are drawn
+// inside the panels they act on, so the whole frame is where to read them.
 func keyText(m Model) string {
 	m.hintsExpanded = true
-	return footerOf(m)
+	return stripANSI(m.View())
 }
 
-// footerOf is the bottom of the screen with the hint bar grown to the whole
-// keymap, which is the fuller form the tests below check the content of.
-func footerOf(m Model) string {
-	m.hintsExpanded = true
+// footerOf is the same: what ? shows, wherever on the screen it shows it.
+func footerOf(m Model) string { return keyText(m) }
+
+// bottomLine is the footer alone, which ? no longer grows.
+func bottomLine(m Model) string {
 	l := m.ws.layoutWithFooter(m.footerHeight())
 	return stripANSI(m.viewFooter(l))
 }
@@ -191,8 +193,10 @@ func TestTheHintBarSaysWhichDeckTheEditingKeysChange(t *testing.T) {
 	if !strings.Contains(got, "edit · Ghen") {
 		t.Errorf("the editing keys aren't headed by the deck they change:\n%s", got)
 	}
-	if !strings.Contains(got, "add / add + tag") {
-		t.Errorf("a and A aren't offered:\n%s", got)
+	for _, want := range []string{"add to deck", "add + tag latest", "remove from deck"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("%q isn't offered:\n%s", want, got)
+		}
 	}
 }
 
@@ -201,7 +205,7 @@ func TestNoEditingDeckMeansNoEditingKeys(t *testing.T) {
 	// what is offered instead is the way to choose a deck.
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
 	got := footerOf(m)
-	for _, gone := range []string{"add / add + tag", "tag / remove"} {
+	for _, gone := range []string{"add to deck", "add a copy", "remove from deck"} {
 		if strings.Contains(got, gone) {
 			t.Errorf("%q offered with no deck being edited:\n%s", gone, got)
 		}
@@ -268,21 +272,16 @@ func TestTheNoticeSitsAboveTheKeysAndGoesAway(t *testing.T) {
 	m := withCards(sized(140, 30), "f", sample(), sortArrival)
 	m.notice = "+1 Sol Ring"
 
-	got := footerOf(m)
-	if !strings.Contains(got, "+1 Sol Ring") {
-		t.Fatalf("the notice isn't shown:\n%s", got)
-	}
-	if !strings.Contains(got, "up/down") {
-		t.Errorf("the keys aren't shown alongside the notice:\n%s", got)
-	}
-
-	// The notice is its own line, above the keys; nothing on it is a hint.
+	got := bottomLine(m)
 	lines := strings.Split(got, "\n")
 	if !strings.Contains(lines[0], "+1 Sol Ring") {
-		t.Errorf("the notice isn't on the first line:\n%s", got)
+		t.Fatalf("the notice isn't on the first line:\n%s", got)
 	}
-	if strings.Contains(lines[0], "up/down") {
+	if strings.Contains(lines[0], "quit") {
 		t.Errorf("the keys are packed onto the notice line:\n%s", lines[0])
+	}
+	if len(lines) < 2 || !strings.Contains(lines[1], "q quit") {
+		t.Errorf("the keys aren't shown under the notice:\n%s", got)
 	}
 
 	m = drive(m, "j")

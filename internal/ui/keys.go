@@ -167,17 +167,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// While the statistics are up they have the keys, and the list behind
-	// them gets none: j and k walk the bars, not the cards. What they don't
-	// claim — h and l, the leader, i — goes on to the workspace. Moved onto
-	// something that isn't a list of cards, there's nothing to count, and
-	// the view there has its keys back — all but s, which still closes.
+	// While the statistics are up they have first claim on the keys: j and
+	// k walk the bars, not the cards. What they don't claim goes on to the
+	// list behind them and then the workspace, as it would without them.
+	// Moved onto something that isn't a list of cards, there's nothing to
+	// count, and the view there has its keys back — all but s, which still
+	// closes.
 	statsUp := m.info.mode == infoStats && (m.statList() != nil || key == "s")
-	if statsUp {
-		if m.statsKey(key) {
-			return m, nil
-		}
-	} else if v := p.top(); v != nil {
+	if statsUp && m.statsKey(key) {
+		return m, nil
+	}
+	// What the statistics leave alone still reaches the list behind them —
+	// v, y, t and / work on the cards while the bars are up.
+	if v := p.top(); v != nil {
 		// The view has first refusal on anything that isn't the workspace's.
 		if handled, cmd := v.key(key, &m, p); handled {
 			// The cursor may have moved, so start the clock on whatever is
@@ -209,6 +211,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ws.movePanel(1)
 
 	case "i":
+		// On a deck, i fetches a card into it: the panel's own bar would
+		// follow a Moxfield user, which is the decks panel's business and
+		// not something you reach for from inside a deck.
+		if l := p.cardsView(); l != nil && l.deck != nil {
+			if !l.deck.Local() {
+				m.notice = "that deck isn't yours — w takes a copy you can add to"
+				return m, nil
+			}
+			p.ask(askAddCard, "add from scryfall", "")
+			return m, nil
+		}
 		// The bar keeps the query that produced what's on screen, so i is
 		// "edit this search" rather than "start again" — with the cursor
 		// where you'd carry on typing.
@@ -240,26 +253,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.hintsExpanded = !m.hintsExpanded
 
 	case "esc":
-		// The cascade, outward one step at a time — esc is "back": step off
-		// the information panel's modes, drop a transient selection, then
-		// the narrowings one at a time — the text filter, the statistics
-		// filter — then step back out of a sub-view, and close the panel.
-		// Closing the last one lands on the splash rather than quitting —
-		// esc *from* the splash is what leaves.
-		switch {
-		// A printed history was put on the information panel from here, so
-		// it comes off from here too, before esc starts taking the panel
-		// itself apart.
-		case m.info.mode == infoVersions:
-			m.info.mode = infoCard
-			m.info.cursor, m.info.offset = 0, 0
-		case p.top() != nil && p.top().clear():
-		case p.clearFilter():
-		case clearStatFilter(p.cardsView()):
-		case p.pop():
-		default:
-			m.ws.close()
-		}
+		_, run := (&m).escStep(p)
+		run()
 
 	case "b":
 		// Clear the narrowings on the list in front of you — the text filter
@@ -271,6 +266,42 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.tryQuit()
 	}
 	return m, nil
+}
+
+// escStep is what esc will do next, and the doing of it. One function for
+// both, so the hint naming the next step and the key taking it can't come
+// apart.
+//
+// The cascade, outward one step at a time — esc is "back": step off the
+// information panel's modes, drop a transient selection, then the
+// narrowings one at a time — the text filter, the statistics filter — then
+// step back out of a sub-view, and close the panel. Closing the last one
+// lands on the splash rather than quitting — esc *from* the splash is what
+// leaves.
+func (m *Model) escStep(p *panel) (string, func()) {
+	switch {
+	// A printed history was put on the information panel from here, so it
+	// comes off from here too, before esc starts taking the panel itself
+	// apart.
+	case m.info.mode == infoVersions:
+		return "close printed text", func() {
+			m.info.mode = infoCard
+			m.info.cursor, m.info.offset = 0, 0
+		}
+	case p.cardsView() != nil && p.cardsView().markCount() > 0:
+		return "drop picks", func() { p.top().clear() }
+	case func() bool { v, ok := p.top().(filterable); return ok && v.filterText() != "" }():
+		return "clear /filter", func() { p.clearFilter() }
+	case p.cardsView() != nil && len(p.cardsView().statFilter) > 0:
+		return "clear stats-filter", func() { clearStatFilter(p.cardsView()) }
+	case len(p.stack) > 1:
+		label := "back"
+		if _, ok := p.stack[len(p.stack)-2].(*deckList); ok {
+			label = "back to decks"
+		}
+		return label, func() { p.pop() }
+	}
+	return "close panel", func() { m.ws.close() }
 }
 
 // handleSearchKey is the search bar's own keymap. Everything it doesn't

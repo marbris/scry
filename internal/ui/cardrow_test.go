@@ -294,15 +294,15 @@ func TestTheNameTakesItsColourFromWhatYouSortedBy(t *testing.T) {
 	// The order you chose is the question you are asking.
 	green := mtg.Card{Name: "Llanowar Elves", TypeLine: "Creature — Elf", Colors: []string{"G"}}
 
-	if got := nameColour(green, sortColor); got != theme.ManaG {
+	if got := nameColour(green, sortColor, sortArrival); got != theme.ManaG {
 		t.Errorf("sorting by colour painted the name %v, want green", got)
 	}
 	// Sorting by type colours the type column, not the name: the name stays
 	// plain so the coloured bands are the types alone.
-	if got := nameColour(green, sortType); got != theme.Text {
+	if got := nameColour(green, sortType, sortArrival); got != theme.Text {
 		t.Errorf("sorting by type painted the name %v, want plain", got)
 	}
-	if got := nameColour(green, sortMana); got != theme.Text {
+	if got := nameColour(green, sortMana, sortArrival); got != theme.Text {
 		t.Errorf("sorting by mana painted the name %v, want plain", got)
 	}
 }

@@ -175,143 +175,163 @@ func manaText(symbols []string) string {
 // manaCost is the whole job for callers that only want the text.
 func manaCost(c mtg.Card) string { return manaText(manaSymbols(c.DisplayManaCost())) }
 
-// sortCards returns the cards in the given order. Arrival order is the
-// tiebreak throughout — a stable sort over the list as it came in — so cards
-// that compare equal stay where you last saw them.
+// sortCards returns the cards in the given order, with a second order
+// breaking the first one's ties. Arrival order is the last tiebreak
+// throughout — a stable sort over the list as it came in — so cards that
+// compare equal stay where you last saw them.
+//
+// The second order sits between the first order's own key and whatever the
+// first order does inside its groups: sorted by type, then by colour, the
+// creatures are laid out WUBRG before the colour sort's dearest-first gets a
+// say, and only then does the name decide.
 //
 // Commanders sort with everything else. They come first in decklist order
 // because that is how a decklist is built, not because anything pins them
 // there: sorting by mana value means by mana value.
-func sortCards(cards []deck.Card, s cardSort) []deck.Card {
-	if s == sortArrival || len(cards) < 2 {
+func sortCards(cards []deck.Card, s, then cardSort) []deck.Card {
+	if (s == sortArrival && then == sortArrival) || len(cards) < 2 {
 		return cards
 	}
 	out := append([]deck.Card(nil), cards...)
-	less := lessFor(s)
+	less := lessFor(s, then)
 	sort.SliceStable(out, func(i, j int) bool { return less(out[i].Card, out[j].Card) })
 	return out
 }
 
-func lessFor(s cardSort) func(a, b mtg.Card) bool {
-	byName := func(a, b mtg.Card) bool { return a.Name < b.Name }
+// lessFor composes the comparison: the first order's key, the second
+// order's key, the first order's inner tiebreak, and the name.
+//
+// Arrival as the first order leaves the list where it is: it has no key to
+// compare, and the second order is only a tiebreak — so what it does there
+// is colour the names, not move them.
+func lessFor(s, then cardSort) func(a, b mtg.Card) bool {
+	if s == sortArrival {
+		return func(a, b mtg.Card) bool { return false }
+	}
+	return func(a, b mtg.Card) bool {
+		if c := keyCmp(s, a, b); c != 0 {
+			return c < 0
+		}
+		if then != sortArrival && then != s {
+			if c := keyCmp(then, a, b); c != 0 {
+				return c < 0
+			}
+		}
+		if c := innerCmp(s, a, b); c != 0 {
+			return c < 0
+		}
+		return a.Name < b.Name
+	}
+}
 
+// keyCmp compares two cards on the one property an order is about, and
+// reports them equal when that property is — the name is the caller's.
+func keyCmp(s cardSort, a, b mtg.Card) int {
 	switch s {
 	case sortName:
-		return byName
+		return strings.Compare(a.Name, b.Name)
 
 	case sortMana:
-		return func(a, b mtg.Card) bool {
-			if a.CMC != b.CMC {
-				return a.CMC < b.CMC
-			}
-			return byName(a, b)
-		}
+		return cmpFloat(a.CMC, b.CMC)
 
 	case sortType:
-		return func(a, b mtg.Card) bool {
-			ta, tb := typeRank(a.TypeLine), typeRank(b.TypeLine)
-			if ta != tb {
-				return ta < tb
-			}
-			return byName(a, b)
-		}
+		return cmpInt(typeRank(a.TypeLine), typeRank(b.TypeLine))
 
 	case sortColor:
-		return func(a, b mtg.Card) bool {
-			ca, cb := colorRank(a), colorRank(b)
-			if ca != cb {
-				return ca < cb
-			}
-			// Dearest first within a colour, so the lands — which cost
-			// nothing and are colourless — end up at the very bottom
-			// instead of heading the last group.
-			if a.CMC != b.CMC {
-				return a.CMC > b.CMC
-			}
-			return byName(a, b)
-		}
+		return cmpInt(colorRank(a), colorRank(b))
 
 	case sortRarity:
-		return func(a, b mtg.Card) bool {
-			ra, rb := rarityRank(a.Rarity), rarityRank(b.Rarity)
-			if ra != rb {
-				return ra > rb // rarest first, which is what you're looking for
-			}
-			return byName(a, b)
-		}
+		// Rarest first, which is what you're looking for.
+		return -cmpInt(rarityRank(a.Rarity), rarityRank(b.Rarity))
 
 	case sortEDHREC:
-		return func(a, b mtg.Card) bool {
-			ra, rb := a.EDHRECRank, b.EDHRECRank
-			// Unranked cards have no rank rather than rank zero, so they go
-			// last instead of straight to the top.
-			if ra == 0 {
-				ra = 1 << 30
-			}
-			if rb == 0 {
-				rb = 1 << 30
-			}
-			if ra != rb {
-				return ra < rb
-			}
-			return byName(a, b)
+		ra, rb := a.EDHRECRank, b.EDHRECRank
+		// Unranked cards have no rank rather than rank zero, so they go
+		// last instead of straight to the top.
+		if ra == 0 {
+			ra = 1 << 30
 		}
+		if rb == 0 {
+			rb = 1 << 30
+		}
+		return cmpInt(ra, rb)
 
 	case sortPower:
 		// Biggest first — a list sorted by power is one you're reading for
-		// the top of the curve. Toughness breaks a tie, then the name.
-		return func(a, b mtg.Card) bool {
-			pa, oka := statValue(a.Power)
-			pb, okb := statValue(b.Power)
-			if oka != okb {
-				return oka // cards with a power at all come first
-			}
-			if pa != pb {
-				return pa > pb
-			}
-			ta, _ := statValue(a.Toughness)
-			tb, _ := statValue(b.Toughness)
-			if ta != tb {
-				return ta > tb
-			}
-			return byName(a, b)
-		}
+		// the top of the curve.
+		return cmpStat(a.Power, b.Power)
 
 	case sortToughness:
-		return func(a, b mtg.Card) bool {
-			ta, oka := statValue(a.Toughness)
-			tb, okb := statValue(b.Toughness)
-			if oka != okb {
-				return oka
-			}
-			if ta != tb {
-				return ta > tb
-			}
-			pa, _ := statValue(a.Power)
-			pb, _ := statValue(b.Power)
-			if pa != pb {
-				return pa > pb
-			}
-			return byName(a, b)
-		}
+		return cmpStat(a.Toughness, b.Toughness)
 
 	case sortUSD:
 		// Dearest first — a list sorted by price is one you're reading to see
 		// what a deck costs, or what to cut. A card with no known price sorts
 		// to the bottom rather than posing as free.
-		return func(a, b mtg.Card) bool {
-			pa, oka := a.USD()
-			pb, okb := b.USD()
-			if oka != okb {
-				return oka
+		pa, oka := a.USD()
+		pb, okb := b.USD()
+		if oka != okb {
+			if oka {
+				return -1
 			}
-			if pa != pb {
-				return pa > pb
-			}
-			return byName(a, b)
+			return 1
 		}
+		return -cmpFloat(pa, pb)
 	}
-	return func(a, b mtg.Card) bool { return false }
+	return 0
+}
+
+// innerCmp is what an order does within one of its own groups, before the
+// name has the last word.
+func innerCmp(s cardSort, a, b mtg.Card) int {
+	switch s {
+	case sortColor:
+		// Dearest first within a colour, so the lands — which cost nothing
+		// and are colourless — end up at the very bottom instead of heading
+		// the last group.
+		return -cmpFloat(a.CMC, b.CMC)
+	case sortPower:
+		// Toughness breaks a tie in power, and power one in toughness: a 2/5
+		// and a 2/2 are not the same card.
+		return cmpStat(a.Toughness, b.Toughness)
+	case sortToughness:
+		return cmpStat(a.Power, b.Power)
+	}
+	return 0
+}
+
+// cmpStat orders a power or toughness biggest first, with the cards that
+// have one at all ahead of those that don't.
+func cmpStat(a, b string) int {
+	va, oka := statValue(a)
+	vb, okb := statValue(b)
+	if oka != okb {
+		if oka {
+			return -1
+		}
+		return 1
+	}
+	return -cmpInt(va, vb)
+}
+
+func cmpInt(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
+func cmpFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
 }
 
 // statValue reads a power or toughness for sorting. Empty means the card has

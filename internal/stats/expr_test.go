@@ -111,3 +111,44 @@ func TestAtLeast(t *testing.T) {
 		t.Errorf("whole deck = %v", got)
 	}
 }
+
+func TestAndNotDropsTheCategory(t *testing.T) {
+	creature := find(t, typeRows(), "Creature")
+	black := find(t, colorRows(), "Black")
+	card := func(tl string, colors ...string) deck.Card {
+		return deck.Card{Card: mtg.Card{Name: tl, TypeLine: tl, Colors: colors}, Qty: 1}
+	}
+	blackElf := card("Creature — Elf", "B")
+	greenElf := card("Creature — Elf", "G")
+	blackSpell := card("Instant", "B")
+
+	// After another category, n is AND NOT: creatures that aren't black.
+	var e Expr
+	e, _ = e.Add(And, creature)
+	e, _ = e.Add(AndNot, black)
+	if got, want := e.String(), "Creature ∧¬ Black"; got != want {
+		t.Errorf("String = %q, want %q", got, want)
+	}
+	if e.Match(blackElf) || !e.Match(greenElf) || e.Match(blackSpell) {
+		t.Error("creature AND NOT black matched the wrong cards")
+	}
+
+	// First, it is plain NOT: everything that isn't black.
+	var n Expr
+	n, _ = n.Add(AndNot, black)
+	if got, want := n.String(), "¬Black"; got != want {
+		t.Errorf("String = %q, want %q", got, want)
+	}
+	if n.Match(blackElf) || !n.Match(greenElf) || n.Match(blackSpell) {
+		t.Error("NOT black matched the wrong cards")
+	}
+
+	// And it folds like the others: (¬Black ∨ Creature) ∧¬ … reads left to right.
+	n, _ = n.Add(Or, creature)
+	if got, want := n.String(), "¬Black ∨ Creature"; got != want {
+		t.Errorf("String = %q, want %q", got, want)
+	}
+	if !n.Match(blackElf) || n.Match(blackSpell) {
+		t.Error("NOT black OR creature matched the wrong cards")
+	}
+}

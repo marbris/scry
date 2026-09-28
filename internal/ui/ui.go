@@ -183,6 +183,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case searchDoneMsg:
 		return m.handleSearchDone(msg)
 
+	case addCardMsg:
+		return m.handleAddCard(msg)
+
 	case deckOpenedMsg:
 		return m.handleDeckOpened(msg)
 

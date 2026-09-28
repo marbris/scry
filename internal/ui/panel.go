@@ -338,25 +338,70 @@ func (p *panel) subtitle() string {
 	return ""
 }
 
-// subtitleWithState adds the one thing about a deck that isn't visible in
-// its rows: whether it has been changed since it was last written. Saving is
-// explicit, so a deck that needs saving has to say so.
-func (p *panel) subtitleWithState() string {
-	out := p.subtitle()
-	l := p.cardsView()
-	if l == nil {
-		return out
-	}
-	// A deck that isn't legal says so where you are working on it; the
-	// reasons are in the decks panel, which has room for them.
-	if l.legality != nil && l.legality.Known && !l.legality.Legal {
-		out += " · illegal"
-	}
-	if l.dirty {
-		if out != "" {
-			out += " · "
+// headerRows is everything under the panel's title, a row of segments per
+// kind of fact. A list of cards has three; other views have their subtitle
+// as a single row.
+func (p *panel) headerRows() [][]string {
+	if p.searchOpen {
+		if p.kind == KindFind {
+			return [][]string{{"order: " + p.queryOrder(), "ctrl+o"}}
 		}
-		out += "uncommitted"
+		return nil
+	}
+	if l := p.cardsView(); l != nil {
+		order := ""
+		if l.deck == nil && p.kind == KindFind {
+			order = p.queryOrder()
+		}
+		return l.headerRows(order)
+	}
+	if v := p.top(); v != nil {
+		if sub := v.subtitle(); sub != "" {
+			return [][]string{{sub}}
+		}
+	}
+	return nil
+}
+
+// subLines lays the header rows out at a width. Each row wraps onto as many
+// lines as it needs, breaking between segments — and inside one only when it
+// is wider than the panel on its own, a long filter say. Nothing is cut off:
+// a header that ends in "…" is hiding the one fact you were looking for.
+func (p *panel) subLines(width int) []string {
+	var out []string
+	for _, row := range p.headerRows() {
+		var parts []string
+		for _, seg := range row {
+			if seg == "" {
+				continue
+			}
+			if textWidth(seg) <= width {
+				parts = append(parts, seg)
+				continue
+			}
+			parts = append(parts, hardWrap(seg, width)...)
+		}
+		out = append(out, packStyled(parts, " · ", width)...)
+	}
+	return out
+}
+
+// hardWrap wraps on spaces, and breaks a word that is wider than the width on
+// its own rather than letting it overrun.
+func hardWrap(s string, width int) []string {
+	var out []string
+	for _, line := range wrap(s, width) {
+		r := []rune(line)
+		for textWidth(string(r)) > width {
+			n := 0
+			for n < len(r) && textWidth(string(r[:n+1])) <= width {
+				n++
+			}
+			n = maxInt(n, 1)
+			out = append(out, string(r[:n]))
+			r = r[n:]
+		}
+		out = append(out, string(r))
 	}
 	return out
 }

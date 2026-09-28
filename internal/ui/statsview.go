@@ -282,10 +282,17 @@ func (m *Model) statsKey(key string) bool {
 		m.rotateStat(1)
 	case "K", "shift+up":
 		m.rotateStat(-1)
+	case "o", "O":
+		// o and O sort the list when the statistics are down; up, o is OR
+		// and O is nothing — claimed anyway, so the list isn't re-sorted
+		// by a near miss for o.
+		if key == "o" {
+			m.addStat(stats.Or)
+		}
 	case "a":
 		m.addStat(stats.And)
-	case "o":
-		m.addStat(stats.Or)
+	case "n":
+		m.addStat(stats.AndNot)
 	case "x":
 		m.dropStat()
 	case "b":
@@ -433,7 +440,10 @@ func (m Model) renderStats(width int) []string {
 		out = append(out, lipgloss.NewStyle().Foreground(theme.Marked).
 			Render(fit("filter: "+expr.String(), width)))
 	}
-	out = append(out, dim.Render(fit("a/o and/or · x remove · p odds · s back", width)))
+	// The short reminder, for when ? isn't drawing the whole keymap below.
+	if !m.hintsExpanded {
+		out = append(out, dim.Render(fit("a/o/n and/or/not · x remove · p odds · s back", width)))
+	}
 	return out
 }
 
@@ -443,6 +453,8 @@ func statMark(expr stats.Expr, r stats.Row) string {
 	switch {
 	case i < 0:
 		return " "
+	case i == 0 && expr[0].Op == stats.AndNot:
+		return "¬"
 	case i == 0:
 		return "•"
 	default:

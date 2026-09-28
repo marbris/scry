@@ -23,6 +23,9 @@ type cardList struct {
 	// the sort and the filter build rows from it, so both can be undone.
 	all   []deck.Card
 	order cardSort
+	// order2 breaks order's ties and colours the names — ' and ". Arrival
+	// means there is none.
+	order2 cardSort
 
 	// rows is what's on screen: all, narrowed and sorted.
 	rows []deck.Card
@@ -123,7 +126,7 @@ func (l *cardList) orderName() string {
 // order or one of them forgotten.
 func (l *cardList) refresh() {
 	rows := l.narrowed()
-	l.rows = sortCards(rows, l.order)
+	l.rows = sortCards(rows, l.order, l.order2)
 	l.cursor.clamp(len(l.rows))
 }
 
@@ -203,6 +206,26 @@ func (l *cardList) cycleSort(delta int) {
 	if had {
 		l.selectByName(on.Card.Name)
 	}
+}
+
+// cycleSort2 changes the second order the same way, which moves cards only
+// within the first order's groups — and repaints every name.
+func (l *cardList) cycleSort2(delta int) {
+	on, had := l.current()
+	l.order2 = l.order2.next(delta)
+	l.refresh()
+	if had {
+		l.selectByName(on.Card.Name)
+	}
+}
+
+// order2Name is what the header calls the second order, or nothing when
+// there isn't one.
+func (l *cardList) order2Name() string {
+	if l.order2 == sortArrival {
+		return ""
+	}
+	return l.order2.String()
 }
 
 func (l *cardList) filterText() string { return l.filter }
@@ -362,6 +385,7 @@ func (l *cardList) render(width, height int, members map[string]membership, focu
 			selected: l.marked(c),
 			member:   members[markKey(c)],
 			cursor:   focused && i == l.cursor.at,
+			then:     l.order2,
 		}, width, nameCol))
 	}
 	for len(lines) < height {
@@ -385,6 +409,18 @@ func (l *cardList) names() map[string]bool {
 func (l *cardList) title() string { return l.name }
 
 func (l *cardList) subtitle() string {
+	out := l.countText() + " · " + l.orderName()
+	if o := l.order2Name(); o != "" {
+		out += " · " + o
+	}
+	for _, seg := range l.narrowingSegments() {
+		out += " · " + seg
+	}
+	return out
+}
+
+// countText is how many cards are showing, over how many there are.
+func (l *cardList) countText() string {
 	out := itoa(l.cardCount())
 	if l.count() != l.total() {
 		out += "/" + itoa(l.cardTotal())
@@ -393,20 +429,65 @@ func (l *cardList) subtitle() string {
 		// the whole answer.
 		out += "/" + itoa(l.matched)
 	}
-	out += " · " + l.orderName()
+	return out
+}
+
+// narrowingSegments is what has been picked out and narrowed away: the two
+// narrowings the rows can't show for themselves. A panel filtered down to a
+// few cards otherwise looks like a short search, and a stat filter set from
+// the panel beside it leaves no mark here at all.
+func (l *cardList) narrowingSegments() []string {
+	var out []string
 	if n := l.markCount(); n > 0 {
-		out += " · " + itoa(n) + " picked"
+		out = append(out, itoa(n)+" picked")
 	}
-	// The two narrowings the rows can't show for themselves: a panel filtered
-	// down to a few cards otherwise looks like a short search, and a stat
-	// filter set from the panel beside it leaves no mark here at all.
 	if l.filter != "" {
-		out += " · /" + l.filter
+		out = append(out, "/"+l.filter)
 	}
 	if len(l.statFilter) > 0 {
-		out += " · [" + l.statFilter.String() + "]"
+		out = append(out, "["+l.statFilter.String()+"]")
 	}
 	return out
+}
+
+// headerRows is the header under the list's name, a row per kind of fact:
+// the deck's state, then where you are and how it is ordered, then how it
+// has been narrowed. Rows are wrapped, never cut — see panel.subLines.
+//
+// queryOrder is the order the Scryfall request asked for, for a list that
+// is a search result; a deck came from no request and leaves it empty.
+func (l *cardList) headerRows(queryOrder string) [][]string {
+	var state []string
+	if l.deck != nil && l.deck.Local() {
+		if l.dirty {
+			state = append(state, "uncommitted")
+		} else {
+			state = append(state, "committed")
+		}
+	}
+	if l.legality != nil && l.legality.Known {
+		if l.legality.Legal {
+			state = append(state, "legal")
+		} else {
+			state = append(state, "illegal")
+		}
+	}
+
+	// [2]20/150: the second row from the top, twenty showing of 150.
+	count := l.countText()
+	if len(l.rows) > 0 {
+		count = "[" + itoa(l.cursor.at+1) + "]" + count
+	}
+	where := []string{count}
+	if queryOrder != "" {
+		where = append(where, queryOrder)
+	}
+	where = append(where, l.orderName())
+	if o := l.order2Name(); o != "" {
+		where = append(where, o)
+	}
+
+	return [][]string{state, where, l.narrowingSegments()}
 }
 
 func (l *cardList) lines(width, height int, focused bool, m *Model) []string {
@@ -429,6 +510,10 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		l.cycleSort(1)
 	case "O":
 		l.cycleSort(-1)
+	case "'":
+		l.cycleSort2(1)
+	case "\"":
+		l.cycleSort2(-1)
 	case "v":
 		l.toggleMark()
 	case "V":
@@ -505,26 +590,29 @@ func (l *cardList) keys() []hintGroup {
 	nav := [][2]string{
 		{"j k", "up/down"},
 		{"gg G", "first/last"},
-		{"o O", "sort"},
+		{"o O", "sort 1"},
+		{"' \"", "sort 2"},
 		{"/", "filter"},
 	}
 
 	sel := [][2]string{
-		{"v V", "pick one/all"},
+		{"v V", "select one/all"},
 		{"y", "yank"},
 	}
 	// p puts into the list in front of you, so it only earns a hint when
 	// that list is one of yours to write to.
-	if l.deck != nil && l.deck.Local() {
+	local := l.deck != nil && l.deck.Local()
+	if local {
 		sel = append(sel, [2]string{"p", "put"})
 	}
-	if l.deck != nil && l.deck.Local() {
+	sel = append(sel, [2]string{"t", "tag"})
+	if local {
 		sel = append(sel, [2]string{"w", "commit"})
 	} else {
 		// Not yours, so writing it asks for a name and makes it yours.
-		sel = append(sel, [2]string{"w W", "save as deck"})
+		sel = append(sel, [2]string{"w W", "save as new deck"})
 	}
-	sel = append(sel, [2]string{"gv", "text history"})
+	sel = append(sel, [2]string{"gv", "card history"})
 
 	return []hintGroup{{"navigation", nav}, {"select", sel}}
 }

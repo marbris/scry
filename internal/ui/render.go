@@ -16,10 +16,17 @@ func (m Model) viewWorkspace() string {
 	ws := m.ws // a copy: layout records the scroll position, and View is a
 	l := ws.layoutWithFooter(m.footerHeight())
 
+	// Every visible panel's header is as tall as the tallest, so the rules
+	// under them — and the first rows of cards — line up across the row.
+	subHeight := 0
+	for i, width := range l.panels {
+		subHeight = maxInt(subHeight, len(ws.panels[l.first+i].subLines(maxInt(width-2, 1))))
+	}
+
 	var columns []string
 	for i, width := range l.panels {
 		at := l.first + i
-		columns = append(columns, m.viewPanel(ws.panels[at], at, width, l.height))
+		columns = append(columns, m.viewPanel(ws.panels[at], at, width, l.height, subHeight))
 	}
 	if l.info > 0 {
 		columns = append(columns, m.viewInfo(l.info, l.height))
@@ -30,7 +37,9 @@ func (m Model) viewWorkspace() string {
 }
 
 // viewPanel draws one panel: a border, its header, and its contents.
-func (m Model) viewPanel(p *panel, index, width, height int) string {
+// subHeight is how many lines the header under the title takes; the panel
+// pads its own to that, so neighbours stay level.
+func (m Model) viewPanel(p *panel, index, width, height, subHeight int) string {
 	focused := index == m.ws.focused
 	editing := index == m.ws.editing
 
@@ -58,14 +67,26 @@ func (m Model) viewPanel(p *panel, index, width, height int) string {
 		headLine = head.Render(fit(text, inner))
 	}
 	lines := []string{headLine}
-	if sub := p.subtitleWithState(); sub != "" {
-		lines = append(lines, lipgloss.NewStyle().
-			Foreground(theme.TextMuted).Render(fit(sub, inner)))
+	muted := lipgloss.NewStyle().Foreground(theme.TextMuted)
+	sub := p.subLines(inner)
+	for _, s := range sub {
+		lines = append(lines, muted.Render(pad(s, inner)))
+	}
+	for i := len(sub); i < subHeight; i++ {
+		lines = append(lines, strings.Repeat(" ", inner))
 	}
 	lines = append(lines, lipgloss.NewStyle().
 		Foreground(theme.Border).
 		Render(strings.Repeat("─", inner)))
-	lines = append(lines, m.viewPanelBody(p, inner, maxInt(height-2-len(lines), 1))...)
+
+	// With ? on, the focused panel's keys sit along its bottom — under the
+	// cards they act on, rather than in a bar the width of the screen.
+	var hints []string
+	if focused && m.hintsExpanded {
+		hints = hintFooter(m.panelHintGroups(p), inner, height-2-len(lines))
+	}
+	lines = append(lines, m.viewPanelBody(p, inner, maxInt(height-2-len(lines)-len(hints), 1))...)
+	lines = append(lines, hints...)
 
 	body := lipgloss.NewStyle().
 		Width(inner).
@@ -177,6 +198,12 @@ func (m Model) viewInfo(width, height int) string {
 		lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", inner)),
 	}
 
+	var hints []string
+	if m.hintsExpanded {
+		hints = hintFooter(m.infoHintGroups(), inner, height-2-len(lines))
+	}
+	height -= len(hints) // the body scrolls in what the keys leave it
+
 	body := m.infoContent(inner)
 	offset := m.info.offset
 	if m.info.mode == infoStats {
@@ -210,6 +237,8 @@ func (m Model) viewInfo(width, height int) string {
 	if len(lines) > height-2 {
 		lines = lines[:maxInt(height-2, 1)]
 	}
+	lines = append(lines, hints...)
+	height += len(hints)
 
 	block := lipgloss.NewStyle().Width(inner).Height(maxInt(height-2, 1)).
 		MaxWidth(inner).Render(strings.Join(lines, "\n"))
@@ -467,24 +496,75 @@ func (m Model) footerLines() []string {
 	return append(lines, hints...)
 }
 
-// footerGroups is what the hint bar shows: at rest, the three keys that reach
-// everything else; pressing ? grows it to the whole contextual keymap.
+// footerGroups is what the bottom line shows: the three keys that reach
+// everything else. ? draws the rest inside the panels they belong to.
 //
-// A focused search bar is the exception — it shows its own small keymap and ?
-// is a character there, so there is nothing to collapse or grow.
+// A focused search bar is the exception — it shows its own small keymap,
+// and ? is a character there, so there is nothing to grow.
 func (m Model) footerGroups() []hintGroup {
 	p := m.ws.current()
 	if p != nil && p.searchOpen && p.search.Focused() {
 		return m.hintGroups()
 	}
-	if m.hintsExpanded {
-		return m.hintGroups()
+	return []hintGroup{{"", restingKeys}}
+}
+
+// hintFooter is a block of keys for the bottom of a panel: a rule, then the
+// groups, each wrapping onto as many lines as it needs. room is how many
+// lines the panel has for body and keys together; the keys leave the body a
+// few of them, and give up their last lines rather than the cards.
+func hintFooter(groups []hintGroup, width, room int) []string {
+	if len(groups) == 0 {
+		return nil
 	}
-	return []hintGroup{{"", [][2]string{
-		{"space", "menu"},
-		{"?", "keys"},
-		{"q", "quit"},
-	}}}
+	block := hintBlock(groups, width)
+	max := room - minBodyUnderHints - 1
+	if max < 1 {
+		return nil
+	}
+	if len(block) > max {
+		block = block[:max]
+	}
+	rule := lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", width))
+	out := []string{rule}
+	for _, line := range block {
+		out = append(out, pad(line, width))
+	}
+	return out
+}
+
+// minBodyUnderHints is how many rows a panel keeps for what it shows when
+// the keys are drawn under it.
+const minBodyUnderHints = 3
+
+// hintBlock renders grouped keys for a panel: each group leads with its
+// title, and its keys wrap rather than being dropped — the panel is where
+// the whole keymap lives now, and a key cut off it is a key nobody finds.
+func hintBlock(groups []hintGroup, width int) []string {
+	// The group titles are a colour of their own, so they read as headings
+	// rather than as one more key.
+	head := lipgloss.NewStyle().Foreground(theme.Info).Bold(true)
+	key := lipgloss.NewStyle().Foreground(theme.Accent)
+	what := lipgloss.NewStyle().Foreground(theme.TextMuted)
+
+	var out []string
+	for _, g := range groups {
+		var parts []string
+		if g.title != "" {
+			parts = append(parts, head.Render(truncate(g.title+":", width)))
+		}
+		for _, r := range g.keys {
+			k, w := r[0], r[1]
+			// A part wider than the whole panel is cut rather than left to
+			// overrun it; at any usable width a key and its label fit.
+			if textWidth(k)+1+textWidth(w) > width {
+				w = truncate(w, maxInt(width-textWidth(k)-1, 1))
+			}
+			parts = append(parts, key.Render(k)+" "+what.Render(w))
+		}
+		out = append(out, packStyled(parts, "  ", width)...)
+	}
+	return out
 }
 
 // hintGroupLines renders grouped keys, one row per group, each led by its

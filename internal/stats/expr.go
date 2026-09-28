@@ -15,11 +15,17 @@ type Op int
 const (
 	And Op = iota
 	Or
+	// AndNot keeps what came before and drops the cards in this category.
+	// As the first clause there is nothing before it, so it is simply NOT.
+	AndNot
 )
 
 func (o Op) Symbol() string {
-	if o == Or {
+	switch o {
+	case Or:
 		return "∨"
+	case AndNot:
+		return "∧¬"
 	}
 	return "∧"
 }
@@ -32,8 +38,9 @@ type Clause struct {
 
 // Expr is a narrowing built a category at a time. It folds from the left —
 // ((c0 op1 c1) op2 c2) … — which is the order the categories were added in,
-// so the expression reads the way it was built. The first clause's Op is
-// never consulted: one category on its own is neither.
+// so the expression reads the way it was built. The first clause's Op only
+// matters when it is AndNot: one category on its own is neither AND nor OR,
+// but it can still be negated.
 type Expr []Clause
 
 // Match reports whether a card survives the narrowing. An empty expression
@@ -43,10 +50,16 @@ func (e Expr) Match(c deck.Card) bool {
 		return true
 	}
 	ok := e[0].Row.Match(c)
+	if e[0].Op == AndNot {
+		ok = !ok
+	}
 	for _, cl := range e[1:] {
-		if cl.Op == Or {
+		switch cl.Op {
+		case Or:
 			ok = ok || cl.Row.Match(c)
-		} else {
+		case AndNot:
+			ok = ok && !cl.Row.Match(c)
+		default:
 			ok = ok && cl.Row.Match(c)
 		}
 	}
@@ -90,13 +103,17 @@ func (e Expr) Without(r Row) Expr {
 }
 
 // String is the expression as it would be written:
-// ((Creature ∧ Black) ∨ Artifact) ∧ 5.
+// ((Creature ∧ Black) ∨ Artifact) ∧ 5, with a negated first category
+// written ¬Black.
 func (e Expr) String() string {
 	if len(e) == 0 {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(strings.Repeat("(", max(len(e)-2, 0)))
+	if e[0].Op == AndNot {
+		b.WriteString("¬")
+	}
 	b.WriteString(e[0].Row.Label)
 	for i, cl := range e[1:] {
 		b.WriteString(" " + cl.Op.Symbol() + " " + cl.Row.Label)

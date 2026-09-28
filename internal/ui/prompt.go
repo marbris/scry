@@ -28,6 +28,9 @@ const (
 	askFollow
 	askTag
 	askWrite
+	// askAddCard is i on a deck: a Scryfall query whose one answer goes
+	// into the deck in front of you.
+	askAddCard
 )
 
 // ask raises the prompt.
@@ -92,6 +95,9 @@ func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if l := p.cardsView(); l != nil {
 				m.tag(l.selection(), answer)
 			}
+
+		case askAddCard:
+			return m, runAddCard(p.id, answer)
 
 		case askWrite:
 			if l := p.cardsView(); l != nil {

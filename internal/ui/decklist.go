@@ -994,13 +994,12 @@ func (l *deckList) keys() []hintGroup {
 		}},
 		{"decks", [][2]string{
 			{"enter", "open/fold"},
-			{"L", "beside"},
-			{"n", "new deck"},
+			{"L", "open beside"},
+			{"n", "new"},
 			{"r", "rename"},
 			{"c C", "copy deck/&considering"},
-			{"x y p", "cut/yank/put"},
+			{"d x y p", "delete/cut/yank/put"},
 			{"s", "git push"},
-			{"d", "delete"},
 			{"gv", "versions"},
 		}},
 	}

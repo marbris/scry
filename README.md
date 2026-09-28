@@ -241,7 +241,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `gg` `G` | first / last row |
 | `K` `J` | move within the info panel |
 | `ctrl+k` `ctrl+j` | info panel, a paragraph at a time |
-| `space` | the menu · `?` grow the hint bar · `q` quit |
+| `space` | the menu · `?` show keys in the panels · `q` quit |
 
 **In a list of cards**
 
@@ -249,7 +249,8 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | --- | --- |
 | `/` | filter as you type |
 | `o` `O` | cycle the sort order |
-| `i` | edit the search |
+| `'` `"` | cycle the second sort order, which colours the names |
+| `i` | edit the search · on a deck of yours, add a card from Scryfall |
 | `v` `V` | select one / all shown |
 | `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
 | `t` `x` | tag the selection · remove a copy |

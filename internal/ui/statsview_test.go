@@ -446,20 +446,30 @@ func TestADeckStillCountsItsCopies(t *testing.T) {
 	t.Fatal("no Land row")
 }
 
-func TestTheStatisticsHintsDontOfferTheEditingKeys(t *testing.T) {
-	// a, x and t filter the bars while the statistics have the keys, so the
-	// hints for adding, removing and tagging would be offering keys that
-	// don't do that.
+func TestTheStatisticsHintsDontOfferTheKeysTheyTake(t *testing.T) {
+	// j, k, a, x, o, O, p and P mean something else while the statistics
+	// have the keys, so the list's hints for them would be offering keys that
+	// don't do that. The rest — c, u, e, v, y — still reach the list, and
+	// stay on offer.
 	m, _, _ := editing(t)
 	m = drive(m, "s")
+	offered := map[string]bool{}
 	for _, g := range m.hintGroups() {
-		if strings.HasPrefix(g.title, "edit") {
-			t.Errorf("the %q group is on offer in the statistics", g.title)
-		}
 		for _, k := range g.keys {
-			if g.title != "statistics" && (k[0] == "b" || strings.HasPrefix(k[0], "a") || k[0] == "x") {
-				t.Errorf("%q %q is offered outside the statistics group", k[0], k[1])
+			offered[k[0]] = true
+			if g.title == "statistics" {
+				continue
 			}
+			for _, f := range strings.Fields(k[0]) {
+				if statsTaken[f] {
+					t.Errorf("%q %q is offered in %q while the statistics have it", k[0], k[1], g.title)
+				}
+			}
+		}
+	}
+	for _, want := range []string{"c", "u", "v V", "y"} {
+		if !offered[want] {
+			t.Errorf("%q isn't offered while the statistics are up", want)
 		}
 	}
 }

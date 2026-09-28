@@ -7,6 +7,7 @@ import (
 
 	"scry/internal/deck"
 	"scry/internal/mtg"
+	"scry/internal/stats"
 	"scry/internal/theme"
 )
 
@@ -44,6 +45,9 @@ type rowState struct {
 	selected bool       // picked out with v
 	member   membership // where else on screen the card is — see membersFor
 	cursor   bool       // under the cursor
+	// then is the list's second order. The first decides the column; this
+	// one decides the colour of the name.
+	then cardSort
 }
 
 // renderRow draws one card to exactly width columns.
@@ -79,7 +83,7 @@ func renderRowCol(c deck.Card, order cardSort, st rowState, width, nameCol int) 
 	// The sort decides what the row is about, so it decides what is worth
 	// colouring. Sorting by colour and reading a column of grey names tells
 	// you nothing the order didn't already.
-	nameStyle := lipgloss.NewStyle().Foreground(nameColour(c.Card, order))
+	nameStyle := lipgloss.NewStyle().Foreground(nameColour(c.Card, order, st.then))
 	if st.cursor {
 		nameStyle = lipgloss.NewStyle().Foreground(theme.SelectionFg).Bold(true)
 	}
@@ -98,22 +102,106 @@ func renderRowCol(c deck.Card, order cardSort, st rowState, width, nameCol int) 
 
 // nameColour is what the card's name is written in.
 //
-// Plain text unless the list is ordered by something the name can carry: by
-// colour, the name takes the card's colour. Sorting by type colours the type
-// column alone — the name stays plain, so the eye reads the types as bands
-// without the whole row taking their colour.
-func nameColour(c mtg.Card, order cardSort) lipgloss.Color {
-	switch order {
-	case sortColor:
-		return colourForCard(c.DisplayColors())
+// The second order decides it: sorted by type and then by colour, the type
+// column carries the type and the name carries the card's colour, so one
+// row says two things. An order with no colour of its own — mana value,
+// price, a rank — leaves the name plain.
+//
+// With no second order, sorting by colour still colours the name: the
+// column beside it is a mana cost, which says the colour symbol by symbol
+// but not at a glance.
+func nameColour(c mtg.Card, order, then cardSort) lipgloss.Color {
+	if then == sortArrival {
+		then = order
+		if order != sortColor {
+			return theme.Text
+		}
+	}
+	if col, ok := sortColour(c, then); ok {
+		return col
 	}
 	return theme.Text
 }
 
+// sortColour is the colour an order paints a card. The categorical orders
+// use the category's own colour — its colour, its type, its rarity. The
+// numeric ones place the card on a ramp from cool to hot: mana value, power
+// and toughness by the number itself, price and EDHREC rank by band, since a
+// dollar or a rank more is no difference worth a colour.
+func sortColour(c mtg.Card, s cardSort) (lipgloss.Color, bool) {
+	switch s {
+	case sortColor:
+		return colourForCard(c.DisplayColors()), true
+	case sortType:
+		return typeColour(c.TypeLine), true
+	case sortRarity:
+		return stats.RarityColour(c.Rarity), true
+	case sortMana:
+		return rampColour(int(c.CMC)), true
+	case sortPower, sortToughness:
+		stat := c.Power
+		if s == sortToughness {
+			stat = c.Toughness
+		}
+		v, ok := statValue(stat)
+		if !ok || v < 0 {
+			return theme.TextMuted, true // no number, or a * with none honest
+		}
+		return rampColour(v), true
+	case sortUSD:
+		v, ok := c.USD()
+		if !ok {
+			return theme.TextMuted, true
+		}
+		return rampColour(stats.PriceBand(v) * (len(ramp()) - 1) / maxInt(stats.PriceBands()-1, 1)), true
+	case sortEDHREC:
+		return rampColour(edhrecBand(c.EDHRECRank)), true
+	}
+	return "", false
+}
+
+// ramp is the scale the numeric orders paint on, low to high. Built from the
+// theme's roles at call time, so a theme switch repaints it.
+func ramp() []lipgloss.Color {
+	return []lipgloss.Color{
+		theme.TextDim, theme.Info, theme.Member, theme.Success,
+		theme.Highlight, theme.Accent, theme.Error, theme.Special,
+	}
+}
+
+// rampColour is step n of the ramp, the top step standing for everything
+// past it — a nine-drop is as hot as a seven.
+func rampColour(n int) lipgloss.Color {
+	r := ramp()
+	return r[max(0, min(n, len(r)-1))]
+}
+
+// edhrecBand puts a rank on the ramp: the most played cards hottest, the
+// unranked coolest.
+func edhrecBand(rank int) int {
+	switch {
+	case rank <= 0:
+		return 0
+	case rank <= 100:
+		return 7
+	case rank <= 500:
+		return 6
+	case rank <= 1000:
+		return 5
+	case rank <= 2500:
+		return 4
+	case rank <= 5000:
+		return 3
+	case rank <= 10000:
+		return 2
+	}
+	return 1
+}
+
 // paintColumn renders the second column. A mana cost gets a colour per
-// symbol, which is how you read a curve at a glance; a type line takes its
-// type's colour; anything else is dim, being a number rather than a fact
-// about the card.
+// symbol, which is how you read a curve at a glance; anything else takes the
+// colour the order gives the card — a type's, a rarity's, or a step on the
+// ramp for a price, a rank, a power or a toughness.
 func paintColumn(text string, c mtg.Card, order cardSort, under bool) string {
 	if text == "" {
 		return ""
@@ -122,11 +210,14 @@ func paintColumn(text string, c mtg.Card, order cardSort, under bool) string {
 		return lipgloss.NewStyle().Foreground(theme.SelectionFg).Render(text)
 	}
 
-	switch {
-	case order.showsMana():
+	if order.showsMana() {
 		return paintMana(text)
-	case order == sortType:
-		return lipgloss.NewStyle().Foreground(typeColour(c.TypeLine)).Render(text)
+	}
+	// Everything else takes the colour its order gives the card: a type's,
+	// a rarity's, or a place on the ramp for a number — the same colour the
+	// name takes when the order is second, so the two sorts read alike.
+	if col, ok := sortColour(c, order); ok {
+		return lipgloss.NewStyle().Foreground(col).Render(text)
 	}
 	return lipgloss.NewStyle().Foreground(theme.TextDim).Render(text)
 }

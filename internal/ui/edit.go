@@ -85,6 +85,13 @@ func (m *Model) add(cards []deck.Card) {
 		return
 	}
 
+	m.notice = addTo(l, cards)
+}
+
+// addTo is the body of an add, against whichever list it is given: a for the
+// editing deck, i for a card fetched into the deck in front of you. It
+// returns the notice to show.
+func addTo(l *cardList, cards []deck.Card) string {
 	l.pushUndo(label("+", cards))
 	added, raised := 0, 0
 	for _, c := range cards {
@@ -100,7 +107,7 @@ func (m *Model) add(cards []deck.Card) {
 	}
 	l.refresh()
 	l.recheck()
-	m.notice = addNotice(cards, added, raised)
+	return addNotice(cards, added, raised)
 }
 
 // remove takes a copy away, and the row with it when the last one goes.
