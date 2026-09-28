@@ -140,6 +140,8 @@ type panel struct {
 	// to follow — open only while you're answering it.
 	asking   askKind
 	askInput textinput.Model
+	// tagComp is tab completion under way in the tag prompt.
+	tagComp *tagCompletion
 	// writeToNewPane remembers whether it was w or W that raised the
 	// save-as prompt, since the answer arrives long after the key.
 	writeToNewPane bool

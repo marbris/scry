@@ -255,7 +255,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `i` | edit the search · on a deck of yours, add a card from Scryfall |
 | `v` `V` | select one / all shown |
 | `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
-| `t` `x` | tag the selection · remove a copy |
+| `t` `x` | tag the selection (`tab` completes a tag you already use) · remove a copy |
 | `c` | set as the editing deck's commander |
 | `u` | undo the last edit |
 | `y` `p` | yank the selection · put it into this list |

@@ -36,6 +36,7 @@ const (
 // ask raises the prompt.
 func (p *panel) ask(kind askKind, label, initial string) {
 	p.asking = kind
+	p.tagComp = nil
 	p.askInput = textinput.New()
 	p.askInput.Prompt = label + ": "
 	p.askInput.PromptStyle = lipgloss.NewStyle().Foreground(theme.Accent)
@@ -50,12 +51,25 @@ func (p *panel) stopAsking() {
 	p.askInput.Blur()
 }
 
-// handleAskKey runs the prompt. Enter acts, esc abandons, and everything
-// else is typing — there is nothing else a one-line question needs.
+// handleAskKey runs the prompt. Enter acts, esc abandons, tab completes a
+// tag, and everything else is typing — there is nothing else a one-line
+// question needs.
 func (m Model) handleAskKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.ws.current()
 
-	switch msg.String() {
+	key := msg.String()
+	if p.asking == askTag && (key == "tab" || key == "shift+tab") {
+		delta := 1
+		if key == "shift+tab" {
+			delta = -1
+		}
+		m.completeTag(p, delta)
+		return m, nil
+	}
+	// Anything but tab ends a walk through the tags that fit.
+	p.tagComp = nil
+
+	switch key {
 	case "esc":
 		p.stopAsking()
 		return m, nil
