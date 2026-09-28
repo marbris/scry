@@ -265,12 +265,12 @@ func TestTheQuerySortAndTheListSortAreDifferentThings(t *testing.T) {
 	m = answer(m, p, sample(), 4, nil)
 
 	queryBefore := p.queryOrder()
-	m = drive(m, "o")
+	m = drive(m, ".")
 	if p.queryOrder() != queryBefore {
-		t.Error("o changed the order the request asks for")
+		t.Error(". changed the order the request asks for")
 	}
 	if p.cardsView().order == sortArrival {
-		t.Error("o did not change the order on screen")
+		t.Error(". did not change the order on screen")
 	}
 }
 

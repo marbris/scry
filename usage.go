@@ -12,6 +12,7 @@ Usage:
   scry sync …               Mirror your decks to a git remote — see ` + "`scry sync`" + `
   scry rules …              The comprehensive rules — see ` + "`scry rules`" + `
   scry theme …              Colours — see ` + "`scry theme`" + `
+  scry keys …               Keybindings — see ` + "`scry keys -h`" + `
   scry -v, --version        Print the version
   scry -h, --help           This
 
@@ -21,9 +22,9 @@ Queries use Scryfall's own syntax:
 
 The app is a row of panels. space opens the menu, ? shows the keys.
 
-Files follow the XDG directories: decks in the data directory, settings and
-themes in the config directory, session state in the state directory, and
-everything re-downloadable in the cache. Decks are files in a git repository
-— SCRY_DECKS_DIR moves them somewhere else.`
+Files follow the XDG directories: decks in the data directory, settings,
+keys and themes in the config directory, session state in the state
+directory, and everything re-downloadable in the cache. Decks are files in a
+git repository — SCRY_DECKS_DIR moves them somewhere else.`
 
 func printUsage() { fmt.Println(cliUsage) }

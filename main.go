@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 	"scry/internal/moxfield"
 	"scry/internal/paths"
 	"scry/internal/rules"
@@ -36,6 +37,11 @@ func main() {
 	if err := theme.Load(); err != nil {
 		fmt.Fprintln(os.Stderr, "Warning:", err)
 	}
+	// The same for keys.json: what can't be used is named, and the default
+	// keys stand in for it.
+	if err := keymap.Load(); err != nil {
+		fmt.Fprintln(os.Stderr, "Warning:", err)
+	}
 
 	args := os.Args[1:]
 	if len(args) == 0 {
@@ -55,6 +61,10 @@ func main() {
 
 	case "theme":
 		runTheme(args[1:])
+		return
+
+	case "keys":
+		runKeys(args[1:])
 		return
 
 	case "rules":

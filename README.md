@@ -183,7 +183,7 @@ Open panels straight to what you want:
 1. `space d` → `n` to make a new deck (or open an existing one). It becomes the editing deck.
 2. `space f` and run a Scryfall query.
 3. Scroll the results; the info panel shows each card. Press `a` to add the highlighted card, or select several with `v`/`V` and add them together.
-4. `/` filters what's on screen, `o`/`O` re-sorts it (mana value, type, colour, power/toughness, EDHREC rank…), `t` tags the selection.
+4. `/` filters what's on screen, `.`/`>` re-sorts it (mana value, type, colour, power/toughness, EDHREC rank…), `t` tags the selection.
 5. `s` opens statistics for the list; walk the categories with `j`/`k` and add them to the filter with `a`/`o`.
 6. Every edit is written to the deck file as you make it; `w` commits it to git. `space w` commits the editing deck from anywhere.
 
@@ -220,6 +220,8 @@ scry sync off                   # disconnect (your decks are untouched)
 scry rules <query>              # search the comprehensive rules
 scry theme                      # list colour themes
 scry theme <name>               # switch theme
+scry keys                       # list every key binding
+scry keys --defaults            # print the defaults as a keys.json to edit
 ```
 
 Because every deck is a file in a git repository, `git log`, `git diff`, and friends work on your decks directly.
@@ -248,8 +250,8 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | Key | Does |
 | --- | --- |
 | `/` | filter as you type |
-| `o` `O` | cycle the sort order |
-| `'` `"` | cycle the second sort order, which colours the names |
+| `.` `>` | cycle the sort order, which fills the right-hand column |
+| `,` `<` | cycle the second sort order, which colours the names on the left |
 | `i` | edit the search · on a deck of yours, add a card from Scryfall |
 | `v` `V` | select one / all shown |
 | `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
@@ -311,6 +313,20 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 
 </details>
 
+### Rebinding keys
+
+Every key is a default you can move. Put the ones you want changed in `~/.config/scry/keys.json`, grouped by where the key acts. To put the sorts back on the keys they used to have, and bring back `,` as a second leader:
+
+```json
+{
+  "cards":  { "sort1.next": ["o"], "sort1.prev": ["O"],
+              "sort2.next": ["'"], "sort2.prev": ["\""] },
+  "global": { "leader": ["space", ","] }
+}
+```
+
+`scry keys` lists every scope, action and key as they're bound now, and `scry keys --defaults` prints the whole keymap as a file to start from. The hints on screen follow your bindings. A clash within one scope is reported on startup, and that scope keeps its defaults until it's fixed. `scry keys -h` has the details.
+
 ## Where your files live, and how to uninstall
 
 `scry` follows the standard per-user directories for your OS. Four kinds of file live in four places, which is what tells a backup what to keep and an uninstall what's safe to delete:
@@ -318,7 +334,7 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 | | Holds | Linux | macOS | Windows |
 | --- | --- | --- | --- | --- |
 | **Data** | your decks (back this up!) | `~/.local/share/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
-| **Config** | settings and themes | `~/.config/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
+| **Config** | settings, keys and themes | `~/.config/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
 | **State** | session, query history | `~/.local/state/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
 | **Cache** | downloaded card data, rules | `~/.cache/scry` | `~/Library/Caches/scry` | `%LocalAppData%\scry` |
 

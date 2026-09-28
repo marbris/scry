@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 )
 
 // Writing a list to disk.
@@ -68,12 +69,12 @@ func (m *Model) write(l *cardList, p *panel, newPane bool) tea.Cmd {
 func (m *Model) writeEditing() tea.Cmd {
 	p := m.ws.editingPanel()
 	if p == nil {
-		m.notice = "no deck is being edited — e chooses one"
+		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
 		return nil
 	}
 	l := p.cardsView()
 	if l == nil {
-		m.notice = "no deck is being edited — e chooses one"
+		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
 		return nil
 	}
 	return m.write(l, p, false)

@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/keymap"
 	"scry/internal/theme"
 )
 
@@ -22,9 +25,9 @@ func (m Model) viewSplash() string {
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
 
 	rows := []struct{ k, v string }{
-		{"space f", "find cards on Scryfall"},
-		{"space d", "your decks, and Moxfield"},
-		{"space r", "the comprehensive rules"},
+		{leaderHint(keymap.LeaderFind), "find cards on Scryfall"},
+		{leaderHint(keymap.LeaderDecks), "your decks, and Moxfield"},
+		{leaderHint(keymap.LeaderRules), "the comprehensive rules"},
 	}
 
 	var lines []string
@@ -32,7 +35,20 @@ func (m Model) viewSplash() string {
 	for _, r := range rows {
 		lines = append(lines, key.Render(pad(r.k, 9))+" "+what.Render(r.v))
 	}
-	lines = append(lines, "", dim.Render("space for the menu · ? for the keys · q to quit"))
+	var how []string
+	for _, h := range []struct {
+		action keymap.Action
+		what   string
+	}{
+		{keymap.GlobalLeader, " for the menu"},
+		{keymap.GlobalHelp, " for the keys"},
+		{keymap.GlobalQuit, " to quit"},
+	} {
+		if k := keymap.Hint(keymap.Global, h.action); k != "" {
+			how = append(how, k+h.what)
+		}
+	}
+	lines = append(lines, "", dim.Render(strings.Join(how, " · ")))
 
 	block := lipgloss.JoinVertical(lipgloss.Left, lines...)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, block)

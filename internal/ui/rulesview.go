@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/keymap"
 	"scry/internal/mtg"
 	"scry/internal/rules"
 	"scry/internal/theme"
@@ -367,31 +368,37 @@ func (v *rulesView) setFilter(s string) {
 }
 
 func (v *rulesView) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
-	switch k {
-	case "j", "down":
-		v.step(1)
-	case "k", "up":
-		v.step(-1)
-	case "g":
+	// The shared list keys, handled here rather than by navKey because
+	// headings aren't rows the cursor can rest on.
+	if k == toTop {
 		v.cursor.at = v.firstSelectable()
-	case "G":
+		return true, nil
+	}
+	switch keymap.Lookup(keymap.List, k) {
+	case keymap.ListDown:
+		v.step(1)
+		return true, nil
+	case keymap.ListUp:
+		v.step(-1)
+		return true, nil
+	case keymap.ListBottom:
 		v.cursor.bottom(len(v.rows))
 		if !v.selectable(v.cursor.at) {
 			v.step(-1)
 		}
-	case "o":
+		return true, nil
+	}
+
+	switch keymap.Lookup(keymap.Rules, k) {
+	case keymap.RulesOrderNext, keymap.RulesOrderPrev:
+		// Two orders, so forward and back are the same step.
 		if !v.grouped {
 			v.order = 1 - v.order
 			v.refresh()
 		}
-	case "O":
-		if !v.grouped {
-			v.order = 1 - v.order
-			v.refresh()
-		}
-	case "/":
+	case keymap.RulesFilter:
 		p.openFilter(v.filter)
-	case "s":
+	case keymap.RulesSync:
 		// Check for a new release and pull it in. Off the main thread, so it
 		// reports back as a notice.
 		return true, syncRules
@@ -511,18 +518,18 @@ func repeatsTerm(text, term string) bool {
 
 func (v *rulesView) keys() []hintGroup {
 	nav := [][2]string{
-		{"j k", "up/down"},
-		{"/", "filter"},
+		listHint("up/down", keymap.ListDown, keymap.ListUp),
+		hint("filter", keymap.Rules, keymap.RulesFilter),
 	}
 	if !v.grouped {
-		nav = append(nav, [2]string{"o O", "order"})
+		nav = append(nav, hint("order", keymap.Rules, keymap.RulesOrderNext, keymap.RulesOrderPrev))
 	}
 	return []hintGroup{
 		{"navigation", nav},
 		{"rules", [][2]string{
-			{"s", "sync"},
-			{"gv", "diff vs previous"},
+			hint("sync", keymap.Rules, keymap.RulesSync),
+			{gotoHint(keymap.GotoVersions), "diff vs previous"},
 		}},
-		{"info panel", [][2]string{{"K J", "read rule"}}},
+		{"info panel", [][2]string{hint("read rule", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown)}},
 	}
 }

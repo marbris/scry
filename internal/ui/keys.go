@@ -3,6 +3,7 @@ package ui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
+	"scry/internal/keymap"
 	"scry/internal/rules"
 )
 
@@ -14,8 +15,11 @@ import (
 // panel without either of them being ambiguous, the same way vim has f,
 // ctrl+f, gf and zf all meaning different things.
 //
-// The leader is space, with comma as an alias for the fingers that learned
-// the old one.
+// The leader is space. Comma used to be an alias for it; it sorts now, on
+// the left-hand one of the two sort keys.
+//
+// Which key is which comes from internal/keymap, which reads keys.json:
+// everything below switches on actions, never on the keys themselves.
 //
 // It follows from that choice that the leader does nothing inside a search
 // bar, where space is a space — the same way vim's leader does nothing in
@@ -23,57 +27,52 @@ import (
 // focused, opening a second empty panel means finishing or abandoning the
 // first, which is fair: an empty panel is a question you haven't answered.
 
-const (
-	leaderKey = " "
-	leaderAlt = ","
-)
-
 // leaderCmd is one entry in the menu the leader raises.
 type leaderCmd struct {
-	key  string
-	what string
-	run  func(*Model)
+	action keymap.Action
+	what   string
+	run    func(*Model)
 }
 
 // leaderMenu is the menu, in the order it's shown: making panels, then
 // getting rid of them, then moving among them.
 var leaderMenu = []leaderCmd{
-	{"f", "find", func(m *Model) { m.ws.open(KindFind) }},
-	{"d", "decks", nil}, // opens the list and checks it, so it needs a command
-	{"r", "rules", nil}, // needs a command, so it is run below
-	{"n", "new", func(m *Model) { m.ws.open(KindNew) }},
-	{"s", "stats (editing deck)", func(m *Model) { m.toggleStats(true) }},
-	{"b", "clear all filters", func(m *Model) { m.clearAllFilters() }},
-	{"w", "commit the editing deck", nil}, // hands back a command, so it is run below
-	{"c", "close", func(m *Model) { m.ws.close() }},
-	{"u", "undo close", func(m *Model) { m.ws.restoreClosed() }},
-	{"o", "only", func(m *Model) { m.ws.only() }},
-	{"h", "move left", func(m *Model) { m.ws.movePanel(-1) }},
-	{"l", "move right", func(m *Model) { m.ws.movePanel(1) }},
-	{"?", "keys", func(m *Model) { m.hintsExpanded = !m.hintsExpanded }},
+	{keymap.LeaderFind, "find", func(m *Model) { m.ws.open(KindFind) }},
+	{keymap.LeaderDecks, "decks", nil}, // opens the list and checks it, so it needs a command
+	{keymap.LeaderRules, "rules", nil}, // needs a command, so it is run below
+	{keymap.LeaderNew, "new", func(m *Model) { m.ws.open(KindNew) }},
+	{keymap.LeaderStats, "stats (editing deck)", func(m *Model) { m.toggleStats(true) }},
+	{keymap.LeaderClearAll, "clear all filters", func(m *Model) { m.clearAllFilters() }},
+	{keymap.LeaderCommit, "commit the editing deck", nil}, // hands back a command, so it is run below
+	{keymap.LeaderClose, "close", func(m *Model) { m.ws.close() }},
+	{keymap.LeaderUndoClose, "undo close", func(m *Model) { m.ws.restoreClosed() }},
+	{keymap.LeaderOnly, "only", func(m *Model) { m.ws.only() }},
+	{keymap.LeaderMoveLeft, "move left", func(m *Model) { m.ws.movePanel(-1) }},
+	{keymap.LeaderMoveRight, "move right", func(m *Model) { m.ws.movePanel(1) }},
+	{keymap.LeaderHelp, "keys", func(m *Model) { m.hintsExpanded = !m.hintsExpanded }},
 }
 
 // handleLeader runs the command a key names. A key that names nothing
 // cancels, rather than doing something surprising with a near miss.
 func (m *Model) handleLeader(key string) tea.Cmd {
 	m.leader = false
+	action := keymap.Lookup(keymap.Leader, key)
 
-	// Two entries hand back a command rather than only changing the
+	// Three entries hand back a command rather than only changing the
 	// workspace, so they can't sit in the table above.
-	if key == "r" {
+	switch action {
+	case keymap.LeaderRules:
 		return m.openRules()
-	}
-	if key == "d" {
+	case keymap.LeaderDecks:
 		l := newDeckList()
 		m.ws.open(KindDecks).show(l)
 		return loadDecks(l)
-	}
-	if key == "w" {
+	case keymap.LeaderCommit:
 		return m.writeEditing()
 	}
 
 	for _, c := range leaderMenu {
-		if c.key == key && c.run != nil {
+		if action != "" && c.action == action && c.run != nil {
 			c.run(m)
 			return nil
 		}
@@ -116,12 +115,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// With nothing open, the leader is the only way forward, so the splash
 	// takes a couple of shortcuts to it.
 	if m.ws.empty() {
-		switch key {
-		case leaderKey, leaderAlt:
-			m.leader = true
-		case "q", "esc", "ctrl+c":
+		if key == "ctrl+c" {
 			return m.tryQuit()
-		case "?":
+		}
+		switch keymap.Lookup(keymap.Global, key) {
+		case keymap.GlobalLeader:
+			m.leader = true
+		case keymap.GlobalQuit, keymap.GlobalBack:
+			return m.tryQuit()
+		case keymap.GlobalHelp:
 			m.hintsExpanded = !m.hintsExpanded
 		}
 		return m, nil
@@ -146,10 +148,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchKey(msg)
 	}
 
+	global := keymap.Lookup(keymap.Global, key)
+
 	// y in the printed-text panel is the go-ahead to download the sets that
 	// aren't cached. It has to be claimed before the view sees it, because
 	// a card list takes y for yank.
-	if key == "y" && m.info.mode == infoVersions {
+	if global == keymap.GlobalFetchSets && m.info.mode == infoVersions {
 		if c := m.focusedCard(); c != nil {
 			if h, ok := m.histories[c.OracleID]; ok && h.state == histWaiting {
 				cmd := m.fetchAllSets(h)
@@ -162,7 +166,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// claimed before any view sees it — a list would otherwise take it for
 	// "go to the top" and gd and gv could never be typed. gg still means
 	// the top: handleGoto passes the second g back down.
-	if key == "g" {
+	if global == keymap.GlobalGoto {
 		m.goPrefix = true
 		return m, nil
 	}
@@ -173,7 +177,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Moved onto something that isn't a list of cards, there's nothing to
 	// count, and the view there has its keys back — all but s, which still
 	// closes.
-	statsUp := m.info.mode == infoStats && (m.statList() != nil || key == "s")
+	statsUp := m.info.mode == infoStats &&
+		(m.statList() != nil || keymap.Lookup(keymap.Stats, key) == keymap.StatsClose)
 	if statsUp && m.statsKey(key) {
 		return m, nil
 	}
@@ -189,15 +194,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	switch key {
-	case leaderKey, leaderAlt:
+	if key == "ctrl+c" {
+		return m.tryQuit()
+	}
+
+	switch global {
+	case keymap.GlobalLeader:
 		m.leader = true
 
-	case "h", "left":
+	case keymap.GlobalPanelPrev:
 		m.ws.step(-1)
 		cmd := m.hover()
 		return m, cmd
-	case "l", "right":
+	case keymap.GlobalPanelNext:
 		m.ws.step(1)
 		cmd := m.hover()
 		return m, cmd
@@ -205,18 +214,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// ctrl with a direction carries the panel itself along the row, focus
 	// going with it — the same thing <space>h and <space>l do, on the keys
 	// your fingers are already on for moving between panels.
-	case "ctrl+h", "ctrl+left":
+	case keymap.GlobalMoveLeft:
 		m.ws.movePanel(-1)
-	case "ctrl+l", "ctrl+right":
+	case keymap.GlobalMoveRight:
 		m.ws.movePanel(1)
 
-	case "i":
+	case keymap.GlobalBar:
 		// On a deck, i fetches a card into it: the panel's own bar would
 		// follow a Moxfield user, which is the decks panel's business and
 		// not something you reach for from inside a deck.
 		if l := p.cardsView(); l != nil && l.deck != nil {
 			if !l.deck.Local() {
-				m.notice = "that deck isn't yours — w takes a copy you can add to"
+				m.notice = "that deck isn't yours — " + keymap.Hint(keymap.Cards, keymap.CardsWrite) + " takes a copy you can add to"
 				return m, nil
 			}
 			p.ask(askAddCard, "add from scryfall", "")
@@ -229,40 +238,40 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.search.Focus()
 		p.search.CursorEnd()
 
-	case "e":
+	case keymap.GlobalEditNext:
 		m.ws.cycleEditing(1)
-	case "E":
+	case keymap.GlobalEditPrev:
 		m.ws.cycleEditing(-1)
 
-	case "K", "shift+up":
+	case keymap.GlobalInfoUp:
 		m.info.move(-1)
-	case "J", "shift+down":
+	case keymap.GlobalInfoDown:
 		m.info.move(1)
-	case "ctrl+k":
+	case keymap.GlobalInfoParaUp:
 		m.scrollInfoParagraph(-1)
-	case "ctrl+j":
+	case keymap.GlobalInfoParaDn:
 		m.scrollInfoParagraph(1)
 
-	case "s":
+	case keymap.GlobalStats:
 		m.toggleStats(false)
 
-	case "?":
+	case keymap.GlobalHelp:
 		// Grow the hint bar to the whole keymap, or shrink it back. It stays
 		// where you put it rather than closing on the next key, so you can
 		// read it and act at the same time.
 		m.hintsExpanded = !m.hintsExpanded
 
-	case "esc":
+	case keymap.GlobalBack:
 		_, run := (&m).escStep(p)
 		run()
 
-	case "b":
+	case keymap.GlobalClearFilter:
 		// Clear the narrowings on the list in front of you — the text filter
 		// and the statistics categories both — at once, where esc takes them
 		// a step at a time.
 		m.clearActiveFilters()
 
-	case "q", "ctrl+c":
+	case keymap.GlobalQuit:
 		return m.tryQuit()
 	}
 	return m, nil
@@ -309,15 +318,20 @@ func (m *Model) escStep(p *panel) (string, func()) {
 func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	p := m.ws.current()
 
-	switch msg.String() {
-	case "tab":
+	key := msg.String()
+	if key == "ctrl+c" {
+		return m, m.quit()
+	}
+
+	switch keymap.Lookup(keymap.Search, key) {
+	case keymap.SearchNextTarget:
 		p.setKind(p.kind.next(1))
 		return m, m.previewKind(p)
-	case "shift+tab":
+	case keymap.SearchPrevTarget:
 		p.setKind(p.kind.next(-1))
 		return m, m.previewKind(p)
 
-	case "esc":
+	case keymap.SearchBack:
 		// The same cascade as everywhere else: clear what's clearable, then
 		// leave, then close. Typing half a query and pressing esc should
 		// lose the half-query, not the panel.
@@ -342,7 +356,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		p.search.Blur()
 		return m, nil
 
-	case "enter":
+	case keymap.SearchRun:
 		if p.kind == KindFind {
 			cmd := m.search(p)
 			return m, cmd
@@ -389,19 +403,17 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "up":
+	case keymap.SearchHistoryPrev:
 		p.recall(-1, m.queryHistory(p))
 		return m, nil
-	case "down":
+	case keymap.SearchHistoryNext:
 		p.recall(1, m.queryHistory(p))
 		return m, nil
 
-	case "ctrl+o":
+	case keymap.SearchQuerySort:
 		cmd := m.cycleQuerySort(p, 1)
 		return m, cmd
 
-	case "ctrl+c":
-		return m, m.quit()
 	}
 
 	// Anything else is typing, which ends a walk through the history: what
@@ -475,19 +487,19 @@ func (m Model) handleGoto(key string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	switch key {
-	case "g":
+	switch keymap.Lookup(keymap.Goto, key) {
+	case keymap.GotoTop:
 		if v := p.top(); v != nil {
-			v.key("g", &m, p) // the views' own "to the top"
+			v.key(toTop, &m, p) // the views' own "to the top"
 		}
 
-	case "d":
+	case keymap.GotoEditing:
 		// Straight to the deck being edited, from wherever you are.
 		if m.ws.editing >= 0 {
 			m.ws.focus(m.ws.editing)
 		}
 
-	case "v":
+	case keymap.GotoVersions:
 		cmd := m.versions(p)
 		return m, cmd
 	}

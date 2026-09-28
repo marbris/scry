@@ -70,20 +70,20 @@ func TestTheSecondOrderColoursTheNames(t *testing.T) {
 	}
 }
 
-func TestQuoteCyclesTheSecondOrderAndKeepsTheCursor(t *testing.T) {
+func TestCommaCyclesTheSecondOrderAndKeepsTheCursor(t *testing.T) {
 	m := withCards(sized(140, 30), "f", sample(), sortType)
 	l := m.ws.current().cardsView()
 	l.selectByName("Sol Ring")
-	m = drive(m, "'")
+	m = drive(m, ",")
 	if l.order2 == sortArrival {
-		t.Fatal("' didn't set a second order")
+		t.Fatal(", didn't set a second order")
 	}
 	if c, _ := l.current(); c.Card.Name != "Sol Ring" {
 		t.Errorf("the cursor moved to %s", c.Card.Name)
 	}
-	m = drive(m, `"`)
+	m = drive(m, "<")
 	if l.order2 != sortArrival {
-		t.Errorf(`" didn't step back: %v`, l.order2)
+		t.Errorf("< didn't step back: %v", l.order2)
 	}
 	_ = m
 }

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 	"scry/internal/mtg"
 	"scry/internal/rules"
 	"scry/internal/stats"
@@ -482,10 +483,12 @@ func (l *cardList) headerRows(queryOrder string) [][]string {
 	if queryOrder != "" {
 		where = append(where, queryOrder)
 	}
-	where = append(where, l.orderName())
+	// Sort 2 before sort 1, the way the columns they colour sit: sort 2
+	// colours the names on the left, sort 1 fills the column on the right.
 	if o := l.order2Name(); o != "" {
 		where = append(where, o)
 	}
+	where = append(where, l.orderName())
 
 	return [][]string{state, where, l.narrowingSegments()}
 }
@@ -505,47 +508,47 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	if l.cursor.navKey(k, len(l.rows)) {
 		return true, nil
 	}
-	switch k {
-	case "o":
+	switch keymap.Lookup(keymap.Cards, k) {
+	case keymap.CardsSort1Next:
 		l.cycleSort(1)
-	case "O":
+	case keymap.CardsSort1Prev:
 		l.cycleSort(-1)
-	case "'":
+	case keymap.CardsSort2Next:
 		l.cycleSort2(1)
-	case "\"":
+	case keymap.CardsSort2Prev:
 		l.cycleSort2(-1)
-	case "v":
+	case keymap.CardsSelect:
 		l.toggleMark()
-	case "V":
+	case keymap.CardsSelectAll:
 		l.markAll()
-	case "/":
+	case keymap.CardsFilter:
 		p.openFilter(l.filter)
 
 	// ── Editing ─────────────────────────────────────────────────
 
-	case "a":
+	case keymap.CardsAdd:
 		m.add(l.selection())
-	case "x":
+	case keymap.CardsRemove:
 		m.remove(l.selection())
-	case "y":
+	case keymap.CardsYank:
 		m.yank(l.selection())
 		l.clearMarks()
-	case "p":
+	case keymap.CardsPut:
 		m.put(l)
-	case "t":
+	case keymap.CardsTag:
 		p.ask(askTag, "tag", "")
-	case "A":
+	case keymap.CardsAddTagged:
 		// Add + tag with the last tag used. It lives on A, beside a for add,
 		// because it is an add that also tags — not a second kind of tag.
 		m.tagWithLast(l.selection())
-	case "c":
+	case keymap.CardsCommander:
 		return true, m.commander(currentOr(l))
-	case "u":
+	case keymap.CardsUndo:
 		m.undo()
 
-	case "w":
+	case keymap.CardsWrite:
 		return true, m.write(l, p, false)
-	case "W":
+	case keymap.CardsWriteNew:
 		return true, m.write(l, p, true)
 
 	default:
@@ -588,31 +591,31 @@ func (l *cardList) info(width int) []string {
 // lists them against that deck, under its name.
 func (l *cardList) keys() []hintGroup {
 	nav := [][2]string{
-		{"j k", "up/down"},
-		{"gg G", "first/last"},
-		{"o O", "sort 1"},
-		{"' \"", "sort 2"},
-		{"/", "filter"},
+		listHint("up/down", keymap.ListDown, keymap.ListUp),
+		{topBottomHint(), "first/last"},
+		hint("sort 2", keymap.Cards, keymap.CardsSort2Next, keymap.CardsSort2Prev),
+		hint("sort 1", keymap.Cards, keymap.CardsSort1Next, keymap.CardsSort1Prev),
+		hint("filter", keymap.Cards, keymap.CardsFilter),
 	}
 
 	sel := [][2]string{
-		{"v V", "select one/all"},
-		{"y", "yank"},
+		hint("select one/all", keymap.Cards, keymap.CardsSelect, keymap.CardsSelectAll),
+		hint("yank", keymap.Cards, keymap.CardsYank),
 	}
 	// p puts into the list in front of you, so it only earns a hint when
 	// that list is one of yours to write to.
 	local := l.deck != nil && l.deck.Local()
 	if local {
-		sel = append(sel, [2]string{"p", "put"})
+		sel = append(sel, hint("put", keymap.Cards, keymap.CardsPut))
 	}
-	sel = append(sel, [2]string{"t", "tag"})
+	sel = append(sel, hint("tag", keymap.Cards, keymap.CardsTag))
 	if local {
-		sel = append(sel, [2]string{"w", "commit"})
+		sel = append(sel, hint("commit", keymap.Cards, keymap.CardsWrite))
 	} else {
 		// Not yours, so writing it asks for a name and makes it yours.
-		sel = append(sel, [2]string{"w W", "save as new deck"})
+		sel = append(sel, hint("save as new deck", keymap.Cards, keymap.CardsWrite, keymap.CardsWriteNew))
 	}
-	sel = append(sel, [2]string{"gv", "card history"})
+	sel = append(sel, [2]string{gotoHint(keymap.GotoVersions), "card history"})
 
 	return []hintGroup{{"navigation", nav}, {"select", sel}}
 }

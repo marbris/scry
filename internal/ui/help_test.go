@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 )
 
 func TestTheLeaderMenuShowsEveryEntry(t *testing.T) {
@@ -54,9 +55,10 @@ func TestEveryMenuKeyPutsTheMenuAway(t *testing.T) {
 		if !m.leader {
 			t.Fatal("space did not raise the menu")
 		}
-		m = drive(m, c.key)
+		key := keymap.Keys(keymap.Leader, c.action)[0]
+		m = drive(m, key)
 		if m.leader {
-			t.Errorf("the menu stayed up after %q", c.key)
+			t.Errorf("the menu stayed up after %q", key)
 		}
 	}
 }

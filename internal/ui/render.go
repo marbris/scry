@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/keymap"
 	"scry/internal/theme"
 )
 
@@ -448,7 +449,9 @@ func (m Model) leaderBarLines() []string {
 
 	var parts []string
 	for _, c := range leaderMenu {
-		parts = append(parts, key.Render(c.key)+" "+what.Render(c.what))
+		if k := keymap.Hint(keymap.Leader, c.action); k != "" {
+			parts = append(parts, key.Render(k)+" "+what.Render(c.what))
+		}
 	}
 	return packStyled(parts, sep, maxInt(m.width-2, 1))
 }
@@ -506,7 +509,7 @@ func (m Model) footerGroups() []hintGroup {
 	if p != nil && p.searchOpen && p.search.Focused() {
 		return m.hintGroups()
 	}
-	return []hintGroup{{"", restingKeys}}
+	return dropUnbound([]hintGroup{{"", restingKeys()}})
 }
 
 // hintFooter is a block of keys for the bottom of a panel: a rule, then the

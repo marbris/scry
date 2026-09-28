@@ -8,7 +8,7 @@ import (
 	"scry/internal/mtg"
 )
 
-// The changes from docs/post-implementation-notes-2.md that are worth a test
+// The changes from notes/post-implementation-notes-2.md (outside the repo) that are worth a test
 // of their own.
 
 // creatures is a handful of cards with power and toughness set, for the

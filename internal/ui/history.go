@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/keymap"
 	"scry/internal/mtg"
 	"scry/internal/prints"
 	"scry/internal/theme"
@@ -233,7 +234,7 @@ func (m Model) renderHistory(c mtg.Card, width int) []string {
 		out = append(out, "")
 		out = append(out, dim.Render(fit(itoa(len(h.missing))+" more "+
 			plural("set", len(h.missing))+" not downloaded", width)))
-		out = append(out, muted.Render(fit("y to fetch them", width)))
+		out = append(out, muted.Render(fit(keymap.Hint(keymap.Global, keymap.GlobalFetchSets)+" to fetch them", width)))
 	}
 	return out
 }

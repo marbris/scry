@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 	"scry/internal/moxfield"
 	"scry/internal/theme"
 )
@@ -504,7 +505,7 @@ func (l *deckList) lines(width, height int, focused bool, m *Model) []string {
 		}, width, height)
 	}
 	if len(l.rows) == 0 {
-		what := "no decks yet — n to make one"
+		what := "no decks yet — " + keymap.Hint(keymap.Decks, keymap.DecksNew) + " to make one"
 		if l.filter != "" {
 			what = "nothing matches"
 		}
@@ -749,14 +750,14 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		return true, nil
 	}
 
-	switch k {
-	case "o":
+	switch action := keymap.Lookup(keymap.Decks, k); action {
+	case keymap.DecksSortNext:
 		l.cycleSort(1)
-	case "O":
+	case keymap.DecksSortPrev:
 		l.cycleSort(-1)
-	case "/":
+	case keymap.DecksFilter:
 		p.openFilter(l.filter)
-	case "enter", "L":
+	case keymap.DecksOpen, keymap.DecksOpenBeside:
 		if e, ok := l.current(); ok && (e.kind == entryFolder || e.kind == entryUser) {
 			l.toggleFolder(e.slug)
 			if e.kind == entryUser && l.expanded[e.slug] {
@@ -764,18 +765,18 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			}
 			return true, nil
 		}
-		return true, m.openEntry(l, p, k == "L")
+		return true, m.openEntry(l, p, action == keymap.DecksOpenBeside)
 
-	case "s":
+	case keymap.DecksSync:
 		// Mirror to the git remote. Unlike the mutations above this touches
 		// the network, so it runs off the main thread and reports back as a
 		// notice; the reload a notice triggers shows anything a pull brought in.
 		return true, syncDecks
 
-	case "n":
+	case keymap.DecksNew:
 		p.ask(askNewDeck, "name", "")
 
-	case "r":
+	case keymap.DecksRename:
 		if e, ok := l.current(); ok {
 			switch {
 			case e.kind == entryLocal || e.kind == entryRemote:
@@ -785,12 +786,12 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			}
 		}
 
-	case "c":
+	case keymap.DecksCopy:
 		if e, ok := l.current(); ok && e.kind != entryFolder && e.kind != entryUser {
 			return true, copyEntry(e)
 		}
 
-	case "C":
+	case keymap.DecksCopyBoth:
 		// A remote's Considering list, alongside the main copy c would take.
 		if e, ok := l.current(); ok && (e.kind == entryRemote || e.kind == entryUserDeck) {
 			return true, copyEntryBoth(e)
@@ -799,23 +800,23 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	// ── Moving decks between folders ─────────────────────────────
 	// y picks a deck up to copy, x to move; p drops it into the folder the
 	// cursor is in. Staged rather than immediate so you can navigate first.
-	case "y":
+	case keymap.DecksYank:
 		if e, ok := l.current(); ok && e.kind == entryLocal {
 			l.moving = &deckMove{slug: e.slug, name: e.name, cut: false}
 		}
-	case "p":
+	case keymap.DecksPut:
 		if l.moving != nil {
 			mv := *l.moving
 			l.moving = nil
 			return true, m.putDeck(mv, l.currentFolder())
 		}
 
-	case "x":
+	case keymap.DecksCut:
 		if e, ok := l.current(); ok && e.kind == entryLocal {
 			l.moving = &deckMove{slug: e.slug, name: e.name, cut: true}
 		}
 
-	case "d":
+	case keymap.DecksDelete:
 		e, ok := l.current()
 		if !ok || e.kind == entryFolder || e.kind == entryUserDeck {
 			// A folder goes when its last deck does; a person's deck goes
@@ -988,19 +989,19 @@ func legalMark(e deckEntry, mark string) string {
 func (l *deckList) keys() []hintGroup {
 	return []hintGroup{
 		{"navigation", [][2]string{
-			{"j k", "up/down"},
-			{"o O", "sort"},
-			{"/", "filter"},
+			listHint("up/down", keymap.ListDown, keymap.ListUp),
+			hint("sort", keymap.Decks, keymap.DecksSortNext, keymap.DecksSortPrev),
+			hint("filter", keymap.Decks, keymap.DecksFilter),
 		}},
 		{"decks", [][2]string{
-			{"enter", "open/fold"},
-			{"L", "open beside"},
-			{"n", "new"},
-			{"r", "rename"},
-			{"c C", "copy deck/&considering"},
-			{"d x y p", "delete/cut/yank/put"},
-			{"s", "git push"},
-			{"gv", "versions"},
+			hint("open/fold", keymap.Decks, keymap.DecksOpen),
+			hint("open beside", keymap.Decks, keymap.DecksOpenBeside),
+			hint("new", keymap.Decks, keymap.DecksNew),
+			hint("rename", keymap.Decks, keymap.DecksRename),
+			hint("copy deck/&considering", keymap.Decks, keymap.DecksCopy, keymap.DecksCopyBoth),
+			hint("delete/cut/yank/put", keymap.Decks, keymap.DecksDelete, keymap.DecksCut, keymap.DecksYank, keymap.DecksPut),
+			hint("git push", keymap.Decks, keymap.DecksSync),
+			{gotoHint(keymap.GotoVersions), "versions"},
 		}},
 	}
 }

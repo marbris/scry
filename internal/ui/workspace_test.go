@@ -328,18 +328,60 @@ func TestGGAndShiftGGoToTheEnds(t *testing.T) {
 	}
 }
 
-func TestOCyclesTheSortAndTheHeaderSaysSo(t *testing.T) {
+func TestDotCyclesTheSortAndTheHeaderSaysSo(t *testing.T) {
 	m := withCards(sized(120, 30), "f", sample(), sortArrival)
-	m = drive(m, "o")
+	m = drive(m, ".")
 	if got := m.ws.current().cardsView().order; got != sortMana {
-		t.Errorf("o moved to %v, want mana value", got)
+		t.Errorf(". moved to %v, want mana value", got)
 	}
 	if !strings.Contains(stripANSI(m.View()), "mana value") {
 		t.Error("the panel does not say what it is sorted by")
 	}
-	m = drive(m, "O", "O")
+	m = drive(m, ">", ">")
 	if got := m.ws.current().cardsView().order; got != sortUSD {
-		t.Errorf("O wrapped to %v", got)
+		t.Errorf("> wrapped to %v", got)
+	}
+}
+
+func TestTheHeaderPutsSort2BeforeSort1(t *testing.T) {
+	// Sort 2 colours the names on the left, sort 1 fills the column on the
+	// right, and the header reads in the same order.
+	m := withCards(sized(140, 30), "f", sample(), sortArrival)
+	m = drive(m, ".", ",", ",")
+	l := m.ws.current().cardsView()
+	one, two := l.orderName(), l.order2Name()
+	if one == "" || two == "" || one == two {
+		t.Fatalf("want two different orders, got %q and %q", one, two)
+	}
+	view := stripANSI(m.View())
+	i, j := strings.Index(view, two+" · "+one), strings.Index(view, one+" · "+two)
+	if i < 0 || j >= 0 {
+		t.Errorf("the header should read %q · %q", two, one)
+	}
+}
+
+func TestCommaIsNoLongerTheLeader(t *testing.T) {
+	m := withCards(sized(120, 30), "f", sample(), sortArrival)
+	m = drive(m, ",")
+	if m.leader {
+		t.Error(", raised the leader menu")
+	}
+	if m.ws.current().cardsView().order2 == sortArrival {
+		t.Error(", didn't cycle sort 2")
+	}
+}
+
+func TestSortingStillWorksWithTheStatisticsUp(t *testing.T) {
+	// The statistics used to claim o and O, so the list couldn't be
+	// re-sorted while they were up. The sort keys are clear of them now.
+	m := withCards(sized(140, 30), "f", sample(), sortArrival)
+	m = drive(m, "s")
+	if m.info.mode != infoStats {
+		t.Fatal("s did not bring the statistics up")
+	}
+	m = drive(m, ".")
+	if got := m.ws.current().cardsView().order; got != sortMana {
+		t.Errorf(". with the statistics up moved to %v, want mana value", got)
 	}
 }
 

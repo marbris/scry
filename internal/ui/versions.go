@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 	"scry/internal/theme"
 )
 
@@ -180,15 +181,15 @@ func (l *versionList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	if l.cursor.navKey(k, len(l.commits)) {
 		return true, l.wantDiff()
 	}
-	switch k {
-	case "/":
+	switch keymap.Lookup(keymap.Versions, k) {
+	case keymap.VersionsFilter:
 		p.openFilter(l.filter)
 		return true, nil
-	case "r":
+	case keymap.VersionsRevert:
 		if c, ok := l.current(); ok {
 			return true, revertVersion(l.slug, l.name, c.Hash)
 		}
-	case "c":
+	case keymap.VersionsCopy:
 		if c, ok := l.current(); ok {
 			return true, copyVersion(l.slug, l.name, c.Hash)
 		}
@@ -298,12 +299,12 @@ func renderDiff(diff string, width int) []string {
 func (l *versionList) keys() []hintGroup {
 	return []hintGroup{
 		{"navigation", [][2]string{
-			{"j k", "up/down"},
-			{"/", "filter"},
+			listHint("up/down", keymap.ListDown, keymap.ListUp),
+			hint("filter", keymap.Versions, keymap.VersionsFilter),
 		}},
 		{"versions", [][2]string{
-			{"r", "revert to"},
-			{"c", "copy from"},
+			hint("revert to", keymap.Versions, keymap.VersionsRevert),
+			hint("copy from", keymap.Versions, keymap.VersionsCopy),
 		}},
 	}
 }

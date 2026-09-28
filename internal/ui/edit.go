@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 )
 
 // Editing the deck you're building.
@@ -38,7 +39,7 @@ func (m *Model) editTarget() (*cardList, string) {
 		return nil, "no deck open to edit — open one of yours first"
 	}
 	if l.deck == nil || !l.deck.Local() {
-		return nil, "that deck isn't yours — w takes a copy you can edit"
+		return nil, "that deck isn't yours — " + keymap.Hint(keymap.Cards, keymap.CardsWrite) + " takes a copy you can edit"
 	}
 	return l, ""
 }
@@ -191,7 +192,7 @@ func (m *Model) put(l *cardList) {
 		return
 	}
 	if l.deck == nil || !l.deck.Local() {
-		m.notice = "that deck isn't yours — p needs a deck you can edit"
+		m.notice = "that deck isn't yours — " + keymap.Hint(keymap.Cards, keymap.CardsPut) + " needs a deck you can edit"
 		return
 	}
 
@@ -261,7 +262,7 @@ func (m *Model) tag(cards []deck.Card, input string) {
 // these, and having to retype the tag each time is what makes people stop.
 func (m *Model) tagWithLast(cards []deck.Card) {
 	if m.lastTag == "" {
-		m.notice = "no tag used yet — t first"
+		m.notice = "no tag used yet — " + keymap.Hint(keymap.Cards, keymap.CardsTag) + " first"
 		return
 	}
 	m.add(cards)

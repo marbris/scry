@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"scry/internal/deck"
+	"scry/internal/keymap"
 	"scry/internal/stats"
 	"scry/internal/theme"
 )
@@ -261,7 +262,7 @@ func (m *Model) toggleStats(editing bool) {
 		return
 	}
 	if editing && m.ws.editingList() == nil {
-		m.notice = "no deck is being edited — e chooses one"
+		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
 		return
 	}
 	m.info.mode = infoStats
@@ -273,37 +274,32 @@ func (m *Model) toggleStats(editing bool) {
 // anything it leaves to the workspace — h and l among them, which still move
 // between lists.
 func (m *Model) statsKey(key string) bool {
-	switch key {
-	case "j", "down":
+	switch keymap.Lookup(keymap.Stats, key) {
+	case keymap.StatsDown:
 		m.moveStat(1)
-	case "k", "up":
+	case keymap.StatsUp:
 		m.moveStat(-1)
-	case "J", "shift+down":
+	case keymap.StatsNextGroup:
 		m.rotateStat(1)
-	case "K", "shift+up":
+	case keymap.StatsPrevGroup:
 		m.rotateStat(-1)
-	case "o", "O":
-		// o and O sort the list when the statistics are down; up, o is OR
-		// and O is nothing — claimed anyway, so the list isn't re-sorted
-		// by a near miss for o.
-		if key == "o" {
-			m.addStat(stats.Or)
-		}
-	case "a":
+	case keymap.StatsOr:
+		m.addStat(stats.Or)
+	case keymap.StatsAnd:
 		m.addStat(stats.And)
-	case "n":
+	case keymap.StatsNot:
 		m.addStat(stats.AndNot)
-	case "x":
+	case keymap.StatsDrop:
 		m.dropStat()
-	case "b":
+	case keymap.StatsClear:
 		clearStatFilter(m.statList())
-	case "p":
+	case keymap.StatsOddsNext:
 		m.stepOdds(1)
-	case "P":
+	case keymap.StatsOddsPrev:
 		m.stepOdds(-1)
-	case "s":
+	case keymap.StatsClose:
 		m.info.mode = infoCard
-	case "esc":
+	case keymap.StatsBack:
 		// Back, a step at a time: the categories, then the text filter,
 		// then out of the statistics.
 		l := m.statList()

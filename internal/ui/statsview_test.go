@@ -461,7 +461,7 @@ func TestTheStatisticsHintsDontOfferTheKeysTheyTake(t *testing.T) {
 				continue
 			}
 			for _, f := range strings.Fields(k[0]) {
-				if statsTaken[f] {
+				if statsTaken()[f] {
 					t.Errorf("%q %q is offered in %q while the statistics have it", k[0], k[1], g.title)
 				}
 			}

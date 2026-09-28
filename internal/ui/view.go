@@ -2,6 +2,8 @@ package ui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"scry/internal/keymap"
 )
 
 // What a panel is showing.
@@ -101,17 +103,24 @@ func (c *cursor) scrollInto(height, n int) {
 	}
 }
 
+// toTop is what handleGoto hands a view for gg. It is not a key anyone can
+// press: g is claimed as a prefix before any view sees it, so "the top"
+// only ever arrives from there, whatever the two keys have been bound to.
+const toTop = "goto:top"
+
 // navKey handles the movement keys every list shares, so no view has to
 // implement j and k for itself.
 func (c *cursor) navKey(k string, n int) bool {
-	switch k {
-	case "j", "down":
-		c.move(1, n)
-	case "k", "up":
-		c.move(-1, n)
-	case "g":
+	if k == toTop {
 		c.top()
-	case "G":
+		return true
+	}
+	switch keymap.Lookup(keymap.List, k) {
+	case keymap.ListDown:
+		c.move(1, n)
+	case keymap.ListUp:
+		c.move(-1, n)
+	case keymap.ListBottom:
 		c.bottom(n)
 	default:
 		return false

@@ -307,7 +307,7 @@ func TestJAndKWalkTheRulesAndTheInfoPanelFollows(t *testing.T) {
 	}
 }
 
-func TestOSwapsBetweenRelevanceAndRuleNumber(t *testing.T) {
+func TestDotSwapsBetweenRelevanceAndRuleNumber(t *testing.T) {
 	m := sized(140, 30)
 	m.rules = fakeRules(t)
 	p := m.ws.open(KindRules)
@@ -315,9 +315,9 @@ func TestOSwapsBetweenRelevanceAndRuleNumber(t *testing.T) {
 	p.show(v)
 
 	before := v.order
-	m = drive(m, "o")
+	m = drive(m, ".")
 	if v.order == before {
-		t.Error("o did not change the order")
+		t.Error(". did not change the order")
 	}
 	if !strings.Contains(stripANSI(m.View()), v.order.String()) {
 		t.Error("the panel does not say which order it is in")
@@ -335,7 +335,7 @@ func TestACardsRulesAreNotReordered(t *testing.T) {
 	p.show(v)
 
 	before := len(v.rows)
-	m = drive(m, "o")
+	m = drive(m, ".")
 	if len(v.rows) != before {
 		t.Errorf("the rows changed: %d then %d", before, len(v.rows))
 	}
