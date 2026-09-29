@@ -175,6 +175,24 @@ func (w *workspace) only() {
 	}
 	keep := w.panels[w.focused]
 	wasEditing := w.editing == w.focused
+
+	// Each panel it closes is remembered as if closed one at a time — the
+	// ones to the right from the far end in, then the ones to the left — so
+	// space u brings them back one by one, each where it was.
+	var order []int
+	for i := len(w.panels) - 1; i > w.focused; i-- {
+		order = append(order, i)
+	}
+	for i := w.focused - 1; i >= 0; i-- {
+		order = append(order, i)
+	}
+	for _, i := range order {
+		w.closed = append(w.closed, closedPanel{panel: w.panels[i], at: i, editing: w.editing == i})
+	}
+	if len(w.closed) > closedLimit {
+		w.closed = w.closed[len(w.closed)-closedLimit:]
+	}
+
 	w.panels = []*panel{keep}
 	w.focused, w.scroll = 0, 0
 	if wasEditing {

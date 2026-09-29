@@ -346,3 +346,28 @@ func TestGGAsksForTheRulingsOfTheCardItLandsOn(t *testing.T) {
 		t.Error("gg landed on a card and didn't ask for its rulings")
 	}
 }
+
+func TestUndoCloseBringsBackWhatOnlyClosed(t *testing.T) {
+	m := sized(240, 30)
+	m = withCards(m, "f", sample()[:1], sortArrival)
+	m = withCards(m, "f", sample()[1:2], sortArrival)
+	m = withCards(m, "f", sample()[2:3], sortArrival)
+	m = withCards(m, "f", sample()[3:], sortArrival)
+	want := append([]*panel(nil), m.ws.panels...)
+	m = focusOn(m, 1)
+	m = drive(m, "space", "o")
+	if m.ws.count() != 1 {
+		t.Fatalf("only left %d panels", m.ws.count())
+	}
+	for i := 0; i < 3; i++ {
+		m = drive(m, "space", "u")
+	}
+	if m.ws.count() != 4 {
+		t.Fatalf("undo close brought back %d of 4", m.ws.count())
+	}
+	for i, p := range want {
+		if m.ws.panels[i] != p {
+			t.Errorf("panel %d isn't back where it was", i)
+		}
+	}
+}
