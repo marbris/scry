@@ -56,11 +56,11 @@ Open a search beside the deck you're building. Cards already in the deck are mar
 
 ### Two sorts, either way round
 
-Every list has two sorts. `.` cycles the first, which fills the column on the right: mana value, colour, type, power, toughness, EDHREC rank, price, rarity. `,` cycles the second, which breaks the first one's ties and colours the names on the left. Sorted by type and then by price, the creatures sit together, dearest first, their names coloured by price. `alt+.` and `alt+,` turn either one round. Each starts the way it reads best: power and price from the top, EDHREC rank from 1. The sorts stay put when you run a new search.
+Every list has two sorts. `.` cycles the first, which fills the column on the right: mana value, colour, type, power, toughness, EDHREC rank, price, rarity. `,` cycles the second, which breaks the first one's ties and colours the names on the left. Sorted by mana value and then by type, the curve reads from the top down, the creatures at each cost grouped together, their names coloured by type. `alt+.` and `alt+,` turn either one round. Each starts the way it reads best: power and price from the top, EDHREC rank from 1. The sorts stay put when you run a new search.
 
 The *inclusion* sort orders a list by where else its cards are: first the ones already in the deck you're building, then the ones in another list on screen, then the ones found only here. Add a card and it moves up to join the others, and the next card slides under the cursor. Which sorts `.` and `,` cycle through, and in what order, is yours to set in `config.json`.
 
-![A search sorted by type and then by price, names coloured by price](screenshots/sorts.png)
+![A search sorted by mana value and then by type, names coloured by type](screenshots/sorts.png)
 
 ### Tag a whole theme at once
 
@@ -76,7 +76,7 @@ Open the statistics panel and walk the breakdown — tags, types, colours, the c
 
 `p` swaps the counts for the odds of drawing them: the chance that your opening seven holds at least one, two, three or four cards from each category — hypergeometric, worked out over the deck as it stands. `p` again steps from at least one up to at least four. How often is there ramp in your opener? At least three lands? Each bar says.
 
-![Opening-hand odds: the chance of at least two cards of each tag in the first seven](screenshots/odds.png)
+![Opening-hand odds: the chance of at least one card of each tag, type and colour in the first seven](screenshots/odds.png)
 
 ### The card as printed
 
@@ -88,7 +88,7 @@ Press `gx` on a card to see it as printed: its most recent ordinary printing, no
 
 Search the comprehensive rules and read the full paragraph in the info panel as you scroll. Open the rules while a card is highlighted and you get the rules that card actually invokes.
 
-![The rules browser: matching paragraphs on the left, the full rule on the right](screenshots/rules.png)
+![The rules browser: the rules a highlighted card invokes on the left, the full rule on the right](screenshots/rules.png)
 
 ### How a card's text has changed
 
