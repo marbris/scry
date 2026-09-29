@@ -300,7 +300,7 @@ func (m Model) barKeys(p *panel) [][2]string {
 	if p.kind == KindFind {
 		out = append(out,
 			hint("queries you've run", keymap.Search, keymap.SearchHistoryPrev, keymap.SearchHistoryNext),
-			hint("order the results", keymap.Search, keymap.SearchQuerySort),
+			hint("result order ↑↓", keymap.Search, keymap.SearchQuerySort, keymap.SearchQueryDir),
 		)
 	}
 	return append(out,

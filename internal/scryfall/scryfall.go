@@ -34,6 +34,15 @@ var SortOptions = []string{
 	"review",
 }
 
+// DirOptions is which way a query asks Scryfall to run the sort. auto leaves
+// it to Scryfall, which picks the natural direction for each order — newest
+// first for released, most played first for edhrec.
+var DirOptions = []string{
+	"auto",
+	"asc",
+	"desc",
+}
+
 // SearchURL is the endpoint, as a variable so a test can point it at a
 // server it controls. Paging is the part of this worth testing and it can't
 // be exercised against the real Scryfall without asking for a lot of cards.
@@ -44,12 +53,12 @@ var SearchURL = "https://api.scryfall.com/cards/search"
 // which is usually more than were fetched.
 //
 // A query that matches nothing is not an error: no results is an answer.
-func Search(query, sort string, limit int) ([]mtg.Card, int, error) {
+func Search(query, sort, dir string, limit int) ([]mtg.Card, int, error) {
 	var all []mtg.Card
 
 	for page := 1; ; page++ {
-		u := fmt.Sprintf("%s?q=%s&order=%s&page=%d",
-			SearchURL, url.QueryEscape(query), url.QueryEscape(sort), page,
+		u := fmt.Sprintf("%s?q=%s&order=%s&dir=%s&page=%d",
+			SearchURL, url.QueryEscape(query), url.QueryEscape(sort), url.QueryEscape(dir), page,
 		)
 		body, err := fetch.Get(u)
 		if err != nil {

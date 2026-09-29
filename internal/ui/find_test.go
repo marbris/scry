@@ -256,6 +256,66 @@ func TestTheQuerySortCanReachPowerAndToughness(t *testing.T) {
 	}
 }
 
+func TestCtrlOOnlyCyclesTheOrderAndEnterSends(t *testing.T) {
+	// With results already on screen, ctrl+o used to re-run the old query
+	// straight away — and the answer arriving closed the bar you were
+	// typing in. It should change what the next enter asks for, and no
+	// more.
+	m, p := typed(sized(120, 30), "t:elf")
+	m = drive(m, "enter")
+	m = answer(m, p, sample(), 4, nil)
+
+	m = drive(m, "i")
+	m = drive(m, "ctrl+o", "ctrl+o")
+	if p.loading {
+		t.Error("ctrl+o sent a query")
+	}
+	if !p.searchOpen {
+		t.Error("ctrl+o closed the bar")
+	}
+
+	m = drive(m, "enter")
+	if !p.loading {
+		t.Error("enter did not send the query")
+	}
+}
+
+func TestCtrlRCyclesTheDirectionTheQueryAsksFor(t *testing.T) {
+	m, p := typed(sized(120, 30), "t:elf")
+	if got := p.queryDirection(); got != "auto" {
+		t.Errorf("default direction is %q, want auto", got)
+	}
+
+	for _, want := range []struct{ dir, glyph string }{
+		{"asc", "↑"}, {"desc", "↓"},
+	} {
+		m = drive(m, "ctrl+r")
+		if got := p.queryDirection(); got != want.dir {
+			t.Errorf("got %q, want %q", got, want.dir)
+		}
+		if !strings.Contains(stripANSI(m.View()), p.queryOrder()+" "+want.glyph) {
+			t.Errorf("the panel does not show %s for %s", want.glyph, want.dir)
+		}
+		if p.loading {
+			t.Error("ctrl+r sent a query")
+		}
+	}
+
+	m = drive(m, "ctrl+r")
+	if got := p.queryDirection(); got != "auto" {
+		t.Errorf("got %q, want it to come back round to auto", got)
+	}
+}
+
+func TestTheResultsHeaderShowsTheDirection(t *testing.T) {
+	m, p := typed(sized(120, 30), "t:elf")
+	m = drive(m, "ctrl+r", "enter")
+	m = answer(m, p, sample(), 4, nil)
+	if !strings.Contains(stripANSI(m.View()), p.queryOrder()+" ↑") {
+		t.Error("the results header does not say the order ran ascending")
+	}
+}
+
 func TestTheQuerySortAndTheListSortAreDifferentThings(t *testing.T) {
 	// One decides which cards come back; the other decides how the ones in
 	// front of you are arranged. Confusing them means re-fetching to

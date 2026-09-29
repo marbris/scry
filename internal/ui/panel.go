@@ -156,6 +156,9 @@ type panel struct {
 	// querySort is the order the *request* asks for — which cards come back
 	// — as an index into scryfall.SortOptions.
 	querySort int
+	// queryDir is which way that order runs, as an index into
+	// scryfall.DirOptions. Zero is auto: Scryfall's choice.
+	queryDir int
 
 	// historyAt is where up and down have walked to, and draft is what was
 	// in the bar before the walk started. The queries themselves belong to
@@ -330,7 +333,7 @@ func (p *panel) subtitle() string {
 	// since that's the one thing about the request you can't see in the bar.
 	if p.searchOpen {
 		if p.kind == KindFind {
-			return "order: " + p.queryOrder() + " · ctrl+o"
+			return "order: " + p.queryOrderLabel() + " · ctrl+o/r"
 		}
 		return ""
 	}
@@ -346,14 +349,14 @@ func (p *panel) subtitle() string {
 func (p *panel) headerRows() [][]string {
 	if p.searchOpen {
 		if p.kind == KindFind {
-			return [][]string{{"order: " + p.queryOrder(), "ctrl+o"}}
+			return [][]string{{"order: " + p.queryOrderLabel(), "ctrl+o/r"}}
 		}
 		return nil
 	}
 	if l := p.cardsView(); l != nil {
 		order := ""
 		if l.deck == nil && p.kind == KindFind {
-			order = p.queryOrder()
+			order = p.queryOrderLabel()
 		}
 		return l.headerRows(order)
 	}

@@ -11,8 +11,9 @@ import (
 // Searching Scryfall.
 //
 // Two orders are in play and they are not the same thing. The query sort —
-// ctrl+o, here — is part of the request: it decides which cards come back
-// when a query matches more than one page. The list sort — o and O — decides
+// ctrl+o, with ctrl+r for its direction — is part of the request: it
+// decides which cards come back when a query matches more than one page.
+// Both only change what the next enter asks for; neither sends anything. The list sort — o and O — decides
 // how the cards already in front of you are arranged. Confusing them means
 // re-fetching to reorder, or reordering and wondering why the cards changed.
 
@@ -31,9 +32,9 @@ type searchDoneMsg struct {
 }
 
 // runSearch asks Scryfall, off the main thread.
-func runSearch(panelID int, query, order string) tea.Cmd {
+func runSearch(panelID int, query, order, dir string) tea.Cmd {
 	return func() tea.Msg {
-		cards, total, err := scryfall.Search(query, order, maxResults)
+		cards, total, err := scryfall.Search(query, order, dir, maxResults)
 		if err != nil {
 			return searchDoneMsg{panel: panelID, query: query, err: err}
 		}
@@ -65,7 +66,7 @@ func (m *Model) search(p *panel) tea.Cmd {
 	p.search.Blur()
 	p.title = query
 
-	return runSearch(p.id, query, scryfall.SortOptions[p.querySort])
+	return runSearch(p.id, query, p.queryOrder(), p.queryDirection())
 }
 
 // handleSearchDone files a finished search, if the panel that asked for it
@@ -104,19 +105,35 @@ func errorText(err error) string {
 	return err.Error()
 }
 
-// cycleQuerySort changes which cards a large query comes back with, and
-// re-runs it if there are already results to replace.
-func (m *Model) cycleQuerySort(p *panel, delta int) tea.Cmd {
+// cycleQuerySort changes which cards a large query will come back with. It
+// sends nothing: the bar may hold a query you haven't finished, and the
+// panel may be showing results for a different one. Enter sends.
+func (p *panel) cycleQuerySort(delta int) {
 	n := len(scryfall.SortOptions)
 	p.querySort = ((p.querySort+delta)%n + n) % n
+}
 
-	if p.title == "" {
-		return nil // nothing to re-fetch yet; it'll apply to the next search
-	}
-	p.loading = true
-	p.err = nil
-	return runSearch(p.id, p.title, scryfall.SortOptions[p.querySort])
+// cycleQueryDir changes which way the next search asks for its order to
+// run: auto, ascending, descending. Like the order, it waits for enter.
+func (p *panel) cycleQueryDir(delta int) {
+	n := len(scryfall.DirOptions)
+	p.queryDir = ((p.queryDir+delta)%n + n) % n
 }
 
 // queryOrder is the name of the order the request will ask for.
 func (p *panel) queryOrder() string { return scryfall.SortOptions[p.querySort] }
+
+// queryDirection is the name of the direction the request will ask for.
+func (p *panel) queryDirection() string { return scryfall.DirOptions[p.queryDir] }
+
+// queryOrderLabel is the order as the header shows it: the name, with an
+// arrow when the direction is chosen rather than left to Scryfall.
+func (p *panel) queryOrderLabel() string {
+	switch p.queryDirection() {
+	case "asc":
+		return p.queryOrder() + " ↑"
+	case "desc":
+		return p.queryOrder() + " ↓"
+	}
+	return p.queryOrder()
+}

@@ -55,7 +55,7 @@ func TestSearchFollowsPagesUntilItHasEnough(t *testing.T) {
 	srv, requests := pagedServer(t, 500, 175)
 	useSearch(t, srv.URL)
 
-	cards, total, err := Search("t:elf", "edhrec", 175)
+	cards, total, err := Search("t:elf", "edhrec", "auto", 175)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestSearchStopsWhenScryfallRunsOut(t *testing.T) {
 	srv, requests := pagedServer(t, 30, 175)
 	useSearch(t, srv.URL)
 
-	cards, total, err := Search("t:elf", "edhrec", 175)
+	cards, total, err := Search("t:elf", "edhrec", "auto", 175)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestSearchGathersSeveralPages(t *testing.T) {
 	srv, requests := pagedServer(t, 200, 60)
 	useSearch(t, srv.URL)
 
-	cards, _, err := Search("t:elf", "edhrec", 175)
+	cards, _, err := Search("t:elf", "edhrec", "auto", 175)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestSearchTruncatesToTheLimit(t *testing.T) {
 	srv, _ := pagedServer(t, 300, 60)
 	useSearch(t, srv.URL)
 
-	cards, _, err := Search("t:elf", "edhrec", 100)
+	cards, _, err := Search("t:elf", "edhrec", "auto", 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestNoResultsIsAnAnswerRatherThanAnError(t *testing.T) {
 	defer srv.Close()
 	useSearch(t, srv.URL)
 
-	cards, total, err := Search("t:elf t:island", "edhrec", 175)
+	cards, total, err := Search("t:elf t:island", "edhrec", "auto", 175)
 	if err != nil {
 		t.Fatalf("a query matching nothing was reported as a failure: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestAFailureOnTheFirstPageIsAFailure(t *testing.T) {
 	defer srv.Close()
 	useSearch(t, srv.URL)
 
-	if _, _, err := Search("t:elf", "edhrec", 175); err == nil {
+	if _, _, err := Search("t:elf", "edhrec", "auto", 175); err == nil {
 		t.Error("a server error was swallowed")
 	}
 }
@@ -176,7 +176,7 @@ func TestPagesAlreadyInHandBeatAFailureOnALaterOne(t *testing.T) {
 	defer srv.Close()
 	useSearch(t, srv.URL)
 
-	cards, total, err := Search("t:elf", "edhrec", 175)
+	cards, total, err := Search("t:elf", "edhrec", "auto", 175)
 	if err != nil {
 		t.Fatalf("the pages we had were thrown away: %v", err)
 	}
@@ -198,9 +198,12 @@ func TestTheQueryAndOrderReachTheRequest(t *testing.T) {
 	defer srv.Close()
 	useSearch(t, srv.URL)
 
-	Search(`o:"draw a card" c:u`, "cmc", 175)
+	Search(`o:"draw a card" c:u`, "cmc", "desc", 175)
 	if !strings.Contains(got, "order=cmc") {
 		t.Errorf("the order did not reach the request: %s", got)
+	}
+	if !strings.Contains(got, "dir=desc") {
+		t.Errorf("the direction did not reach the request: %s", got)
 	}
 	if !strings.Contains(got, "draw+a+card") && !strings.Contains(got, "draw%20a%20card") {
 		t.Errorf("the query did not reach the request: %s", got)

@@ -91,7 +91,7 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 // says whether it did. Anything else — no answer, several answers, a failure
 // — is the interface's business.
 func PrintCardIfSingle(query string) bool {
-	cards, total, err := scryfall.Search(query, "edhrec", 2)
+	cards, total, err := scryfall.Search(query, "edhrec", "auto", 2)
 	if err != nil || total != 1 || len(cards) != 1 {
 		return false
 	}

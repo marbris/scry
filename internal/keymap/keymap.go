@@ -154,6 +154,7 @@ const (
 	SearchHistoryPrev Action = "history.prev"
 	SearchHistoryNext Action = "history.next"
 	SearchQuerySort   Action = "query-sort"
+	SearchQueryDir    Action = "query-dir"
 )
 
 type binding struct {
@@ -269,6 +270,8 @@ var defaults = []binding{
 	{Search, SearchHistoryPrev, k("up")},
 	{Search, SearchHistoryNext, k("down")},
 	{Search, SearchQuerySort, k("ctrl+o")},
+	// Not ctrl+i, which a terminal sends as the same byte as tab.
+	{Search, SearchQueryDir, k("ctrl+r")},
 	{Search, SearchRun, k("enter")},
 	{Search, SearchBack, k("esc")},
 }

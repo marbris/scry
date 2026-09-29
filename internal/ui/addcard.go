@@ -32,7 +32,7 @@ type addCardMsg struct {
 // runAddCard asks Scryfall, off the main thread.
 func runAddCard(panelID int, query string) tea.Cmd {
 	return func() tea.Msg {
-		cards, total, err := scryfall.Search(query, "edhrec", maxResults)
+		cards, total, err := scryfall.Search(query, "edhrec", "auto", maxResults)
 		msg := addCardMsg{panel: panelID, query: query, total: total, err: err}
 		for _, c := range cards {
 			msg.cards = append(msg.cards, deck.Card{Card: c})

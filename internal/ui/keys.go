@@ -411,8 +411,11 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case keymap.SearchQuerySort:
-		cmd := m.cycleQuerySort(p, 1)
-		return m, cmd
+		p.cycleQuerySort(1)
+		return m, nil
+	case keymap.SearchQueryDir:
+		p.cycleQueryDir(1)
+		return m, nil
 
 	}
 
