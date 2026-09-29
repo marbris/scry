@@ -324,3 +324,11 @@ func TestTheMarkersRankEditingThenFocusedThenOther(t *testing.T) {
 		t.Error("the three marks aren't three colours")
 	}
 }
+
+func TestTheLeaderMenuFillsTheWidthBeforeWrapping(t *testing.T) {
+	// A coloured separator used to be measured by its escape codes, and the
+	// menu wrapped with most of the line still empty.
+	if lines := sized(200, 30).leaderReference(198); len(lines) != 1 {
+		t.Errorf("the menu takes %d lines at 198 wide", len(lines))
+	}
+}

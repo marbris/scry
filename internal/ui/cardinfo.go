@@ -477,14 +477,16 @@ func legalities(c mtg.Card, width int) []string {
 func packStyled(parts []string, sep string, width int) []string {
 	var out []string
 	line, lineWidth := "", 0
+	// The separator may be styled too, so it is measured as it will show.
+	sepW := lipgloss.Width(sep)
 	for _, p := range parts {
 		w := lipgloss.Width(p)
 		switch {
 		case line == "":
 			line, lineWidth = p, w
-		case lineWidth+textWidth(sep)+w <= width:
+		case lineWidth+sepW+w <= width:
 			line += sep + p
-			lineWidth += textWidth(sep) + w
+			lineWidth += sepW + w
 		default:
 			out = append(out, line)
 			line, lineWidth = p, w
