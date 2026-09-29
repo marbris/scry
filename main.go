@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/config"
 	"scry/internal/deck"
 	"scry/internal/keymap"
 	"scry/internal/moxfield"
@@ -40,6 +41,11 @@ func main() {
 	// The same for keys.json: what can't be used is named, and the default
 	// keys stand in for it.
 	if err := keymap.Load(); err != nil {
+		fmt.Fprintln(os.Stderr, "Warning:", err)
+	}
+
+	// And for the list orders in config.json.
+	if err := ui.SetSortConfig(config.Load().Sort); err != nil {
 		fmt.Fprintln(os.Stderr, "Warning:", err)
 	}
 

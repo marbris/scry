@@ -24,9 +24,15 @@ type cardList struct {
 	// the sort and the filter build rows from it, so both can be undone.
 	all   []deck.Card
 	order cardSort
-	// order2 breaks order's ties and colours the names — ' and ". Arrival
+	// order2 breaks order's ties and colours the names — , and <. Arrival
 	// means there is none.
 	order2 cardSort
+	// desc1 and desc2 are which way each order runs. Each starts the way
+	// its order reads best, and alt+. and alt+, turn them round.
+	desc1, desc2 bool
+	// members is where else on screen each card is, for the inclusion
+	// order. The workspace keeps it current; see Model.resortInclusion.
+	members map[string]membership
 
 	// rows is what's on screen: all, narrowed and sorted.
 	rows []deck.Card
@@ -94,7 +100,7 @@ func newCardList(cards []deck.Card, order cardSort, arrivalName string) *cardLis
 		arrivalName = "as found"
 	}
 	l := &cardList{
-		all: cards, order: order, marks: map[string]bool{}, arrivalName: arrivalName,
+		all: cards, order: order, desc1: order.descending(), marks: map[string]bool{}, arrivalName: arrivalName,
 		rulings: map[string][]mtg.Ruling{}, rulingErr: map[string]error{},
 	}
 	l.refresh()
@@ -114,12 +120,33 @@ func (l *cardList) recheck() {
 	l.legality = &verdict
 }
 
-// orderName is what the panel calls its current order.
+// orderName is what the panel calls its current order, with the way it
+// runs.
 func (l *cardList) orderName() string {
+	name := l.order.String()
 	if l.order == sortArrival {
-		return l.arrivalName
+		name = l.arrivalName
 	}
-	return l.order.String()
+	return name + dirArrow(l.desc1)
+}
+
+// dirArrow is which way an order runs, as the header shows it: ↑ for
+// ascending, ↓ for descending — the same arrows the query's order wears.
+func dirArrow(desc bool) string {
+	if desc {
+		return " ↓"
+	}
+	return " ↑"
+}
+
+// spec is how this list is ordered, for sortCards.
+func (l *cardList) spec() sortSpec {
+	return sortSpec{first: l.order, then: l.order2, desc1: l.desc1, desc2: l.desc2, members: l.members}
+}
+
+// sortsBy reports whether either of the list's orders is s.
+func (l *cardList) sortsBy(s cardSort) bool {
+	return l.order == s || l.order2 == s
 }
 
 // refresh rebuilds what's on screen. Everything that changes the list goes
@@ -127,7 +154,7 @@ func (l *cardList) orderName() string {
 // order or one of them forgotten.
 func (l *cardList) refresh() {
 	rows := l.narrowed()
-	l.rows = sortCards(rows, l.order, l.order2)
+	l.rows = sortCards(rows, l.spec())
 	l.cursor.clamp(len(l.rows))
 }
 
@@ -203,6 +230,7 @@ func (l *cardList) clampCursor()   { l.cursor.clamp(len(l.rows)) }
 func (l *cardList) cycleSort(delta int) {
 	on, had := l.current()
 	l.order = l.order.next(delta)
+	l.desc1 = l.order.descending()
 	l.refresh()
 	if had {
 		l.selectByName(on.Card.Name)
@@ -214,10 +242,34 @@ func (l *cardList) cycleSort(delta int) {
 func (l *cardList) cycleSort2(delta int) {
 	on, had := l.current()
 	l.order2 = l.order2.next(delta)
+	l.desc2 = l.order2.descending()
 	l.refresh()
 	if had {
 		l.selectByName(on.Card.Name)
 	}
+}
+
+// flipSort turns one of the two orders round — the first with first set,
+// otherwise the second — keeping the cursor on its card.
+func (l *cardList) flipSort(first bool) {
+	on, had := l.current()
+	if first {
+		l.desc1 = !l.desc1
+	} else {
+		l.desc2 = !l.desc2
+	}
+	l.refresh()
+	if had {
+		l.selectByName(on.Card.Name)
+	}
+}
+
+// keepSorts takes another list's orders and their directions, so a new
+// search comes back the way the last one was laid out.
+func (l *cardList) keepSorts(from *cardList) {
+	l.order, l.order2 = from.order, from.order2
+	l.desc1, l.desc2 = from.desc1, from.desc2
+	l.refresh()
 }
 
 // order2Name is what the header calls the second order, or nothing when
@@ -226,7 +278,7 @@ func (l *cardList) order2Name() string {
 	if l.order2 == sortArrival {
 		return ""
 	}
-	return l.order2.String()
+	return l.order2.String() + dirArrow(l.desc2)
 }
 
 func (l *cardList) filterText() string { return l.filter }
@@ -517,6 +569,10 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		l.cycleSort2(1)
 	case keymap.CardsSort2Prev:
 		l.cycleSort2(-1)
+	case keymap.CardsSort1Dir:
+		l.flipSort(true)
+	case keymap.CardsSort2Dir:
+		l.flipSort(false)
 	case keymap.CardsSelect:
 		l.toggleMark()
 	case keymap.CardsSelectAll:

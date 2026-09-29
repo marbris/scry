@@ -159,6 +159,9 @@ type panel struct {
 	// queryDir is which way that order runs, as an index into
 	// scryfall.DirOptions. Zero is auto: Scryfall's choice.
 	queryDir int
+	// lastSorts is the list a failed search threw away, kept only for its
+	// orders, so the next search that works is laid out the same.
+	lastSorts *cardList
 
 	// historyAt is where up and down have walked to, and draft is what was
 	// in the bar before the walk started. The queries themselves belong to

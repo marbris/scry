@@ -122,14 +122,21 @@ func onColour(bg lipgloss.Color) lipgloss.Style {
 // row says two things. An order with no colour of its own — mana value,
 // price, a rank — leaves the name plain.
 //
-// With no second order, sorting by colour still colours the name: the
-// column beside it is a mana cost, which says the colour symbol by symbol
-// but not at a glance.
+// With no second order, the name carries the card's type — the one thing a
+// row of names and mana costs doesn't otherwise show. Two exceptions. Sorted
+// by colour, the name carries the colour: the column beside it is a mana
+// cost, which says the colour symbol by symbol but not at a glance. Sorted
+// by type, the type column is already painted, and the name stays plain so
+// the coloured bands are the types alone.
 func nameColour(c mtg.Card, order, then cardSort) lipgloss.Color {
 	if then == sortArrival {
-		then = order
-		if order != sortColor {
+		switch order {
+		case sortColor:
+			then = sortColor
+		case sortType:
 			return theme.Text
+		default:
+			then = sortType
 		}
 	}
 	if col, ok := sortColour(c, then); ok {

@@ -26,7 +26,7 @@ func creatures() []deck.Card {
 }
 
 func TestSortingByPowerIsBiggestFirstAndLandsThoseWithout(t *testing.T) {
-	sorted := sortCards(creatures(), sortPower, sortArrival)
+	sorted := sortCards(creatures(), sortSpec{first: sortPower, desc1: true})
 	got := make([]string, len(sorted))
 	for i, c := range sorted {
 		got[i] = c.Card.Name
@@ -38,7 +38,7 @@ func TestSortingByPowerIsBiggestFirstAndLandsThoseWithout(t *testing.T) {
 }
 
 func TestSortingByToughnessBreaksTiesByPower(t *testing.T) {
-	sorted := sortCards(creatures(), sortToughness, sortArrival)
+	sorted := sortCards(creatures(), sortSpec{first: sortToughness, desc1: true})
 	// Tarmogoyf (5) then the two 2-toughness creatures, biggest power first,
 	// then Sol Ring which has neither.
 	got := make([]string, len(sorted))

@@ -179,7 +179,7 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 		m.notice = msg.err.Error()
 	}
 
-	l := newCardList(msg.cards, sortArrival, "decklist")
+	l := newCardList(msg.cards, firstSort(), "decklist")
 	l.name = msg.info.Name
 	l.deck = &msg.info
 	l.dirty = msg.uncommitted

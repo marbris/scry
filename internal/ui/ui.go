@@ -153,6 +153,17 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	// Whatever the message changed — a card added, the editing deck moved,
+	// a panel opened — a list ordered by where else its cards are is kept
+	// in that order, here, rather than by every handler that could change it.
+	if updated, ok := next.(Model); ok {
+		updated.resortInclusion()
+	}
+	return next, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Views built before the rulebook arrived get it now, so nothing has to
 	// remember to ask. Deferred on a value receiver, which works because
 	// what it changes is reached through the panel pointers rather than

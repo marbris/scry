@@ -135,7 +135,7 @@ func TestTheRowIsExactlyAsWideAsItIsToldToBe(t *testing.T) {
 		Name: "Dwynen, Gilt-Leaf Daen", TypeLine: "Legendary Creature — Elf Faerie Noble",
 		ManaCost: "{2}{G}{G}",
 	}}
-	for _, order := range cardSorts {
+	for _, order := range allSorts {
 		for width := 6; width <= 60; width++ {
 			if got := textWidth(row(c, order, width)); got > width {
 				t.Errorf("order %v at width %d rendered %d columns", order, width, got)
@@ -303,8 +303,12 @@ func TestTheNameTakesItsColourFromWhatYouSortedBy(t *testing.T) {
 	if got := nameColour(green, sortType, sortArrival); got != theme.Text {
 		t.Errorf("sorting by type painted the name %v, want plain", got)
 	}
-	if got := nameColour(green, sortMana, sortArrival); got != theme.Text {
-		t.Errorf("sorting by mana painted the name %v, want plain", got)
+	// Any other order, Scryfall's own included, leaves the name to say
+	// what the rest of the row doesn't: the card's type.
+	for _, order := range []cardSort{sortArrival, sortMana, sortUSD} {
+		if got := nameColour(green, order, sortArrival); got != theme.Success {
+			t.Errorf("sorting by %v painted the name %v, want the creature colour", order, got)
+		}
 	}
 }
 
@@ -356,7 +360,7 @@ func TestPaintingNeverChangesAColumnsWidth(t *testing.T) {
 		Name: "Dwynen, Gilt-Leaf Daen", TypeLine: "Legendary Creature — Elf Archer",
 		ManaCost: "{2}{G}{G}", Colors: []string{"G"},
 	}}
-	for _, order := range cardSorts {
+	for _, order := range allSorts {
 		for width := 8; width <= 50; width++ {
 			got := stripANSI(renderRow(c, order, rowState{}, width))
 			if textWidth(got) > width {

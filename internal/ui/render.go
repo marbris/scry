@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"scry/internal/deck"
 	"scry/internal/keymap"
 	"scry/internal/theme"
 )
@@ -184,6 +185,63 @@ func (m Model) membersFor(l *cardList) map[string]membership {
 		}
 	}
 	return out
+}
+
+// resortInclusion keeps every list's idea of where else its cards are
+// current, and re-sorts the lists ordered by it whose cards have moved
+// between groups.
+//
+// Every list keeps it, not only the ones sorted by it, so that stepping onto
+// the inclusion order with . sorts by what is true now.
+//
+// The cursor stays on its card, unless that card is the one that moved: add
+// a card to the deck and it goes up to join the others, and the cursor goes
+// on to the card that was below it — so a run of adds walks down the list.
+func (m Model) resortInclusion() {
+	for _, p := range m.ws.panels {
+		for _, v := range p.stack {
+			l, ok := v.(*cardList)
+			if !ok {
+				continue
+			}
+			members := m.membersFor(l)
+			if sameMembers(members, l.members) {
+				continue
+			}
+			before := l.members
+			l.members = members
+			if !l.sortsBy(sortInclusion) {
+				continue
+			}
+
+			on, had := l.current()
+			var below deck.Card
+			hasBelow := l.cursor.at+1 < len(l.rows)
+			if hasBelow {
+				below = l.rows[l.cursor.at+1]
+			}
+			l.refresh()
+			switch {
+			case !had:
+			case before[markKey(on)] != members[markKey(on)] && hasBelow:
+				l.selectByName(below.Card.Name)
+			default:
+				l.selectByName(on.Card.Name)
+			}
+		}
+	}
+}
+
+func sameMembers(a, b map[string]membership) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if w, ok := b[k]; !ok || w != v {
+			return false
+		}
+	}
+	return true
 }
 
 // viewInfo draws the information panel.

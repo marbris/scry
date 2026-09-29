@@ -22,7 +22,7 @@ func TestTheSecondOrderBreaksTheFirstOnesTies(t *testing.T) {
 		{Card: mtg.Card{Name: "C Blue Bolt", TypeLine: "Instant", Colors: []string{"U"}}},
 		{Card: mtg.Card{Name: "D Black Wurm", TypeLine: "Creature — Wurm", Colors: []string{"B"}}},
 	}
-	got := sortCards(cards, sortType, sortColor)
+	got := sortCards(cards, sortSpec{first: sortType, then: sortColor})
 	var names []string
 	for _, c := range got {
 		names = append(names, c.Card.Name)

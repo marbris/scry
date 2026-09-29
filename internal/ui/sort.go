@@ -32,12 +32,37 @@ const (
 	sortPower
 	sortToughness
 	sortUSD
+	// sortInclusion groups a list by where else its cards are: in the deck
+	// being edited first, then in some other list on screen, then only here.
+	sortInclusion
 )
 
-var cardSorts = []cardSort{
+// allSorts is every order there is, whether or not the cycle offers it.
+var allSorts = []cardSort{
 	sortArrival, sortMana, sortName, sortType, sortColor, sortRarity, sortEDHREC,
-	sortPower, sortToughness, sortUSD,
+	sortPower, sortToughness, sortUSD, sortInclusion,
 }
+
+// defaultCycle is the order . and , step through as it ships. Name is left
+// out: a list in alphabetical order is one you could only want for finding
+// a card, and / does that better.
+var defaultCycle = []cardSort{
+	sortArrival, sortMana, sortColor, sortType, sortPower, sortToughness,
+	sortEDHREC, sortUSD, sortRarity, sortInclusion,
+}
+
+// sortCycle is the cycle in force, which config.json can reorder and trim.
+var sortCycle = defaultCycle
+
+// defaultDescending is the orders that read best-first from the top down:
+// the biggest creatures, the dearest cards, the rarest. The rest start
+// ascending — a rank is best at 1, and a colour or a type has no better end.
+var defaultDescending = map[cardSort]bool{
+	sortPower: true, sortToughness: true, sortUSD: true, sortRarity: true,
+}
+
+// sortDescending is the directions in force, which config.json can flip.
+var sortDescending = defaultDescending
 
 func (s cardSort) String() string {
 	switch s {
@@ -59,15 +84,30 @@ func (s cardSort) String() string {
 		return "toughness"
 	case sortUSD:
 		return "usd"
+	case sortInclusion:
+		return "inclusion"
 	}
 	return "as found"
 }
 
-// next cycles through the orders, wrapping.
+// next cycles through the orders in force, wrapping. An order the cycle
+// doesn't offer — one config.json has since left out — steps to its start.
 func (s cardSort) next(delta int) cardSort {
-	n := len(cardSorts)
-	return cardSort((int(s) + delta%n + n) % n)
+	n := len(sortCycle)
+	for i, c := range sortCycle {
+		if c == s {
+			return sortCycle[((i+delta)%n+n)%n]
+		}
+	}
+	return sortCycle[0]
 }
+
+// firstSort is where a new list starts: the head of the cycle, which is the
+// order the cards came in unless config.json says otherwise.
+func firstSort() cardSort { return sortCycle[0] }
+
+// descending is the direction an order starts in.
+func (s cardSort) descending() bool { return sortDescending[s] }
 
 // showsMana reports whether the second column is a mana cost, which decides
 // whether it gets painted symbol by symbol.
@@ -175,6 +215,15 @@ func manaText(symbols []string) string {
 // manaCost is the whole job for callers that only want the text.
 func manaCost(c mtg.Card) string { return manaText(manaSymbols(c.DisplayManaCost())) }
 
+// sortSpec is everything a list's order depends on: the two orders, which
+// way each runs, and — for the inclusion order — where else each card is.
+type sortSpec struct {
+	first, then cardSort
+	desc1       bool
+	desc2       bool
+	members     map[string]membership
+}
+
 // sortCards returns the cards in the given order, with a second order
 // breaking the first one's ties. Arrival order is the last tiebreak
 // throughout — a stable sort over the list as it came in — so cards that
@@ -188,97 +237,116 @@ func manaCost(c mtg.Card) string { return manaText(manaSymbols(c.DisplayManaCost
 // Commanders sort with everything else. They come first in decklist order
 // because that is how a decklist is built, not because anything pins them
 // there: sorting by mana value means by mana value.
-func sortCards(cards []deck.Card, s, then cardSort) []deck.Card {
-	if (s == sortArrival && then == sortArrival) || len(cards) < 2 {
+func sortCards(cards []deck.Card, spec sortSpec) []deck.Card {
+	if len(cards) < 2 {
 		return cards
 	}
+	if spec.first == sortArrival {
+		// Arrival has no key to compare, and the second order is only a
+		// tiebreak — so what it does there is colour the names, not move
+		// them. Turned round, it is the list upside down.
+		if !spec.desc1 {
+			return cards
+		}
+		out := make([]deck.Card, len(cards))
+		for i, c := range cards {
+			out[len(cards)-1-i] = c
+		}
+		return out
+	}
 	out := append([]deck.Card(nil), cards...)
-	less := lessFor(s, then)
-	sort.SliceStable(out, func(i, j int) bool { return less(out[i].Card, out[j].Card) })
+	less := lessFor(spec)
+	sort.SliceStable(out, func(i, j int) bool { return less(out[i], out[j]) })
 	return out
 }
 
 // lessFor composes the comparison: the first order's key, the second
 // order's key, the first order's inner tiebreak, and the name.
-//
-// Arrival as the first order leaves the list where it is: it has no key to
-// compare, and the second order is only a tiebreak — so what it does there
-// is colour the names, not move them.
-func lessFor(s, then cardSort) func(a, b mtg.Card) bool {
-	if s == sortArrival {
-		return func(a, b mtg.Card) bool { return false }
-	}
-	return func(a, b mtg.Card) bool {
-		if c := keyCmp(s, a, b); c != 0 {
+func lessFor(spec sortSpec) func(a, b deck.Card) bool {
+	return func(a, b deck.Card) bool {
+		if c := keyCmp(spec.first, spec.desc1, spec.members, a, b); c != 0 {
 			return c < 0
 		}
-		if then != sortArrival && then != s {
-			if c := keyCmp(then, a, b); c != 0 {
+		if spec.then != sortArrival && spec.then != spec.first {
+			if c := keyCmp(spec.then, spec.desc2, spec.members, a, b); c != 0 {
 				return c < 0
 			}
 		}
-		if c := innerCmp(s, a, b); c != 0 {
+		if c := innerCmp(spec.first, a.Card, b.Card); c != 0 {
 			return c < 0
 		}
-		return a.Name < b.Name
+		return a.Card.Name < b.Card.Name
 	}
 }
 
-// keyCmp compares two cards on the one property an order is about, and
-// reports them equal when that property is — the name is the caller's.
-func keyCmp(s cardSort, a, b mtg.Card) int {
-	switch s {
-	case sortName:
-		return strings.Compare(a.Name, b.Name)
-
-	case sortMana:
-		return cmpFloat(a.CMC, b.CMC)
-
-	case sortType:
-		return cmpInt(typeRank(a.TypeLine), typeRank(b.TypeLine))
-
-	case sortColor:
-		return cmpInt(colorRank(a), colorRank(b))
-
-	case sortRarity:
-		// Rarest first, which is what you're looking for.
-		return -cmpInt(rarityRank(a.Rarity), rarityRank(b.Rarity))
-
-	case sortEDHREC:
-		ra, rb := a.EDHRECRank, b.EDHRECRank
-		// Unranked cards have no rank rather than rank zero, so they go
-		// last instead of straight to the top.
-		if ra == 0 {
-			ra = 1 << 30
+// keyCmp compares two cards on the one property an order is about, in the
+// direction asked for, and reports them equal when that property is — the
+// name is the caller's.
+//
+// A card with no value at all — unranked, unpriced, no power — goes to the
+// bottom whichever way the order runs: turning a list round is for reading
+// it from the other end, not for bringing the blanks to the top.
+func keyCmp(s cardSort, desc bool, members map[string]membership, a, b deck.Card) int {
+	va, oka := sortKey(s, members, a)
+	vb, okb := sortKey(s, members, b)
+	if oka != okb {
+		if oka {
+			return -1
 		}
-		if rb == 0 {
-			rb = 1 << 30
-		}
-		return cmpInt(ra, rb)
-
-	case sortPower:
-		// Biggest first — a list sorted by power is one you're reading for
-		// the top of the curve.
-		return cmpStat(a.Power, b.Power)
-
-	case sortToughness:
-		return cmpStat(a.Toughness, b.Toughness)
-
-	case sortUSD:
-		// Dearest first — a list sorted by price is one you're reading to see
-		// what a deck costs, or what to cut. A card with no known price sorts
-		// to the bottom rather than posing as free.
-		pa, oka := a.USD()
-		pb, okb := b.USD()
-		if oka != okb {
-			if oka {
-				return -1
-			}
-			return 1
-		}
-		return -cmpFloat(pa, pb)
+		return 1
 	}
-	return 0
+	if s == sortName {
+		c := strings.Compare(a.Card.Name, b.Card.Name)
+		if desc {
+			return -c
+		}
+		return c
+	}
+	c := cmpFloat(va, vb)
+	if desc {
+		return -c
+	}
+	return c
+}
+
+// sortKey is the number an order ranks a card by, low to high, and whether
+// the card has one at all. Each order's key runs its natural way up — mana
+// value from 0, rarity from common, power from the smallest — and the
+// direction is laid over it by keyCmp.
+func sortKey(s cardSort, members map[string]membership, dc deck.Card) (float64, bool) {
+	c := dc.Card
+	switch s {
+	case sortMana:
+		return c.CMC, true
+	case sortType:
+		return float64(typeRank(c.TypeLine)), true
+	case sortColor:
+		return float64(colorRank(c)), true
+	case sortRarity:
+		r := rarityRank(c.Rarity)
+		return float64(r), r > 0
+	case sortEDHREC:
+		return float64(c.EDHRECRank), c.EDHRECRank > 0
+	case sortPower:
+		v, ok := statValue(c.Power)
+		return float64(v), ok
+	case sortToughness:
+		v, ok := statValue(c.Toughness)
+		return float64(v), ok
+	case sortUSD:
+		return c.USD()
+	case sortInclusion:
+		// In the deck being edited, then elsewhere on screen, then only
+		// here: the closer a card already is to the deck, the higher.
+		switch members[markKey(dc)] {
+		case inTarget:
+			return 0, true
+		case inOther:
+			return 1, true
+		}
+		return 2, true
+	}
+	return 0, true
 }
 
 // innerCmp is what an order does within one of its own groups, before the

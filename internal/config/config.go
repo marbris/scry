@@ -21,6 +21,19 @@ import (
 type Config struct {
 	Theme string `json:"theme,omitempty"`
 	Sync  *Sync  `json:"sync,omitempty"`
+	Sort  *Sort  `json:"sort,omitempty"`
+}
+
+// Sort is how the list orders behave: which ones . and , step through, in
+// what order, and which way each one starts out running. Either half can be
+// left out and the shipped one stands.
+type Sort struct {
+	// Cycle is the orders in the order they come round. One left out isn't
+	// offered at all.
+	Cycle []string `json:"cycle,omitempty"`
+	// Direction is "asc" or "desc" by order name, for those that should
+	// start the other way from how they ship.
+	Direction map[string]string `json:"direction,omitempty"`
 }
 
 // Sync is where your decks are mirrored: a git remote you own, and the branch

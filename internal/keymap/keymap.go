@@ -77,6 +77,8 @@ const (
 	CardsSort1Prev Action = "sort1.prev"
 	CardsSort2Next Action = "sort2.next"
 	CardsSort2Prev Action = "sort2.prev"
+	CardsSort1Dir  Action = "sort1.direction"
+	CardsSort2Dir  Action = "sort2.direction"
 	CardsSelect    Action = "select"
 	CardsSelectAll Action = "select-all"
 	CardsFilter    Action = "filter"
@@ -195,6 +197,10 @@ var defaults = []binding{
 	{Cards, CardsSort1Prev, k(">")},
 	{Cards, CardsSort2Next, k(",")},
 	{Cards, CardsSort2Prev, k("<")},
+	// ctrl+. would be the natural key, but a terminal sends it as a plain
+	// dot; alt reaches the program as itself.
+	{Cards, CardsSort1Dir, k("alt+.")},
+	{Cards, CardsSort2Dir, k("alt+,")},
 	{Cards, CardsFilter, k("/")},
 	{Cards, CardsSelect, k("v")},
 	{Cards, CardsSelectAll, k("V")},

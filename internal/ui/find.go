@@ -13,8 +13,10 @@ import (
 // Two orders are in play and they are not the same thing. The query sort —
 // ctrl+o, with ctrl+r for its direction — is part of the request: it
 // decides which cards come back when a query matches more than one page.
-// Both only change what the next enter asks for; neither sends anything. The list sort — o and O — decides
-// how the cards already in front of you are arranged. Confusing them means
+// Both only change what the next enter asks for; neither sends anything. The
+// list sorts — . and , with alt for their directions — decide how the cards
+// already in front of you are arranged, and carry over from one search to
+// the next. Confusing them means
 // re-fetching to reorder, or reordering and wondering why the cards changed.
 
 // maxResults is one Scryfall page, which is the whole result set kept.
@@ -81,15 +83,27 @@ func (m Model) handleSearchDone(msg searchDoneMsg) (tea.Model, tea.Cmd) {
 
 	p.loading = false
 	if msg.err != nil {
+		// The orders outlive a failed search too, so the next one that
+		// works still comes back laid out the way you had it.
+		if l := p.cardsView(); l != nil {
+			p.lastSorts = l
+		}
 		p.err = msg.err
 		p.stack = nil
 		return m, nil
 	}
 
-	// Kept in the order Scryfall sent them. The query asked for an order —
-	// EDHREC rank, by default — and re-sorting on arrival would throw away
-	// the answer to the question just asked.
-	l := newCardList(msg.cards, sortArrival, "scryfall order")
+	// Laid out the way the last search in this panel was: the orders are
+	// how you read a list, not part of the question. A panel's first search
+	// starts at the head of the cycle — Scryfall's own order, as it ships,
+	// which is the answer to the order the query asked for.
+	l := newCardList(msg.cards, firstSort(), "scryfall order")
+	if prev := p.cardsView(); prev != nil {
+		l.keepSorts(prev)
+	} else if p.lastSorts != nil {
+		l.keepSorts(p.lastSorts)
+	}
+	p.lastSorts = nil
 	l.name = msg.query
 	l.matched = msg.total
 	p.show(l)
