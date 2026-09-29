@@ -8,9 +8,11 @@ import (
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
 	"ttr/internal/prints"
+	"ttr/internal/stats"
 	"ttr/internal/theme"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // alt is a key with alt held, the way the terminal reports it.
@@ -368,6 +370,18 @@ func TestUndoCloseBringsBackWhatOnlyClosed(t *testing.T) {
 	for i, p := range want {
 		if m.ws.panels[i] != p {
 			t.Errorf("panel %d isn't back where it was", i)
+		}
+	}
+}
+
+func TestEveryStatMarkFitsItsOneCellGutter(t *testing.T) {
+	a, b := stats.Row{Label: "removal"}, stats.Row{Label: "Creature"}
+	for _, op := range []stats.Op{stats.And, stats.Or, stats.AndNot} {
+		expr := stats.Expr{{Op: stats.And, Row: a}, {Op: op, Row: b}}
+		for _, r := range []stats.Row{a, b} {
+			if w := lipgloss.Width(statMark(expr, r)); w != 1 {
+				t.Errorf("%v: the mark %q is %d cells", op, statMark(expr, r), w)
+			}
 		}
 	}
 }

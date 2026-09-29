@@ -499,12 +499,15 @@ func (m Model) renderStats(width int) []string {
 }
 
 // statMark is the and/or beside a category that's part of the narrowing.
+// The gutter is one cell, so and-not is its ¬ alone — the and goes without
+// saying there — where the header, with room, writes ∧¬ in full. Two cells
+// in a one-cell gutter wrapped the row and pushed the panel off the screen.
 func statMark(expr stats.Expr, r stats.Row) string {
 	i := expr.Index(r)
 	switch {
 	case i < 0:
 		return " "
-	case i == 0 && expr[0].Op == stats.AndNot:
+	case expr[i].Op == stats.AndNot:
 		return "¬"
 	case i == 0:
 		return "•"
