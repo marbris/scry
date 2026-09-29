@@ -49,6 +49,9 @@ type Model struct {
 	// hoverSeq rises with every move, so a ruling fetched for a card you
 	// have since scrolled past can be recognised as stale.
 	hoverSeq int
+	// hovered is the card whose rulings were last asked for, so a new card
+	// under the cursor — however it got there — is noticed.
+	hovered string
 
 	// images are the pictures gx has fetched, by card; imageSeq does for
 	// them what hoverSeq does for rulings; kitty is what the terminal is
@@ -174,9 +177,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// And the picture gx put up is the one the terminal holds, at the
 		// size the panel now has room for.
 		synced, imgCmd := updated.syncImage()
-		return synced, tea.Batch(cmd, imgCmd)
+		cmd = tea.Batch(cmd, imgCmd)
+		// Whenever the card under the cursor changes — a move, gg, a search
+		// coming back, a session restored — its rulings are asked for. Only
+		// the moves used to ask, so the first card of a fresh list sat on "…".
+		if id := focusedID(synced); id != synced.hovered && id != "" {
+			synced.hovered = id
+			hover := synced.hover()
+			cmd = tea.Batch(cmd, hover)
+		}
+		return synced, cmd
 	}
 	return next, cmd
+}
+
+// focusedID is the card under the cursor, or "" where there is none.
+func focusedID(m Model) string {
+	if c := m.focusedCard(); c != nil {
+		return c.ID
+	}
+	return ""
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {

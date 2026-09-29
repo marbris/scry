@@ -332,3 +332,17 @@ func TestTheLeaderMenuFillsTheWidthBeforeWrapping(t *testing.T) {
 		t.Errorf("the menu takes %d lines at 198 wide", len(lines))
 	}
 }
+
+func TestGGAsksForTheRulingsOfTheCardItLandsOn(t *testing.T) {
+	m := withCards(sized(140, 30), "f", sample(), sortArrival)
+	for i := range m.ws.current().cardsView().all {
+		m.ws.current().cardsView().all[i].Card.ID = "id" + itoa(i)
+	}
+	m.ws.current().cardsView().refresh()
+	m = drive(m, "j", "j")
+	seq := m.hoverSeq
+	m = drive(m, "g", "g")
+	if m.hoverSeq == seq {
+		t.Error("gg landed on a card and didn't ask for its rulings")
+	}
+}
