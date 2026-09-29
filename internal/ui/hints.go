@@ -184,6 +184,7 @@ func (m Model) panelHintGroups(p *panel) []hintGroup {
 	} else {
 		nav = append(nav, listHint("down/up", keymap.ListDown, keymap.ListUp))
 	}
+	nav = append(nav, [2]string{topBottomHint(), "first/last"})
 
 	// i reaches the panel's search bar — except on a deck, where it fetches
 	// a card into it, and on somebody else's deck, where it does neither.
@@ -202,16 +203,16 @@ func (m Model) panelHintGroups(p *panel) []hintGroup {
 
 	groups := append([]hintGroup{{"", nav}}, rest...)
 
-	// e chooses the deck the edit keys write to. Only offered where the
-	// focused panel is a list of cards: a, x and t do nothing from a decks
-	// panel or the rules, so which deck they'd go to is no question there.
+	// With no deck being edited, e is how to choose one — offered where the
+	// focused panel is a list of cards, since a, x and t do nothing from a
+	// decks panel or the rules. Once there is one, e sits under it instead:
+	// what it moves is which panel that is.
 	if p.cardsView() != nil {
-		editKeys := hint("", keymap.Global, keymap.GlobalEditNext, keymap.GlobalEditPrev)[0]
-		label := m.editingLabel()
 		if target := m.ws.editingList(); target == nil || target.deck == nil {
-			label = "choose a deck to edit"
+			groups = append(groups, hintGroup{"", [][2]string{
+				hint("choose a deck to edit", keymap.Global, keymap.GlobalEditNext, keymap.GlobalEditPrev),
+			}})
 		}
-		groups = append(groups, hintGroup{"", [][2]string{{editKeys, label}}})
 	}
 
 	if statsUp {
@@ -368,6 +369,11 @@ func (m Model) editHints() [][2]string {
 		hint("commander", keymap.Cards, keymap.CardsCommander),
 		hint("undo", keymap.Cards, keymap.CardsUndo),
 	}
+	// e and E move the editing deck on, so they sit under the deck they
+	// move away from — but only when there is another deck to move to.
+	if m.editableCount() > 1 {
+		keys = append(keys, hint("next/prev deck", keymap.Global, keymap.GlobalEditNext, keymap.GlobalEditPrev))
+	}
 	var out [][2]string
 	for _, k := range keys {
 		if k[0] != "" {
@@ -390,13 +396,19 @@ func (m Model) infoKeys(p *panel) [][2]string {
 	if p.cardsView() == nil {
 		return nil
 	}
-	return [][2]string{
+	var keys [][2]string
+	// The printed history and the picture are put up over the card, and
+	// esc takes them down again — back to the card.
+	if m.info.mode == infoVersions || m.info.mode == infoImage {
+		keys = append(keys, hint("back", keymap.Global, keymap.GlobalBack))
+	}
+	return append(keys,
 		hint("stats", keymap.Global, keymap.GlobalStats),
 		hint("editing deck stats", keymap.Global, keymap.GlobalStatsEdit),
 		hint("half page", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown),
-		{gotoHint(keymap.GotoVersions), "card history"},
-		{gotoHint(keymap.GotoImage), "printing"},
-	}
+		[2]string{gotoHint(keymap.GotoVersions), "card history"},
+		[2]string{gotoHint(keymap.GotoImage), "printing"},
+	)
 }
 
 // statsHints are the keys while the statistics have them.
@@ -413,18 +425,14 @@ func statsHints() [][2]string {
 	}
 }
 
-// editingLabel says what e and E will do, which depends on whether there is
-// anywhere else for them to go. "the next deck" with one deck open names a
-// deck that isn't there.
-func (m Model) editingLabel() string {
+// editableCount is how many decks of yours are open — how many places e and
+// E have to go.
+func (m Model) editableCount() int {
 	n := 0
 	for i := range m.ws.panels {
 		if m.ws.editable(i) {
 			n++
 		}
 	}
-	if n > 1 {
-		return "next/prev deck"
-	}
-	return "choose deck"
+	return n
 }

@@ -201,8 +201,11 @@ func (m Model) renderHistory(c mtg.Card, width int) []string {
 		return wrapStyled(errorText(h.err), width, lipgloss.NewStyle().Foreground(theme.Error))
 	}
 
+	// Newest first: the wording in force today on top, and the older ones
+	// under it, the way you read back through a history.
 	var out []string
-	for i, rev := range h.revisions {
+	for i := range h.revisions {
+		rev := h.revisions[len(h.revisions)-1-i]
 		if i > 0 {
 			out = append(out, "")
 		}

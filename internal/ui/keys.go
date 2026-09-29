@@ -46,7 +46,6 @@ var leaderMenu = []leaderCmd{
 	{keymap.LeaderClose, "close", func(m *Model) { m.ws.close() }},
 	{keymap.LeaderUndoClose, "undo close", func(m *Model) { m.ws.restoreClosed() }},
 	{keymap.LeaderOnly, "only", func(m *Model) { m.ws.only() }},
-	{keymap.LeaderHelp, "keys", func(m *Model) { m.hintsExpanded = !m.hintsExpanded }},
 }
 
 // handleLeader runs the command a key names. A key that names nothing

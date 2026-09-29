@@ -7,6 +7,7 @@ import (
 	"scry/internal/config"
 	"scry/internal/deck"
 	"scry/internal/mtg"
+	"scry/internal/prints"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -225,5 +226,64 @@ func TestScryfallOrderColoursTheNamesByType(t *testing.T) {
 	sol := mtg.Card{Name: "Sol Ring", TypeLine: "Artifact"}
 	if got := nameColour(sol, sortArrival, sortArrival); got != typeColour(sol.TypeLine) {
 		t.Errorf("Scryfall order painted an artifact %v", got)
+	}
+}
+
+func TestThePrintedHistoryReadsNewestFirst(t *testing.T) {
+	m := withCards(sized(140, 40), "f", []deck.Card{{Card: historyCard()}}, sortArrival)
+	m = drive(m, "g", "v")
+	h := m.histories["oid"]
+	h.state = histReady
+	h.revisions = []prints.TextRevision{
+		{Text: "Flying (old)", SetName: "Alpha", Released: "1993-08-05"},
+		{Text: "Flying", SetName: "Foundations", Released: "2024-11-15", Current: true},
+	}
+	body := stripANSI(strings.Join(m.renderHistory(historyCard(), 60), "\n"))
+	if strings.Index(body, "Foundations") > strings.Index(body, "Alpha") {
+		t.Errorf("the oldest wording is on top:\n%s", body)
+	}
+}
+
+func TestEscBackIsOfferedOverThePrintedTextAndThePicture(t *testing.T) {
+	withKitty(t, true)
+	for _, keys := range [][]string{{"g", "v"}, {"g", "x"}} {
+		m := withCards(sized(140, 40), "f", twoCards(), sortArrival)
+		m = drive(m, keys...)
+		if got := offered(m, "back"); got != "esc" {
+			t.Errorf("%s: esc back is offered as %q", strings.Join(keys, ""), got)
+		}
+	}
+	m := withCards(sized(140, 40), "f", twoCards(), sortArrival)
+	if got := offered(m, "back"); got != "" {
+		t.Error("esc back is offered over a plain card")
+	}
+}
+
+func TestTheLeaderMenuIsOnlyTheLeadersKeys(t *testing.T) {
+	got := stripANSI(strings.Join(sized(140, 30).leaderReference(200), " "))
+	if strings.Contains(got, "keys") {
+		t.Errorf("the leader menu offers ? keys: %s", got)
+	}
+}
+
+func TestEChoosesTheNextDeckFromUnderTheEditingDeck(t *testing.T) {
+	m, _, _ := twoDecks(t)
+	m.ws.editing = 1
+	m.hintsExpanded = true
+	m = focusOn(m, 0) // the search
+	search := stripANSI(m.viewPanel(m.ws.panels[0], 0, 60, 30, 2))
+	editing := stripANSI(m.viewPanel(m.ws.panels[1], 1, 60, 30, 2))
+	if strings.Contains(search, "next/prev deck") {
+		t.Errorf("e is offered under the search:\n%s", search)
+	}
+	if !strings.Contains(editing, "e E next/prev deck") {
+		t.Errorf("e isn't offered under the editing deck:\n%s", editing)
+	}
+}
+
+func TestFirstAndLastAreOffered(t *testing.T) {
+	m := withCards(sized(140, 30), "f", sample(), sortArrival)
+	if got := offered(m, "first/last"); got != "gg G" {
+		t.Errorf("gg G offered as %q", got)
 	}
 }
