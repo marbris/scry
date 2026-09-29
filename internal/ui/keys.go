@@ -41,14 +41,11 @@ var leaderMenu = []leaderCmd{
 	{keymap.LeaderDecks, "decks", nil}, // opens the list and checks it, so it needs a command
 	{keymap.LeaderRules, "rules", nil}, // needs a command, so it is run below
 	{keymap.LeaderNew, "new", func(m *Model) { m.ws.open(KindNew) }},
-	{keymap.LeaderStats, "stats (editing deck)", func(m *Model) { m.toggleStats(true) }},
-	{keymap.LeaderClearAll, "clear all filters", func(m *Model) { m.clearAllFilters() }},
-	{keymap.LeaderCommit, "commit the editing deck", nil}, // hands back a command, so it is run below
+	{keymap.LeaderSync, "git push", nil},             // hands back a command, so it is run below
+	{keymap.LeaderCommitAll, "commit all lists", nil}, // so does this
 	{keymap.LeaderClose, "close", func(m *Model) { m.ws.close() }},
 	{keymap.LeaderUndoClose, "undo close", func(m *Model) { m.ws.restoreClosed() }},
 	{keymap.LeaderOnly, "only", func(m *Model) { m.ws.only() }},
-	{keymap.LeaderMoveLeft, "move left", func(m *Model) { m.ws.movePanel(-1) }},
-	{keymap.LeaderMoveRight, "move right", func(m *Model) { m.ws.movePanel(1) }},
 	{keymap.LeaderHelp, "keys", func(m *Model) { m.hintsExpanded = !m.hintsExpanded }},
 }
 
@@ -58,7 +55,7 @@ func (m *Model) handleLeader(key string) tea.Cmd {
 	m.leader = false
 	action := keymap.Lookup(keymap.Leader, key)
 
-	// Three entries hand back a command rather than only changing the
+	// A few entries hand back a command rather than only changing the
 	// workspace, so they can't sit in the table above.
 	switch action {
 	case keymap.LeaderRules:
@@ -67,8 +64,13 @@ func (m *Model) handleLeader(key string) tea.Cmd {
 		l := newDeckList()
 		m.ws.open(KindDecks).show(l)
 		return loadDecks(l)
-	case keymap.LeaderCommit:
-		return m.writeEditing()
+	case keymap.LeaderSync:
+		// Mirror to the git remote, from wherever you are: it is about all
+		// your decks, not the one under the cursor. It touches the network,
+		// so it runs off the main thread and reports back as a notice.
+		return syncDecks
+	case keymap.LeaderCommitAll:
+		return m.commitAll()
 	}
 
 	for _, c := range leaderMenu {
@@ -212,8 +214,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	// ctrl with a direction carries the panel itself along the row, focus
-	// going with it — the same thing <space>h and <space>l do, on the keys
-	// your fingers are already on for moving between panels.
+	// going with it, on the keys your fingers are already on for moving
+	// between panels — and, unlike a leader sequence, it repeats.
 	case keymap.GlobalMoveLeft:
 		m.ws.movePanel(-1)
 	case keymap.GlobalMoveRight:
@@ -247,13 +249,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.scrollInfoHalf(-1)
 	case keymap.GlobalInfoDown:
 		m.scrollInfoHalf(1)
-	case keymap.GlobalInfoParaUp:
-		m.scrollInfoParagraph(-1)
-	case keymap.GlobalInfoParaDn:
-		m.scrollInfoParagraph(1)
-
 	case keymap.GlobalStats:
 		m.toggleStats(false)
+	case keymap.GlobalStatsEdit:
+		m.toggleStats(true)
 
 	case keymap.GlobalHelp:
 		// Grow the hint bar to the whole keymap, or shrink it back. It stays
@@ -270,6 +269,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// and the statistics categories both — at once, where esc takes them
 		// a step at a time.
 		m.clearActiveFilters()
+	case keymap.GlobalClearAll:
+		m.clearAllFilters()
 
 	case keymap.GlobalQuit:
 		return m.tryQuit()
@@ -560,14 +561,44 @@ func (m Model) tryQuit() (tea.Model, tea.Cmd) {
 }
 
 // saveEverything commits every deck with uncommitted edits, for the w in
-// the quit question.
+// the quit question and for <space>w.
 func (m Model) saveEverything() tea.Cmd {
 	var cmds []tea.Cmd
-	for _, p := range m.ws.panels {
-		l := p.cardsView()
-		if l != nil && l.dirty && l.deck != nil && l.deck.Local() {
-			cmds = append(cmds, saveDeck(p.id, *l.deck, l.all))
+	for _, d := range m.openDecks() {
+		if d.list.dirty && d.list.deck.Local() {
+			cmds = append(cmds, saveDeck(d.panel.id, *d.list.deck, d.list.all))
 		}
 	}
 	return tea.Batch(cmds...)
+}
+
+// commitAll is <space>w: every open list with uncommitted edits, committed —
+// the edits a/x/t made to one deck and the cards you put into another alike.
+func (m *Model) commitAll() tea.Cmd {
+	cmd := m.saveEverything()
+	if cmd == nil {
+		m.notice = "nothing to commit"
+	}
+	return cmd
+}
+
+// openDeck is a deck open somewhere in the workspace, and the panel it's in.
+type openDeck struct {
+	panel *panel
+	list  *cardList
+}
+
+// openDecks is every deck open in any panel — not only the ones on top: a
+// deck opened from the decks list and stepped back out of is still open,
+// and can still have edits nobody has committed.
+func (m Model) openDecks() []openDeck {
+	var out []openDeck
+	for _, p := range m.ws.panels {
+		for _, v := range p.stack {
+			if l, ok := v.(*cardList); ok && l.deck != nil {
+				out = append(out, openDeck{p, l})
+			}
+		}
+	}
+	return out
 }

@@ -2,10 +2,10 @@ package ui
 
 // The information panel, pinned to the right.
 //
-// It is never focused. K and J scroll it half a screen and ctrl+k / ctrl+j a
-// paragraph, from wherever you happen to be — which is what keeps it a panel
-// you read rather than a place you have to go and come back from. The cost
-// is four keys in the shift and control spaces; the saving is a whole mode.
+// It is never focused. K and J scroll it half a screen from wherever you
+// happen to be — which is what keeps it a panel you read rather than a place
+// you have to go and come back from. The cost is two keys in the shift
+// space; the saving is a whole mode.
 //
 // In statistics J and K turn the groups over instead, and j and k walk the
 // categories.

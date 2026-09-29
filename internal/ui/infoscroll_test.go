@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-
 	"scry/internal/deck"
 	"scry/internal/mtg"
 	"scry/internal/rules"
@@ -36,15 +34,6 @@ func longInfo(t *testing.T) Model {
 	return m
 }
 
-func ctrl(m Model, down bool) Model {
-	msg := tea.KeyMsg{Type: tea.KeyCtrlK}
-	if down {
-		msg = tea.KeyMsg{Type: tea.KeyCtrlJ}
-	}
-	next, _ := m.Update(msg)
-	return next.(Model)
-}
-
 func TestShiftJScrollsHalfTheInfoPanel(t *testing.T) {
 	m := longInfo(t)
 	_, room, most, _ := m.infoSpan()
@@ -72,28 +61,6 @@ func TestShiftJStopsAtTheBottom(t *testing.T) {
 	m = drive(m, "K")
 	if m.info.offset >= most {
 		t.Errorf("K at the bottom didn't move: %d", m.info.offset)
-	}
-}
-
-func TestCtrlJNeverScrollsPastTheBottom(t *testing.T) {
-	// ctrl+j used to go on to the last paragraph's start however far down
-	// that was, while the drawing stopped at the bottom — so ctrl+k then had
-	// to unwind presses nobody could see before anything moved.
-	m := longInfo(t)
-	_, _, most, _ := m.infoSpan()
-	for i := 0; i < 40; i++ {
-		m = ctrl(m, true)
-	}
-	if m.info.offset != most {
-		t.Fatalf("offset %d, want the bottom %d", m.info.offset, most)
-	}
-	before := stripANSI(m.View())
-	m = ctrl(m, false)
-	if m.info.offset >= most {
-		t.Errorf("ctrl+k at the bottom didn't move: %d", m.info.offset)
-	}
-	if stripANSI(m.View()) == before {
-		t.Error("ctrl+k at the bottom changed nothing on screen")
 	}
 }
 

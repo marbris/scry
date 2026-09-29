@@ -240,7 +240,7 @@ func TestSpaceWSavesTheEditingDeckFromAnotherPanel(t *testing.T) {
 		t.Fatal("still in the deck panel")
 	}
 
-	cmd := m.writeEditing()
+	cmd := m.commitAll()
 	if cmd == nil {
 		t.Fatal("space w produced nothing to do")
 	}
@@ -275,12 +275,12 @@ func TestSpaceWSavesTheEditingDeckFromAnotherPanel(t *testing.T) {
 	}
 }
 
-func TestSpaceWWithNoEditingDeckSaysSo(t *testing.T) {
+func TestSpaceWWithNothingToCommitSaysSo(t *testing.T) {
 	m := drive(sized(120, 30), "space", "f")
-	if cmd := m.writeEditing(); cmd != nil {
-		t.Error("something was saved with no deck being edited")
+	if cmd := m.commitAll(); cmd != nil {
+		t.Error("something was saved with no deck open")
 	}
-	if !strings.Contains(m.notice, "no deck is being edited") {
+	if !strings.Contains(m.notice, "nothing to commit") {
 		t.Errorf("the notice says %q", m.notice)
 	}
 }

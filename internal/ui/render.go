@@ -82,10 +82,21 @@ func (m Model) viewPanel(p *panel, index, width, height, subHeight int) string {
 		Render(strings.Repeat("─", inner)))
 
 	// With ? on, the focused panel's keys sit along its bottom — under the
-	// cards they act on, rather than in a bar the width of the screen.
+	// cards they act on, rather than in a bar the width of the screen — and
+	// the editing deck's panel carries the keys that change it. One panel
+	// can be both, and then has both, each under its own rule.
 	var hints []string
-	if focused && m.hintsExpanded {
-		hints = hintFooter(m.panelHintGroups(p), inner, height-2-len(lines))
+	if m.hintsExpanded {
+		var blocks [][]hintGroup
+		if focused {
+			blocks = append(blocks, m.panelHintGroups(p))
+		}
+		if editing {
+			if keys := m.editHints(); len(keys) > 0 {
+				blocks = append(blocks, []hintGroup{{"", keys}})
+			}
+		}
+		hints = hintFooter(blocks, inner, height-2-len(lines))
 	}
 	lines = append(lines, m.viewPanelBody(p, inner, maxInt(height-2-len(lines)-len(hints), 1))...)
 	lines = append(lines, hints...)
@@ -268,8 +279,8 @@ func (m Model) viewInfo(width, height int) string {
 		// the bottom used to move a cursor you could no longer see.
 		offset = m.statScroll(offset, room, len(body))
 	}
-	// Scrolled with K and J, and ctrl+k and ctrl+j, from wherever you are —
-	// the panel is read, never focused.
+	// Scrolled with K and J from wherever you are — the panel is read, never
+	// focused.
 	if offset > maxInt(len(body)-room, 0) {
 		offset = maxInt(len(body)-room, 0)
 	}
@@ -328,9 +339,8 @@ func (m Model) infoTitle() string {
 }
 
 // infoContent is the whole information-panel body for the current mode,
-// before it is scrolled — the lines paragraph scrolling counts and the view
-// draws from the same place, so they can't disagree about where a paragraph
-// begins.
+// before it is scrolled — the lines scrolling counts and the view draws
+// from the same place, so they can't disagree about where the bottom is.
 func (m Model) infoContent(inner int) []string {
 	switch m.info.mode {
 	case infoStats:
@@ -350,7 +360,7 @@ func (m Model) infoFrame(width, height int) (inner int, hints []string, room int
 	inner = maxInt(width-2, 1)
 	const title = 2 // the title and the rule under it
 	if m.hintsExpanded {
-		hints = hintFooter(m.infoHintGroups(), inner, height-2-title)
+		hints = hintFooter([][]hintGroup{m.infoHintGroups()}, inner, height-2-title)
 	}
 	return inner, hints, maxInt(height-len(hints)-2-title, 1)
 }
@@ -377,59 +387,6 @@ func (m *Model) scrollInfoHalf(dir int) {
 	}
 	at := minInt(m.info.offset, most) + dir*maxInt(room/2, 1)
 	m.info.offset = maxInt(minInt(at, most), 0)
-}
-
-// scrollInfoParagraph moves the information panel by a paragraph — the
-// same idea as ctrl+k / ctrl+j jumping a whole group in statistics. A
-// card's rulings run to several paragraphs.
-//
-// Never past the furthest the panel can scroll. It used to go on to the
-// last paragraph's start however far down that was, while the drawing
-// stopped at the bottom: the extra presses built up an offset nobody could
-// see, and ctrl+k then had to unwind all of it before anything moved.
-func (m *Model) scrollInfoParagraph(delta int) {
-	inner, _, most, ok := m.infoSpan()
-	if !ok {
-		return // no information panel on a terminal this narrow
-	}
-	starts := paragraphStarts(m.infoContent(inner))
-	cur := minInt(m.info.offset, most)
-
-	next := 0
-	if delta > 0 {
-		next = most
-		for _, s := range starts {
-			if s > cur {
-				next = s
-				break
-			}
-		}
-	} else {
-		for i := len(starts) - 1; i >= 0; i-- {
-			if starts[i] < cur {
-				next = starts[i]
-				break
-			}
-		}
-	}
-	m.info.offset = minInt(next, most)
-}
-
-// paragraphStarts is the line index each paragraph begins on: a non-blank
-// line at the top, or one following a blank line. Blank lines are the seams
-// the card panel puts between a card's type, its text, its printing and each
-// of its rulings.
-func paragraphStarts(body []string) []int {
-	var out []int
-	prevBlank := true
-	for i, line := range body {
-		blank := strings.TrimSpace(stripStyles(line)) == ""
-		if !blank && prevBlank {
-			out = append(out, i)
-		}
-		prevBlank = blank
-	}
-	return out
 }
 
 // scrollTo brings a line into view with as little movement as possible.
@@ -532,9 +489,13 @@ func (m Model) viewLeaderBar() string {
 // The layout asks how tall this is, so growing it takes room from the panels
 // rather than pushing them off the screen.
 func (m Model) leaderBarLines() []string {
+	return packStyled(leaderParts(), leaderSep(), maxInt(m.width-2, 1))
+}
+
+// leaderParts is the leader's menu, an entry each: the key, and what it does.
+func leaderParts() []string {
 	key := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true)
 	what := lipgloss.NewStyle().Foreground(theme.Text)
-	sep := lipgloss.NewStyle().Foreground(theme.TextMuted).Render(" · ")
 
 	var parts []string
 	for _, c := range leaderMenu {
@@ -542,7 +503,25 @@ func (m Model) leaderBarLines() []string {
 			parts = append(parts, key.Render(k)+" "+what.Render(c.what))
 		}
 	}
-	return packStyled(parts, sep, maxInt(m.width-2, 1))
+	return parts
+}
+
+func leaderSep() string {
+	return lipgloss.NewStyle().Foreground(theme.TextMuted).Render(" · ")
+}
+
+// leaderReference is the leader's menu as ? shows it along the bottom: led
+// by the leader itself, so it reads as what to press first — "space: f find
+// · d decks · …" — without having to press it to find out.
+func (m Model) leaderReference(width int) []string {
+	lead := keymap.Hint(keymap.Global, keymap.GlobalLeader)
+	parts := leaderParts()
+	if lead == "" || len(parts) == 0 {
+		return nil
+	}
+	head := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render(lead + ":")
+	parts[0] = head + " " + parts[0]
+	return packStyled(parts, leaderSep(), width)
 }
 
 // footerHeight is how many rows the bottom of the screen needs. The leader
@@ -575,8 +554,15 @@ func (m Model) viewHint(l layout) string {
 // the keys for what to do next fought over the same row, and the bar grew
 // tall. The notice is on its own line above them now, and each group is a
 // single row across the full width.
+//
+// With ? on, the leader's menu sits above the keys: the panels carry their
+// own keys, and the leader's are the ones that belong to none of them.
 func (m Model) footerLines() []string {
-	hints := m.hintGroupLines(m.footerGroups(), maxInt(m.width-2, 1))
+	width := maxInt(m.width-2, 1)
+	hints := m.hintGroupLines(m.footerGroups(), width)
+	if m.hintsExpanded && !m.barFocused() {
+		hints = append(m.leaderReference(width), hints...)
+	}
 	for i := range hints {
 		hints[i] = " " + hints[i]
 	}
@@ -588,39 +574,47 @@ func (m Model) footerLines() []string {
 	return append(lines, hints...)
 }
 
-// footerGroups is what the bottom line shows: the three keys that reach
+// barFocused reports whether a search bar has the cursor, where every key
+// is typing and the footer shows the bar's own keys.
+func (m Model) barFocused() bool {
+	p := m.ws.current()
+	return p != nil && p.searchOpen && p.search.Focused()
+}
+
+// footerGroups is what the bottom line shows: the two keys that reach
 // everything else. ? draws the rest inside the panels they belong to.
 //
 // A focused search bar is the exception — it shows its own small keymap,
 // and ? is a character there, so there is nothing to grow.
 func (m Model) footerGroups() []hintGroup {
-	p := m.ws.current()
-	if p != nil && p.searchOpen && p.search.Focused() {
+	if m.barFocused() {
 		return m.hintGroups()
 	}
 	return dropUnbound([]hintGroup{{"", restingKeys()}})
 }
 
-// hintFooter is a block of keys for the bottom of a panel: a rule, then the
-// groups, each wrapping onto as many lines as it needs. room is how many
-// lines the panel has for body and keys together; the keys leave the body a
-// few of them, and give up their last lines rather than the cards.
-func hintFooter(groups []hintGroup, width, room int) []string {
-	if len(groups) == 0 {
-		return nil
-	}
-	block := hintBlock(groups, width)
-	max := room - minBodyUnderHints - 1
-	if max < 1 {
-		return nil
-	}
-	if len(block) > max {
-		block = block[:max]
-	}
+// hintFooter is the keys for the bottom of a panel: for each block, a rule,
+// then its groups, each wrapping onto as many lines as it needs. room is how
+// many lines the panel has for body and keys together; the keys leave the
+// body a few of them, and give up their last lines rather than the cards.
+func hintFooter(blocks [][]hintGroup, width, room int) []string {
 	rule := lipgloss.NewStyle().Foreground(theme.Border).Render(strings.Repeat("─", width))
-	out := []string{rule}
-	for _, line := range block {
-		out = append(out, pad(line, width))
+	var out []string
+	for _, groups := range blocks {
+		if len(groups) == 0 {
+			continue
+		}
+		out = append(out, rule)
+		for _, line := range hintBlock(groups, width) {
+			out = append(out, pad(line, width))
+		}
+	}
+	max := room - minBodyUnderHints
+	if max < 2 {
+		return nil
+	}
+	if len(out) > max {
+		out = out[:max]
 	}
 	return out
 }

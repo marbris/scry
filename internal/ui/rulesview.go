@@ -518,7 +518,6 @@ func repeatsTerm(text, term string) bool {
 
 func (v *rulesView) keys() []hintGroup {
 	nav := [][2]string{
-		listHint("up/down", keymap.ListDown, keymap.ListUp),
 		hint("filter", keymap.Rules, keymap.RulesFilter),
 	}
 	if !v.grouped {

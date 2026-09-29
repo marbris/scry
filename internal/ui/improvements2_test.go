@@ -245,14 +245,15 @@ func TestPanelsShareOneHeaderHeight(t *testing.T) {
 func TestQuestionMarkPutsTheKeysInThePanels(t *testing.T) {
 	m, _ := ownDeck(sized(160, 40))
 	m = drive(m, "?")
-	if got := bottomLine(m); strings.Contains(got, "select:") {
-		t.Errorf("the footer still grows:\n%s", got)
-	}
 	view := stripANSI(m.View())
-	if strings.Contains(view, "info panel:") {
-		t.Error("the information panel's keys are headed with its own name")
+	// No headings in the panels: every key in the block is about the panel
+	// it sits in.
+	for _, heading := range []string{"info panel:", "navigation:", "select:"} {
+		if strings.Contains(view, heading) {
+			t.Errorf("the keys are headed %q", heading)
+		}
 	}
-	for _, want := range []string{"select:", "sort 2", "add from scryfall", "paragraph"} {
+	for _, want := range []string{"select", "sort 1 & 2", "add from scryfall", "card history"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("%q isn't on screen:\n%s", want, view)
 		}

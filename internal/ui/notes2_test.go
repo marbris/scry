@@ -100,20 +100,6 @@ func TestCtrlLCarriesThePanelRight(t *testing.T) {
 	}
 }
 
-func TestParagraphStartsAreTheNonBlankLinesAfterBlanks(t *testing.T) {
-	body := []string{"heading", "type line", "", "first ability", "", "", "second"}
-	got := paragraphStarts(body)
-	want := []int{0, 3, 6}
-	if len(got) != len(want) {
-		t.Fatalf("starts %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("starts %v, want %v", got, want)
-		}
-	}
-}
-
 func TestTheLeaderMenuHasNoBackgroundBand(t *testing.T) {
 	// A band of colour across the bottom contrasts with a semi-transparent
 	// terminal; the menu is plain text now, so it carries no background
@@ -156,16 +142,20 @@ func TestEachHintGroupIsOneRow(t *testing.T) {
 }
 
 func TestTheHintBarStartsCollapsedAndQuestionMarkGrowsIt(t *testing.T) {
-	// At rest the bar shows only the three keys that reach everything else;
-	// ? grows it to the whole keymap, and ? again shrinks it back. There is
-	// no separate reference window — the panels stay visible throughout.
+	// At rest the bar shows only ? and q; ? grows the keys into the panels
+	// and the leader's menu along the bottom, and ? again shrinks it back.
+	// There is no separate reference window — the panels stay visible
+	// throughout.
 	m := withCards(sized(140, 30), "f", sample(), sortArrival)
 
 	rest := stripANSI(m.View())
-	if !strings.Contains(rest, "space") || !strings.Contains(rest, "q quit") {
-		t.Errorf("the resting bar doesn't show the three keys:\n%s", rest)
+	if !strings.Contains(rest, "? keys") || !strings.Contains(rest, "q quit") {
+		t.Errorf("the resting bar doesn't show ? and q:\n%s", rest)
 	}
-	if strings.Contains(rest, "navigation:") || strings.Contains(rest, "select:") {
+	if strings.Contains(rest, "space") {
+		t.Errorf("the resting bar still offers the menu:\n%s", rest)
+	}
+	if strings.Contains(rest, "sort 1 & 2") || strings.Contains(rest, "space:") {
 		t.Errorf("the resting bar already shows the full keymap:\n%s", rest)
 	}
 	// The panels are still there — ? is not a window that replaces them.
@@ -175,7 +165,7 @@ func TestTheHintBarStartsCollapsedAndQuestionMarkGrowsIt(t *testing.T) {
 
 	m = drive(m, "?")
 	grown := stripANSI(m.View())
-	for _, want := range []string{"navigation:", "select:", "Sol Ring"} {
+	for _, want := range []string{"sort 1 & 2", "select", "space: f find", "Sol Ring"} {
 		if !strings.Contains(grown, want) {
 			t.Errorf("after ? the bar/panels don't show %q:\n%s", want, grown)
 		}

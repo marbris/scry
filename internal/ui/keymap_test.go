@@ -2,6 +2,7 @@ package ui
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"scry/internal/keymap"
@@ -46,8 +47,8 @@ func TestARebindingMovesTheKeyAndItsHint(t *testing.T) {
 	if got := m.ws.current().cardsView().order; got != sortMana {
 		t.Errorf("z moved to %v, want mana value", got)
 	}
-	if got := offered(m, "sort 1"); got != "z Z" {
-		t.Errorf("the hint says %q, want %q", got, "z Z")
+	if got := offered(m, "sort 1 & 2"); got != "z Z , <" {
+		t.Errorf("the hint says %q, want %q", got, "z Z , <")
 	}
 }
 
@@ -62,8 +63,9 @@ func TestAReboundLeaderIsTheLeaderEverywhere(t *testing.T) {
 	if m = drive(m, ";"); !m.leader {
 		t.Fatal("; did not raise the menu")
 	}
-	if got := offered(m, "menu"); got != ";" {
-		t.Errorf("the footer offers %q for the menu, want ;", got)
+	// The menu ? draws along the bottom is led by the leader in force.
+	if got := stripANSI(strings.Join(m.leaderReference(200), " ")); !strings.HasPrefix(got, ";:") {
+		t.Errorf("the menu's reference reads %q, want it led by ;", got)
 	}
 }
 

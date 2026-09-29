@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"scry/internal/deck"
-	"scry/internal/keymap"
 )
 
 // Writing a list to disk.
@@ -51,33 +50,6 @@ func (m *Model) write(l *cardList, p *panel, newPane bool) tea.Cmd {
 	p.ask(askWrite, "save as", name)
 	p.writeToNewPane = newPane
 	return nil
-}
-
-// writeEditing is <space>w: commit the deck you are editing, from wherever
-// you happen to be.
-//
-// Bare w saves the list you are looking at. That is the right default, but it
-// makes the one list you most want saved the hardest to reach: a/x/t write to
-// the editing deck from any panel, so the deck with unsaved changes in it is
-// routinely not the one under the cursor. This is the same key in the panel
-// space, meaning the panel-level thing — the same relationship <space>s has
-// to s.
-//
-// It never asks for a name. e can only land on a deck of yours, so there is
-// no case here where the answer is "this isn't yours yet"; that is what w on
-// the list itself is for.
-func (m *Model) writeEditing() tea.Cmd {
-	p := m.ws.editingPanel()
-	if p == nil {
-		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
-		return nil
-	}
-	l := p.cardsView()
-	if l == nil {
-		m.notice = "no deck is being edited — " + keymap.Hint(keymap.Global, keymap.GlobalEditNext) + " chooses one"
-		return nil
-	}
-	return m.write(l, p, false)
 }
 
 // saveDeck writes the deck and commits the change, off the main thread.
@@ -200,9 +172,11 @@ func (m Model) handleDeckSaved(msg deckSavedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if p := m.ws.byID(msg.panel); p != nil {
-		if l := p.cardsView(); l != nil {
-			l.dirty = false
+	// By the deck rather than the panel: the list committed may not be the
+	// one on top of it any more.
+	for _, d := range m.openDecks() {
+		if d.list.deck.Slug == msg.slug {
+			d.list.dirty = false
 		}
 	}
 
@@ -242,10 +216,9 @@ func (m Model) handleDeckWritten(msg deckWrittenMsg) (tea.Model, tea.Cmd) {
 // quitting asks about.
 func (m Model) dirtyDecks() []string {
 	var out []string
-	for _, p := range m.ws.panels {
-		l := p.cardsView()
-		if l != nil && l.dirty && l.deck != nil {
-			out = append(out, l.deck.Name)
+	for _, d := range m.openDecks() {
+		if d.list.dirty {
+			out = append(out, d.list.deck.Name)
 		}
 	}
 	return out

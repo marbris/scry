@@ -641,21 +641,21 @@ func (l *cardList) info(width int) []string {
 	return cardInfo(c, width, l.rules, l.rulings[c.Card.ID], l.rulingErr[c.Card.ID])
 }
 
-// keys is what this list offers, in two groups: moving about it, and picking
-// cards out of it. The editing keys are not here: a, A, x, t, c and u act on
-// the editing deck rather than on the list under the cursor, so hintGroups
-// lists them against that deck, under its name.
+// keys is what this list offers, in two groups: ordering and narrowing it,
+// and picking cards out of it. Moving about is the workspace's to offer, and
+// the editing keys are not here either: a, A, x, t, c and u act on the
+// editing deck rather than on the list under the cursor, so they are drawn
+// under that deck.
 func (l *cardList) keys() []hintGroup {
 	nav := [][2]string{
-		listHint("up/down", keymap.ListDown, keymap.ListUp),
-		{topBottomHint(), "first/last"},
-		hint("sort 2", keymap.Cards, keymap.CardsSort2Next, keymap.CardsSort2Prev),
-		hint("sort 1", keymap.Cards, keymap.CardsSort1Next, keymap.CardsSort1Prev),
+		hint("sort 1 & 2", keymap.Cards, keymap.CardsSort1Next, keymap.CardsSort1Prev,
+			keymap.CardsSort2Next, keymap.CardsSort2Prev),
+		hint("flip sort 1/2", keymap.Cards, keymap.CardsSort1Dir, keymap.CardsSort2Dir),
 		hint("filter", keymap.Cards, keymap.CardsFilter),
 	}
 
 	sel := [][2]string{
-		hint("select one/all", keymap.Cards, keymap.CardsSelect, keymap.CardsSelectAll),
+		hint("select", keymap.Cards, keymap.CardsSelect, keymap.CardsSelectAll),
 		hint("yank", keymap.Cards, keymap.CardsYank),
 	}
 	// p puts into the list in front of you, so it only earns a hint when
@@ -671,7 +671,6 @@ func (l *cardList) keys() []hintGroup {
 		// Not yours, so writing it asks for a name and makes it yours.
 		sel = append(sel, hint("save as new deck", keymap.Cards, keymap.CardsWrite, keymap.CardsWriteNew))
 	}
-	sel = append(sel, [2]string{gotoHint(keymap.GotoVersions), "card history"})
 
 	return []hintGroup{{"navigation", nav}, {"select", sel}}
 }

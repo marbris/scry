@@ -26,9 +26,11 @@ import (
 // can offer esc under two different names.
 
 // With ? on, the keys are drawn where they act: at the bottom of the focused
-// panel, the keys for that panel; at the bottom of the information panel, the
-// keys for what it shows. The footer keeps only the three that reach
-// everything else — and, while a search bar has the cursor, the bar's own.
+// panel, the keys for that panel; at the bottom of the editing deck, the keys
+// that change it; at the bottom of the information panel, the keys for what
+// it shows; and along the bottom of the screen, the leader's menu. Without
+// it, the footer keeps only ? and q — and, while a search bar has the
+// cursor, the bar's own keys.
 
 // contextKeys is every key that does something where you are, flattened out
 // of the groups.
@@ -56,7 +58,7 @@ func gotoHint(a keymap.Action) string {
 	return seqHint(keymap.Hint(keymap.Global, keymap.GlobalGoto), "", keymap.Hint(keymap.Goto, a))
 }
 
-// leaderHint is a leader key as the hints write it: "space s".
+// leaderHint is a leader key as the hints write it: "space f".
 func leaderHint(a keymap.Action) string {
 	return seqHint(keymap.Hint(keymap.Global, keymap.GlobalLeader), " ", keymap.Hint(keymap.Leader, a))
 }
@@ -98,10 +100,10 @@ func dropUnbound(groups []hintGroup) []hintGroup {
 	return out
 }
 
-// restingKeys are the keys the footer always shows: the way to everything.
+// restingKeys are the keys the footer always shows: the way to everything
+// else, and the way out.
 func restingKeys() [][2]string {
 	return [][2]string{
-		hint("menu", keymap.Global, keymap.GlobalLeader),
 		hint("keys", keymap.Global, keymap.GlobalHelp),
 		hint("quit", keymap.Global, keymap.GlobalQuit),
 	}
@@ -124,8 +126,11 @@ func (m Model) hintGroups() []hintGroup {
 	}
 
 	groups := m.panelHintGroups(p)
+	if keys := m.editHints(); len(keys) > 0 {
+		groups = append(groups, hintGroup{"edit", keys})
+	}
 	groups = append(groups, m.infoHintGroups()...)
-	return dropUnbound(addHints(groups, "navigation", restingKeys()...))
+	return dropUnbound(append(groups, hintGroup{"", restingKeys()}))
 }
 
 // statsTaken is every key the statistics claim while they're up, as the
@@ -143,56 +148,90 @@ func statsTaken() map[string]bool {
 	return taken
 }
 
-// panelHintGroups is what the focused panel shows at its bottom: its own
-// keys, the editing keys against the deck they change, and the way between
-// and out of panels.
+// panelHintGroups is what the focused panel shows at its bottom: the way
+// about, the view's own keys, and the way out — compact, and without
+// headings, since every key in the block is about the panel it sits in.
+//
+// The view's first group is its moving-about keys, and goes in among the
+// workspace's: the order reads as you'd reach for them, from moving, through
+// narrowing, to leaving. The rest follow, and e — which chooses the deck the
+// edit keys go to — comes last, next to where those keys are.
 func (m Model) panelHintGroups(p *panel) []hintGroup {
 	statsUp := m.info.mode == infoStats && m.statList() != nil
 
-	var groups []hintGroup
+	var viewNav [][2]string
+	var rest []hintGroup
 	if v := p.top(); v != nil {
-		for _, g := range v.keys() {
+		for i, g := range v.keys() {
 			// The information panel's keys are drawn in that panel.
-			if g.title != "info panel" {
-				groups = append(groups, hintGroup{g.title, append([][2]string(nil), g.keys...)})
+			if g.title == "info panel" {
+				continue
 			}
+			if i == 0 {
+				viewNav = g.keys
+				continue
+			}
+			rest = append(rest, hintGroup{"", append([][2]string(nil), g.keys...)})
 		}
+	}
+
+	var nav [][2]string
+	if m.ws.count() > 1 {
+		nav = append(nav,
+			[2]string{moveKeys(), "down/up/left/right"},
+			hint("move panel", keymap.Global, keymap.GlobalMoveLeft, keymap.GlobalMoveRight),
+		)
+	} else {
+		nav = append(nav, listHint("down/up", keymap.ListDown, keymap.ListUp))
 	}
 
 	// i reaches the panel's search bar — except on a deck, where it fetches
 	// a card into it, and on somebody else's deck, where it does neither.
 	if i, ok := m.iHint(p); ok {
-		groups = addHints(groups, "navigation", hint(i, keymap.Global, keymap.GlobalBar))
+		nav = append(nav, hint(i, keymap.Global, keymap.GlobalBar))
 	}
+	nav = append(nav, viewNav...)
 
 	// b clears the narrowings, but only earns a hint while there is one to
 	// clear — otherwise it is a key that does nothing, offered next to esc.
 	if m.focusNarrowed() {
-		groups = addHints(groups, "navigation", hint("clear filters", keymap.Global, keymap.GlobalClearFilter))
-	}
-
-	// The editing keys, against the deck they change — which is routinely
-	// not the list under the cursor.
-	if title, keys := m.editGroup(p); len(keys) > 0 {
-		groups = append(groups, hintGroup{title, keys})
-	}
-
-	// The tail of navigation: between panels, and out of this one.
-	var tail [][2]string
-	if m.ws.count() > 1 {
-		tail = append(tail,
-			hint("left/right panel", keymap.Global, keymap.GlobalPanelPrev, keymap.GlobalPanelNext),
-			hint("move panel", keymap.Global, keymap.GlobalMoveLeft, keymap.GlobalMoveRight),
-		)
+		nav = append(nav, hint("clear filters/all", keymap.Global, keymap.GlobalClearFilter, keymap.GlobalClearAll))
 	}
 	esc, _ := (&m).escStep(p)
-	tail = append(tail, hint(esc, keymap.Global, keymap.GlobalBack))
-	groups = addHints(groups, "navigation", tail...)
+	nav = append(nav, hint(esc, keymap.Global, keymap.GlobalBack))
+
+	groups := append([]hintGroup{{"", nav}}, rest...)
+
+	// e chooses the deck the edit keys write to. Only offered where the
+	// focused panel is a list of cards: a, x and t do nothing from a decks
+	// panel or the rules, so which deck they'd go to is no question there.
+	if p.cardsView() != nil {
+		editKeys := hint("", keymap.Global, keymap.GlobalEditNext, keymap.GlobalEditPrev)[0]
+		label := m.editingLabel()
+		if target := m.ws.editingList(); target == nil || target.deck == nil {
+			label = "choose a deck to edit"
+		}
+		groups = append(groups, hintGroup{"", [][2]string{{editKeys, label}}})
+	}
 
 	if statsUp {
 		groups = withoutTaken(groups)
 	}
 	return dropUnbound(groups)
+}
+
+// moveKeys is the four ways to move written as one: "j k h l" — down and up
+// the list, left and right along the panels.
+func moveKeys() string {
+	vertical := keymap.Hint(keymap.List, keymap.ListDown, keymap.ListUp)
+	horizontal := keymap.Hint(keymap.Global, keymap.GlobalPanelPrev, keymap.GlobalPanelNext)
+	switch {
+	case vertical == "":
+		return horizontal
+	case horizontal == "":
+		return vertical
+	}
+	return vertical + " " + horizontal
 }
 
 // withoutTaken drops the keys the statistics have claimed, and any group
@@ -309,44 +348,39 @@ func (m Model) barKeys(p *panel) [][2]string {
 	)
 }
 
-// editGroup is the keys that change a deck, and the name of the deck they
-// change. They act on the *editing* deck from whatever panel you are in — so
-// the deck they change is routinely not the list in front of you, which is
-// exactly why the group is headed with its name.
+// editHints is the keys that change the editing deck, drawn at the bottom
+// of that deck's panel whatever panel you are in. They act on the *editing*
+// deck from anywhere — so the deck they change is routinely not the list in
+// front of you, which is exactly why they sit under the deck rather than
+// under the cursor.
 //
-// Only offered where the focused panel is a list of cards: a, x, t and the
-// rest do nothing from a decks panel or the rules, so they are not named
-// there. With no deck being edited they explain themselves away and are
-// replaced by the way to choose one.
-func (m Model) editGroup(p *panel) (string, [][2]string) {
-	if p.cardsView() == nil {
-		return "", nil
-	}
-
-	editKeys := hint("", keymap.Global, keymap.GlobalEditNext, keymap.GlobalEditPrev)[0]
+// Nothing while no deck is being edited: e, in the focused panel, is how to
+// choose one.
+func (m Model) editHints() [][2]string {
 	target := m.ws.editingList()
 	if target == nil || target.deck == nil {
-		return "edit", [][2]string{{editKeys, "choose a deck to edit"}}
+		return nil
 	}
-
-	if m.ws.editing == m.ws.focused {
-		return "edit · this deck", [][2]string{
-			hint("add a copy", keymap.Cards, keymap.CardsAdd),
-			hint("add + tag latest", keymap.Cards, keymap.CardsAddTagged),
-			hint("remove", keymap.Cards, keymap.CardsRemove),
-			hint("commander", keymap.Cards, keymap.CardsCommander),
-			hint("undo", keymap.Cards, keymap.CardsUndo),
-			{editKeys, m.editingLabel()},
+	keys := [][2]string{
+		hint("add", keymap.Cards, keymap.CardsAdd),
+		hint("add + tag latest", keymap.Cards, keymap.CardsAddTagged),
+		hint("remove", keymap.Cards, keymap.CardsRemove),
+		hint("commander", keymap.Cards, keymap.CardsCommander),
+		hint("undo", keymap.Cards, keymap.CardsUndo),
+	}
+	var out [][2]string
+	for _, k := range keys {
+		if k[0] != "" {
+			out = append(out, k)
 		}
 	}
-	return "edit · " + target.deck.Name, [][2]string{
-		hint("add to deck", keymap.Cards, keymap.CardsAdd),
-		hint("add + tag latest", keymap.Cards, keymap.CardsAddTagged),
-		hint("remove from deck", keymap.Cards, keymap.CardsRemove),
-		hint("commander of deck", keymap.Cards, keymap.CardsCommander),
-		hint("undo", keymap.Cards, keymap.CardsUndo),
-		{editKeys, m.editingLabel()},
+	if m.info.mode == infoStats && m.statList() != nil {
+		if g := withoutTaken([]hintGroup{{"", out}}); len(g) > 0 {
+			return g[0].keys
+		}
+		return nil
 	}
+	return out
 }
 
 // infoKeys are the information-panel keys for a card list — statistics, and
@@ -358,9 +392,9 @@ func (m Model) infoKeys(p *panel) [][2]string {
 	}
 	return [][2]string{
 		hint("stats", keymap.Global, keymap.GlobalStats),
-		{leaderHint(keymap.LeaderStats), "editing deck stats"},
+		hint("editing deck stats", keymap.Global, keymap.GlobalStatsEdit),
 		hint("half page", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown),
-		hint("paragraph", keymap.Global, keymap.GlobalInfoParaUp, keymap.GlobalInfoParaDn),
+		{gotoHint(keymap.GotoVersions), "card history"},
 	}
 }
 

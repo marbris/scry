@@ -767,12 +767,6 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 		}
 		return true, m.openEntry(l, p, action == keymap.DecksOpenBeside)
 
-	case keymap.DecksSync:
-		// Mirror to the git remote. Unlike the mutations above this touches
-		// the network, so it runs off the main thread and reports back as a
-		// notice; the reload a notice triggers shows anything a pull brought in.
-		return true, syncDecks
-
 	case keymap.DecksNew:
 		p.ask(askNewDeck, "name", "")
 
@@ -989,7 +983,6 @@ func legalMark(e deckEntry, mark string) string {
 func (l *deckList) keys() []hintGroup {
 	return []hintGroup{
 		{"navigation", [][2]string{
-			listHint("up/down", keymap.ListDown, keymap.ListUp),
 			hint("sort", keymap.Decks, keymap.DecksSortNext, keymap.DecksSortPrev),
 			hint("filter", keymap.Decks, keymap.DecksFilter),
 		}},
@@ -1000,7 +993,6 @@ func (l *deckList) keys() []hintGroup {
 			hint("rename", keymap.Decks, keymap.DecksRename),
 			hint("copy deck/&considering", keymap.Decks, keymap.DecksCopy, keymap.DecksCopyBoth),
 			hint("delete/cut/yank/put", keymap.Decks, keymap.DecksDelete, keymap.DecksCut, keymap.DecksYank, keymap.DecksPut),
-			hint("git push", keymap.Decks, keymap.DecksSync),
 			{gotoHint(keymap.GotoVersions), "versions"},
 		}},
 	}

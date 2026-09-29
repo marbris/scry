@@ -167,7 +167,6 @@ func TestHint(t *testing.T) {
 		{Hint(Cards, CardsSort1Next, CardsSort1Prev), ". >"},
 		{Hint(Cards, CardsSort2Next, CardsSort2Prev), ", <"},
 		{Hint(List, ListDown, ListUp), "j k"},
-		{Hint(Global, GlobalInfoParaUp, GlobalInfoParaDn), "ctrl+k/j"},
 		{Hint(Global, GlobalMoveLeft, GlobalMoveRight), "ctrl+h/l"},
 		{Hint(Global, GlobalLeader), "space"},
 		{Hint(Search, SearchHistoryPrev, SearchHistoryNext), "↑ ↓"},

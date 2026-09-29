@@ -264,12 +264,12 @@ func TestStatisticsFollowTheFocusedList(t *testing.T) {
 	}
 }
 
-func TestSpaceSCountsTheEditingDeck(t *testing.T) {
+func TestShiftSCountsTheEditingDeck(t *testing.T) {
 	m, search, target := editing(t)
 	m = focusOn(m, 0)
-	m = drive(m, "space", "s")
+	m = drive(m, "S")
 	if !m.stats.editing {
-		t.Fatal("space s did not go to the editing deck")
+		t.Fatal("S did not go to the editing deck")
 	}
 	counted, _ := m.statCards()
 	if len(counted) != len(target.all) {
@@ -281,7 +281,7 @@ func TestSpaceSCountsTheEditingDeck(t *testing.T) {
 	}
 }
 
-func TestSpaceBClearsEveryList(t *testing.T) {
+func TestShiftBClearsEveryList(t *testing.T) {
 	m := sized(200, 30)
 	m = withCards(m, "f", sample(), sortArrival)
 	search := m.ws.panels[0].cardsView()
@@ -292,9 +292,9 @@ func TestSpaceBClearsEveryList(t *testing.T) {
 	if len(search.statFilter) == 0 || len(target.statFilter) == 0 {
 		t.Fatal("not both narrowed")
 	}
-	m = drive(m, "space", "b")
+	m = drive(m, "B")
 	if len(search.statFilter) != 0 || len(target.statFilter) != 0 {
-		t.Error("space b left a list narrowed")
+		t.Error("B left a list narrowed")
 	}
 }
 

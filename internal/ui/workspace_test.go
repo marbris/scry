@@ -149,7 +149,8 @@ func TestOnlyKeepsTheFocusedPanel(t *testing.T) {
 func TestAPanelCanBeMovedAlongTheRow(t *testing.T) {
 	m := openPanel(sized(200, 40), "f", "angel")
 	m = openPanel(m, "d", "marbri")
-	m = drive(m, "space", "h")
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlH})
+	m = next.(Model)
 
 	if m.ws.panels[0].kind != KindDecks {
 		t.Errorf("panels are %v, %v; want decks moved to the left",

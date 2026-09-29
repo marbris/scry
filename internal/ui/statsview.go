@@ -38,7 +38,7 @@ type statsState struct {
 	// top is the group drawn first. J and K turn the order over, so the
 	// group you want to read sits at the top rather than off the bottom.
 	top string
-	// editing is <space>s: the deck you're editing, wherever you are.
+	// editing is S: the deck you're editing, wherever you are.
 	editing bool
 	// odds is 0 for counts, or n for the chance of at least n in the
 	// opening hand. p and P step it.
@@ -103,7 +103,7 @@ func groupIndex(title string) int {
 }
 
 // statCards is what the statistics describe: the focused list, or the
-// editing deck when <space>s asked for it.
+// editing deck when S asked for it.
 func (m Model) statCards() (counted, source []deck.Card) {
 	if l := m.statList(); l != nil {
 		return l.narrowed(), l.all
@@ -254,7 +254,7 @@ func (m *Model) clearActiveFilters() {
 }
 
 // clearAllFilters drops every narrowing on every list — the statistics
-// categories and the text filters alike. <space>b.
+// categories and the text filters alike. B.
 func (m *Model) clearAllFilters() {
 	for _, p := range m.ws.panels {
 		clearStatFilter(p.cardsView())

@@ -60,13 +60,13 @@ const (
 	GlobalEditPrev    Action = "editing.prev"
 	GlobalInfoUp      Action = "info.half-page-up"
 	GlobalInfoDown    Action = "info.half-page-down"
-	GlobalInfoParaUp  Action = "info.paragraph-up"
-	GlobalInfoParaDn  Action = "info.paragraph-down"
 	GlobalFetchSets   Action = "info.fetch-sets"
 	GlobalStats       Action = "stats"
+	GlobalStatsEdit   Action = "stats.editing"
 	GlobalHelp        Action = "help"
 	GlobalBack        Action = "back"
 	GlobalClearFilter Action = "clear-filters"
+	GlobalClearAll    Action = "clear-all-filters"
 	GlobalQuit        Action = "quit"
 
 	ListDown   Action = "down"
@@ -98,7 +98,6 @@ const (
 	DecksFilter     Action = "filter"
 	DecksOpen       Action = "open"
 	DecksOpenBeside Action = "open-beside"
-	DecksSync       Action = "sync"
 	DecksNew        Action = "new"
 	DecksRename     Action = "rename"
 	DecksCopy       Action = "copy"
@@ -135,14 +134,11 @@ const (
 	LeaderDecks     Action = "decks"
 	LeaderRules     Action = "rules"
 	LeaderNew       Action = "new"
-	LeaderStats     Action = "stats"
-	LeaderClearAll  Action = "clear-all-filters"
-	LeaderCommit    Action = "commit"
+	LeaderSync      Action = "sync"
+	LeaderCommitAll Action = "commit-all"
 	LeaderClose     Action = "close"
 	LeaderUndoClose Action = "undo-close"
 	LeaderOnly      Action = "only"
-	LeaderMoveLeft  Action = "move-left"
-	LeaderMoveRight Action = "move-right"
 	LeaderHelp      Action = "help"
 
 	GotoTop      Action = "top"
@@ -178,13 +174,13 @@ var defaults = []binding{
 	{Global, GlobalEditPrev, k("E")},
 	{Global, GlobalInfoUp, k("K", "shift+up")},
 	{Global, GlobalInfoDown, k("J", "shift+down")},
-	{Global, GlobalInfoParaUp, k("ctrl+k")},
-	{Global, GlobalInfoParaDn, k("ctrl+j")},
 	{Global, GlobalFetchSets, k("y")},
 	{Global, GlobalStats, k("s")},
+	{Global, GlobalStatsEdit, k("S")},
 	{Global, GlobalHelp, k("?")},
 	{Global, GlobalBack, k("esc")},
 	{Global, GlobalClearFilter, k("b")},
+	{Global, GlobalClearAll, k("B")},
 	{Global, GlobalQuit, k("q")},
 
 	{List, ListDown, k("j", "down")},
@@ -228,7 +224,6 @@ var defaults = []binding{
 	{Decks, DecksCut, k("x")},
 	{Decks, DecksYank, k("y")},
 	{Decks, DecksPut, k("p")},
-	{Decks, DecksSync, k("s")},
 
 	{Rules, RulesOrderNext, k(".")},
 	{Rules, RulesOrderPrev, k(">")},
@@ -257,14 +252,11 @@ var defaults = []binding{
 	{Leader, LeaderDecks, k("d")},
 	{Leader, LeaderRules, k("r")},
 	{Leader, LeaderNew, k("n")},
-	{Leader, LeaderStats, k("s")},
-	{Leader, LeaderClearAll, k("b")},
-	{Leader, LeaderCommit, k("w")},
+	{Leader, LeaderSync, k("s")},
+	{Leader, LeaderCommitAll, k("w")},
 	{Leader, LeaderClose, k("c")},
 	{Leader, LeaderUndoClose, k("u")},
 	{Leader, LeaderOnly, k("o")},
-	{Leader, LeaderMoveLeft, k("h")},
-	{Leader, LeaderMoveRight, k("l")},
 	{Leader, LeaderHelp, k("?")},
 
 	{Goto, GotoTop, k("g")},

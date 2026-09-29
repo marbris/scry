@@ -299,7 +299,6 @@ func renderDiff(diff string, width int) []string {
 func (l *versionList) keys() []hintGroup {
 	return []hintGroup{
 		{"navigation", [][2]string{
-			listHint("up/down", keymap.ListDown, keymap.ListUp),
 			hint("filter", keymap.Versions, keymap.VersionsFilter),
 		}},
 		{"versions", [][2]string{

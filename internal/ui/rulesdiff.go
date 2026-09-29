@@ -213,7 +213,6 @@ func (v *rulesDiff) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 func (v *rulesDiff) keys() []hintGroup {
 	return []hintGroup{
 		{"navigation", [][2]string{
-			listHint("up/down", keymap.ListDown, keymap.ListUp),
 			{topBottomHint(), "first/last"},
 		}},
 		{"info panel", [][2]string{hint("read the change", keymap.Global, keymap.GlobalInfoUp, keymap.GlobalInfoDown)}},
