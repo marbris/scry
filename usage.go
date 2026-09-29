@@ -13,6 +13,7 @@ Usage:
   scry rules …              The comprehensive rules — see ` + "`scry rules`" + `
   scry theme …              Colours — see ` + "`scry theme`" + `
   scry keys …               Keybindings — see ` + "`scry keys -h`" + `
+  scry init                 Write commented-out templates of every settings file
   scry -v, --version        Print the version
   scry -h, --help           This
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"scry/internal/config"
+	"scry/internal/jsonc"
 	"scry/internal/paths"
 )
 
@@ -181,9 +182,15 @@ func readTheme(path string) (Theme, error) {
 	return parse(body)
 }
 
+// parse reads a theme file, which may carry comments. One that is nothing
+// but comments — the template `scry init` writes — is a theme that changes
+// nothing, so everything falls back to the default.
 func parse(body []byte) (Theme, error) {
 	var t Theme
-	if err := json.Unmarshal(body, &t); err != nil {
+	if jsonc.Empty(body) {
+		return t, nil
+	}
+	if err := json.Unmarshal(jsonc.Strip(body), &t); err != nil {
 		return Theme{}, err
 	}
 	return t, nil

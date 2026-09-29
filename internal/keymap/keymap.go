@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 
+	"scry/internal/jsonc"
 	"scry/internal/paths"
 )
 
@@ -379,7 +380,12 @@ func Load() error {
 	if err != nil {
 		return err
 	}
-	return apply(body)
+	// A file of nothing but comments is the template `scry init` writes,
+	// with nothing uncommented yet: the defaults, as they are.
+	if jsonc.Empty(body) {
+		return nil
+	}
+	return apply(jsonc.Strip(body))
 }
 
 // apply lays a keys.json over the defaults, one scope at a time.

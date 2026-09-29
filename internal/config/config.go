@@ -9,9 +9,11 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
+	"scry/internal/jsonc"
 	"scry/internal/paths"
 )
 
@@ -52,16 +54,38 @@ func Path() string { return filepath.Join(paths.Config(), "config.json") }
 func Load() Config {
 	var c Config
 	body, err := os.ReadFile(Path())
-	if err != nil {
+	if err != nil || jsonc.Empty(body) {
 		return c
 	}
-	json.Unmarshal(body, &c)
+	json.Unmarshal(jsonc.Strip(body), &c)
 	return c
+}
+
+// Check reports a settings file that is there but can't be read as one — a
+// missing comma after an edit, say. Load carries on regardless, with nothing
+// set; this is so the reason gets said once, at startup.
+func Check() error {
+	body, err := os.ReadFile(Path())
+	if err != nil || jsonc.Empty(body) {
+		return nil
+	}
+	var c Config
+	if err := json.Unmarshal(jsonc.Strip(body), &c); err != nil {
+		return fmt.Errorf("%s: %w", Path(), err)
+	}
+	return nil
 }
 
 // Save writes the settings back, whole. Callers Load, change one field, and
 // Save, so the keys they don't touch survive.
+//
+// Not over a file that can't be read, though: Load gave the caller nothing
+// for it, and writing that back would lose every setting in it for the sake
+// of a typo.
 func Save(c Config) error {
+	if err := Check(); err != nil {
+		return fmt.Errorf("%w — fix it first, or it would be overwritten", err)
+	}
 	body, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err

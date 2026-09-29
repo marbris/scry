@@ -44,7 +44,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Warning:", err)
 	}
 
-	// And for the list orders in config.json.
+	// And for config.json itself, and the list orders in it.
+	if err := config.Check(); err != nil {
+		fmt.Fprintln(os.Stderr, "Warning:", err)
+	}
 	if err := ui.SetSortConfig(config.Load().Sort); err != nil {
 		fmt.Fprintln(os.Stderr, "Warning:", err)
 	}
@@ -71,6 +74,10 @@ func main() {
 
 	case "keys":
 		runKeys(args[1:])
+		return
+
+	case "init":
+		runInit(args[1:])
 		return
 
 	case "rules":

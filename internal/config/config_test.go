@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -44,5 +45,32 @@ func TestThemeAndSyncCoexist(t *testing.T) {
 	}
 	if got.Sync == nil || got.Sync.Remote != "git@example.com:me/decks.git" {
 		t.Fatalf("sync not persisted: %+v", got.Sync)
+	}
+}
+
+func TestSaveLeavesABrokenFileAlone(t *testing.T) {
+	isolate(t)
+	os.MkdirAll(filepath.Dir(Path()), 0755)
+	broken := []byte("{ \"theme\": \"nord\",, }")
+	if err := os.WriteFile(Path(), broken, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Save(Config{Theme: "gruvbox"}); err == nil {
+		t.Error("saved over a file that couldn't be read")
+	}
+	if got, _ := os.ReadFile(Path()); string(got) != string(broken) {
+		t.Errorf("the file was changed: %s", got)
+	}
+}
+
+func TestACommentedFileLoads(t *testing.T) {
+	isolate(t)
+	os.MkdirAll(filepath.Dir(Path()), 0755)
+	body := "// a comment\n{\n  // \"theme\": \"nord\",\n  \"theme\": \"gruvbox\" // chosen\n}\n"
+	if err := os.WriteFile(Path(), []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if got := Load().Theme; got != "gruvbox" {
+		t.Errorf("theme %q", got)
 	}
 }
