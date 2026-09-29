@@ -50,6 +50,11 @@ func Ordinary(c mtg.Card) bool {
 	if c.BorderColor == "borderless" || c.BorderColor == "gold" || c.BorderColor == "silver" {
 		return false
 	}
+	// A reprint in an old frame — the retro-frame versions of a remastered
+	// set — is a throwback, not the card as it looks now.
+	if c.Frame != "" && c.Frame != "2015" {
+		return false
+	}
 	for _, f := range c.FrameEffects {
 		if specialFrames[f] {
 			return false

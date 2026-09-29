@@ -73,3 +73,13 @@ func TestPreferPassesOverSetsNotOutYetAndTheList(t *testing.T) {
 		t.Errorf("chose %q, want cmm", got.Set)
 	}
 }
+
+func TestPreferPassesOverRetroFrames(t *testing.T) {
+	newestFirst := []mtg.Card{
+		printing("inr", "masters", func(c *mtg.Card) { c.Frame = "1997" }),
+		printing("avr", "expansion", func(c *mtg.Card) { c.Frame = "2015" }),
+	}
+	if got, _ := Prefer(newestFirst, "2026-09-29"); got.Set != "avr" {
+		t.Errorf("chose %q, want the modern frame", got.Set)
+	}
+}

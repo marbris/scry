@@ -23,11 +23,11 @@ func withKitty(t *testing.T, can bool) *[]string {
 
 func TestImageFitKeepsTheCardsShape(t *testing.T) {
 	// 488×680, the size Scryfall's "normal" pictures are.
-	cols, rows := imageFit(488, 680, 40, 100)
+	cols, rows := imageFit(488, 680, 40, 100, 2)
 	if cols != 40 || rows != 28 {
 		t.Errorf("40 wide fits %d×%d, want 40×28", cols, rows)
 	}
-	cols, rows = imageFit(488, 680, 40, 14)
+	cols, rows = imageFit(488, 680, 40, 14, 2)
 	if rows != 14 || cols != 20 {
 		t.Errorf("14 high fits %d×%d, want 20×14", cols, rows)
 	}

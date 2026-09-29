@@ -246,17 +246,17 @@ func openInBrowser(url, what string) tea.Cmd {
 // ── Drawing ─────────────────────────────────────────────────────
 
 // imageFit is the size in cells a card's picture takes in a space: the
-// full width if the height allows, otherwise the full height. A cell is
-// about twice as tall as it is wide.
-func imageFit(w, h, cols, rows int) (int, int) {
-	if w <= 0 || h <= 0 || cols <= 0 || rows <= 0 {
+// full width if the height allows, otherwise the full height. aspect is how
+// many times taller than wide a cell is.
+func imageFit(w, h, cols, rows int, aspect float64) (int, int) {
+	if w <= 0 || h <= 0 || cols <= 0 || rows <= 0 || aspect <= 0 {
 		return 0, 0
 	}
-	fitRows := int(float64(cols)*float64(h)/float64(w)/2 + 0.5)
+	fitRows := int(float64(cols)*float64(h)/float64(w)/aspect + 0.5)
 	if fitRows <= rows {
 		return cols, maxInt(fitRows, 1)
 	}
-	fitCols := int(float64(rows)*float64(w)*2/float64(h) + 0.5)
+	fitCols := int(float64(rows)*float64(w)*aspect/float64(h) + 0.5)
 	return maxInt(minInt(fitCols, cols), 1), rows
 }
 
@@ -270,7 +270,7 @@ func (m Model) syncImage() (Model, tea.Cmd) {
 		if c := m.focusedCard(); c != nil {
 			if i, ok := m.images[imageKey((*c))]; ok && i.state == imgReady {
 				if inner, room, _, ok := m.infoSpan(); ok {
-					cols, rows := imageFit(i.w, i.h, inner, room-imageCaptionRows)
+					cols, rows := imageFit(i.w, i.h, inner, room-imageCaptionRows, cellAspect())
 					if cols > 0 && rows > 0 && rows <= len(placeholderDiacritics) {
 						want = kittyShown{imageKey((*c)), cols, rows}
 						img = i

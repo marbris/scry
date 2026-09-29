@@ -35,6 +35,7 @@ type Card struct {
 	ImageURIs    ImageURIs `json:"image_uris"`
 	SetType      string    `json:"set_type"`
 	BorderColor  string    `json:"border_color"`
+	Frame        string    `json:"frame"`
 	FrameEffects []string  `json:"frame_effects"`
 	Promo        bool      `json:"promo"`
 	FullArt      bool      `json:"full_art"`
