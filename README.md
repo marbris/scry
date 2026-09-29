@@ -54,6 +54,14 @@ Open a search beside the deck you're building. Cards already in the deck are mar
 
 ![A search panel beside the editing deck, with cards marked as already in the deck](screenshots/add-to-deck.png)
 
+### Two sorts, either way round
+
+Every list has two sorts. `.` cycles the first, which fills the column on the right: mana value, colour, type, power, toughness, EDHREC rank, price, rarity. `,` cycles the second, which breaks the first one's ties and colours the names on the left. Sorted by type and then by price, the creatures sit together, dearest first, their names coloured by price. `alt+.` and `alt+,` turn either one round. Each starts the way it reads best: power and price from the top, EDHREC rank from 1. The sorts stay put when you run a new search.
+
+The *inclusion* sort orders a list by where else its cards are: first the ones already in the deck you're building, then the ones in another list on screen, then the ones found only here. Add a card and it moves up to join the others, and the next card slides under the cursor. Which sorts `.` and `,` cycle through, and in what order, is yours to set in `config.json`.
+
+![A search sorted by type and then by price, names coloured by price](screenshots/sorts.png)
+
 ### Tag a whole theme at once
 
 Narrow a list with `/`, select what's left with `V`, and tag them together with `t`. `T` adds them to the deck and tags them in one stroke — sorting a search into a deck is dozens of these.
@@ -62,9 +70,19 @@ Narrow a list with `/`, select what's left with `V`, and tag them together with 
 
 ### Statistics that answer questions
 
-Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Add categories with AND (`a`) and OR (`o`) to filter the list, and the histograms recompute for that subset. `p` swaps the counts for opening-hand odds. Moxfield shows you stats; here you can interrogate them.
+Open the statistics panel and walk the breakdown — tags, types, colours, the curve. Build a filter from the categories with AND (`a`), OR (`o`) and NOT (`n`) — *ramp and not lands*, *removal or counterspells* — and the list and the histograms narrow to that subset as you go. Moxfield shows you stats; here you can interrogate them.
 
-![The statistics panel: histograms of the deck, filtered to a selected category](screenshots/stats-filter.png)
+![The statistics panel: histograms of the deck, filtered to a combination of categories](screenshots/stats-filter.png)
+
+`p` swaps the counts for the odds of drawing them: the chance that your opening seven holds at least one, two, three or four cards from each category — hypergeometric, worked out over the deck as it stands. `p` again steps from at least one up to at least four. How often is there ramp in your opener? At least three lands? Each bar says.
+
+![Opening-hand odds: the chance of at least two cards of each tag in the first seven](screenshots/odds.png)
+
+### The card as printed
+
+Press `gx` on a card to see it as printed: its most recent ordinary printing, not a promo or a borderless showcase, in the info panel. The picture follows the cursor as you move. In kitty, Ghostty and WezTerm it's drawn right in the terminal; anywhere else, `gx` opens it in your browser. `gx` on a Moxfield deck in the decks panel opens it on Moxfield.
+
+![A search with the highlighted card's printing drawn in the info panel](screenshots/printing.png)
 
 ### The rules, searchable
 
@@ -90,7 +108,7 @@ Each deck is a file in a git repository, so `scry` keeps every version. Press `g
 
 ![A deck's version history, with the diff for the selected version shown in the info panel](screenshots/deck-git.png)
 
-And because it's a git repository, it can sync. Point `scry` at a private remote you own — `scry sync remote <url>` — and `s` in the decks panel (or `scry sync`) mirrors your whole collection to it and pulls back whatever you changed on another machine. It's plain git, so any host works — GitHub, Codeberg, GitLab, or your own server — and there's nothing to install beyond the git you already have. A remote you seeded with a README merges in cleanly on the first sync; the one thing git can't decide for you — the same deck edited two places at once — surfaces as a conflict to resolve with git, never a silent overwrite. Make the repo **private**; your decks are yours.
+And because it's a git repository, it can sync. Point `scry` at a private remote you own — `scry sync remote <url>` — and `space s` from anywhere (or `scry sync`) mirrors your whole collection to it and pulls back whatever you changed on another machine. It's plain git, so any host works — GitHub, Codeberg, GitLab, or your own server — and there's nothing to install beyond the git you already have. A remote you seeded with a README merges in cleanly on the first sync; the one thing git can't decide for you — the same deck edited two places at once — surfaces as a conflict to resolve with git, never a silent overwrite. Make the repo **private**; your decks are yours.
 
 ## Install
 
@@ -183,9 +201,9 @@ Open panels straight to what you want:
 1. `space d` → `n` to make a new deck (or open an existing one). It becomes the editing deck.
 2. `space f` and run a Scryfall query.
 3. Scroll the results; the info panel shows each card. Press `a` to add the highlighted card, or select several with `v`/`V` and add them together.
-4. `/` filters what's on screen, `.`/`>` re-sorts it (mana value, type, colour, power/toughness, EDHREC rank…), `t` tags the selection.
+4. `/` filters what's on screen, `.`/`>` re-sorts it (mana value, colour, type, power/toughness, EDHREC rank…) and `,`/`<` sorts within that, `alt+.`/`alt+,` turn either round, `t` tags the selection.
 5. `s` opens statistics for the list; walk the categories with `j`/`k` and add them to the filter with `a`/`o`.
-6. Every edit is written to the deck file as you make it; `w` commits it to git. `space w` commits the editing deck from anywhere.
+6. Every edit is written to the deck file as you make it; `w` commits it to git. `space w` commits every open deck from anywhere, and `space s` pushes them to your git remote.
 
 ## Command line
 
@@ -222,13 +240,14 @@ scry theme                      # list colour themes
 scry theme <name>               # switch theme
 scry keys                       # list every key binding
 scry keys --defaults            # print the defaults as a keys.json to edit
+scry init                       # write commented-out templates of every settings file
 ```
 
 Because every deck is a file in a git repository, `git log`, `git diff`, and friends work on your decks directly.
 
 ## Key bindings
 
-The bottom of the screen always shows the keys for where you are — press `?` to expand it. The essentials:
+The bottom of the screen shows `?` and `q`. Press `?` and each panel shows its own keys along its bottom, the deck you're editing shows the keys that change it, and the bottom of the screen shows the `space` menu. The essentials:
 
 <details>
 <summary><b>Full key reference</b></summary>
@@ -242,7 +261,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `j` `k` | up / down in the list |
 | `gg` `G` | first / last row |
 | `K` `J` | scroll the info panel half a screen |
-| `ctrl+k` `ctrl+j` | info panel, a paragraph at a time |
+| `b` `B` | clear this list's filters · clear every list's filters |
 | `space` | the menu · `?` show keys in the panels · `q` quit |
 
 **In a list of cards**
@@ -252,6 +271,7 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `/` | filter as you type |
 | `.` `>` | cycle the sort order, which fills the right-hand column |
 | `,` `<` | cycle the second sort order, which colours the names on the left |
+| `alt+.` `alt+,` | turn the first / second sort round (ascending ↑, descending ↓) |
 | `i` | edit the search · on a deck of yours, add a card from Scryfall |
 | `v` `V` | select one / all shown |
 | `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
@@ -259,8 +279,9 @@ The bottom of the screen always shows the keys for where you are — press `?` t
 | `c` | set as the editing deck's commander |
 | `u` | undo the last edit |
 | `y` `p` | yank the selection · put it into this list |
-| `s` | statistics for this list |
+| `s` `S` | statistics for this list · for the editing deck |
 | `gv` | how this card's printed text has changed |
+| `gx` | the card as printed, in the info panel (or the browser) |
 | `w` `W` | commit this deck · save a search or remote deck as a deck of yours (here / in a new panel) |
 
 **In the decks panel**
@@ -290,8 +311,8 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 | `c` `C` | copy deck · copy deck & its considering list |
 | `y` `x` `p` | yank (copy) · cut (move) · put into the folder you're on |
 | `d` | delete |
-| `s` | git push: sync your decks with their git remote |
 | `gv` | git versions of the deck |
+| `gx` | open a Moxfield deck on moxfield.com |
 
 **The editing deck**
 
@@ -299,7 +320,8 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 | --- | --- |
 | `e` `E` | choose which deck to edit |
 | `gd` | jump to the editing deck |
-| `space w` | commit the editing deck from anywhere |
+| `space w` | commit every open deck with uncommitted edits, from anywhere |
+| `space s` | git push: sync your decks with their git remote |
 
 **Panels**
 
@@ -307,9 +329,8 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 | --- | --- |
 | `space f` `space d` `space r` | new search / decks / rules panel |
 | `space n` | new blank panel (`tab` picks its target) |
-| `space s` | statistics for the editing deck |
 | `space c` `space o` | close this panel / close the others |
-| `space h` `space l` | move this panel left / right |
+| `space u` | bring back the panel you last closed |
 
 </details>
 
@@ -325,7 +346,23 @@ Every key is a default you can move. Put the ones you want changed in `~/.config
 }
 ```
 
-`scry keys` lists every scope, action and key as they're bound now, and `scry keys --defaults` prints the whole keymap as a file to start from. The hints on screen follow your bindings. A clash within one scope is reported on startup, and that scope keeps its defaults until it's fixed. `scry keys -h` has the details.
+`scry keys` lists every scope, action and key as they're bound now, and `scry keys --defaults` prints the whole keymap as a file to start from — or run `scry init`, which writes it into place with every line commented out. The hints on screen follow your bindings. A clash within one scope is reported on startup, and that scope keeps its defaults until it's fixed. `scry keys -h` has the details.
+
+### Sort orders
+
+Which sorts `.` and `,` step through, in what order, and which way each starts, live in `~/.config/scry/config.json`. Leave a sort out of the cycle and it isn't offered. `name` is left out as it ships:
+
+```json
+{
+  "sort": {
+    "cycle": ["scryfall", "mana value", "colour", "type", "power", "toughness",
+              "edhrec", "usd", "rarity", "inclusion"],
+    "direction": { "power": "desc", "usd": "desc", "rarity": "desc" }
+  }
+}
+```
+
+`scry init` writes every settings file — `config.json`, `keys.json` and a theme to start from — with all the defaults in them, commented out: they change nothing until you uncomment a line, and they show you everything there is to change. Settings files may carry `//` comments.
 
 ## Where your files live, and how to uninstall
 
