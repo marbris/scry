@@ -290,6 +290,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // leaves.
 func (m *Model) escStep(p *panel) (string, func()) {
 	switch {
+	// The picture gx put up comes off the same way.
+	case m.info.mode == infoImage:
+		return "close printing", func() {
+			m.info.mode = infoCard
+			m.info.offset = 0
+		}
 	// A printed history was put on the information panel from here, so it
 	// comes off from here too, before esc starts taking the panel itself
 	// apart.
@@ -506,8 +512,31 @@ func (m Model) handleGoto(key string) (tea.Model, tea.Cmd) {
 	case keymap.GotoVersions:
 		cmd := m.versions(p)
 		return m, cmd
+
+	case keymap.GotoImage:
+		cmd := m.gx(p)
+		return m, cmd
 	}
 	return m, nil
+}
+
+// gx shows whatever is under the cursor as it looks: a card's printing in
+// the information panel, a deck of somebody else's on Moxfield.
+func (m *Model) gx(p *panel) tea.Cmd {
+	switch v := p.top().(type) {
+	case *cardList:
+		if c, ok := v.current(); ok {
+			return m.gxCard(c.Card)
+		}
+	case *deckList:
+		e, ok := v.current()
+		if !ok || e.id == "" || (e.kind != entryRemote && e.kind != entryUserDeck) {
+			m.notice = "gx opens a Moxfield deck — this one is only here"
+			return nil
+		}
+		return openInBrowser("https://moxfield.com/decks/"+e.id, e.name)
+	}
+	return nil
 }
 
 // versions opens the history of whatever is under the cursor: a deck's

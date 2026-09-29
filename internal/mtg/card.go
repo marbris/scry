@@ -28,6 +28,19 @@ type Card struct {
 	Lang            string `json:"lang"`
 	Digital         bool   `json:"digital"`
 
+	// What a printing looks like, and how ordinary a printing it is: gx
+	// shows the card as most recently printed, but not as a promo, a
+	// borderless showcase or some other special treatment.
+	ScryfallURI  string    `json:"scryfall_uri"`
+	ImageURIs    ImageURIs `json:"image_uris"`
+	SetType      string    `json:"set_type"`
+	BorderColor  string    `json:"border_color"`
+	FrameEffects []string  `json:"frame_effects"`
+	Promo        bool      `json:"promo"`
+	FullArt      bool      `json:"full_art"`
+	Variation    bool      `json:"variation"`
+	Games        []string  `json:"games"`
+
 	Name          string            `json:"name"`
 	ManaCost      string            `json:"mana_cost"`
 	TypeLine      string            `json:"type_line"`
@@ -59,6 +72,35 @@ type Face struct {
 	Power      string   `json:"power"`
 	Toughness  string   `json:"toughness"`
 	Loyalty    string   `json:"loyalty"`
+	// A double-faced card has an image per face and none of its own.
+	ImageURIs ImageURIs `json:"image_uris"`
+}
+
+// ImageURIs are the sizes Scryfall renders a printing at.
+type ImageURIs struct {
+	Normal string `json:"normal"`
+	Large  string `json:"large"`
+	PNG    string `json:"png"`
+}
+
+// Image is the link to a printing's picture at the size asked for — "normal"
+// or "large" — or its front face's, for a card that has one per face.
+func (c Card) Image(size string) string {
+	pick := func(u ImageURIs) string {
+		if size == "large" && u.Large != "" {
+			return u.Large
+		}
+		return u.Normal
+	}
+	if u := pick(c.ImageURIs); u != "" {
+		return u
+	}
+	for _, f := range c.CardFaces {
+		if u := pick(f.ImageURIs); u != "" {
+			return u
+		}
+	}
+	return ""
 }
 
 // Faces returns a card's printed faces as cards in their own right, so

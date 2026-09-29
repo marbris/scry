@@ -321,6 +321,8 @@ func (m Model) infoTitle() string {
 		return m.statTitle()
 	case infoVersions:
 		return "printed text"
+	case infoImage:
+		return "printing"
 	}
 
 	p := m.ws.current()
@@ -347,6 +349,8 @@ func (m Model) infoContent(inner int) []string {
 		return m.renderStats(inner)
 	case infoVersions:
 		return m.infoVersions(inner)
+	case infoImage:
+		return m.infoImageLines(inner)
 	default:
 		return m.infoBody(inner)
 	}

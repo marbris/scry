@@ -21,6 +21,8 @@ const (
 	// infoVersions is gv: a deck's git history, or a card's printed text
 	// through the years.
 	infoVersions
+	// infoImage is gx: the card as printed, following the cursor.
+	infoImage
 )
 
 func (i infoMode) String() string {
@@ -29,6 +31,8 @@ func (i infoMode) String() string {
 		return "statistics"
 	case infoVersions:
 		return "versions"
+	case infoImage:
+		return "printing"
 	}
 	return "card"
 }

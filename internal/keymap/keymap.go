@@ -144,6 +144,7 @@ const (
 	GotoTop      Action = "top"
 	GotoEditing  Action = "editing"
 	GotoVersions Action = "versions"
+	GotoImage    Action = "image"
 
 	SearchNextTarget  Action = "target.next"
 	SearchPrevTarget  Action = "target.prev"
@@ -262,6 +263,7 @@ var defaults = []binding{
 	{Goto, GotoTop, k("g")},
 	{Goto, GotoEditing, k("d")},
 	{Goto, GotoVersions, k("v")},
+	{Goto, GotoImage, k("x")},
 
 	{Search, SearchNextTarget, k("tab")},
 	{Search, SearchPrevTarget, k("shift+tab")},

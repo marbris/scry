@@ -994,6 +994,7 @@ func (l *deckList) keys() []hintGroup {
 			hint("copy deck/&considering", keymap.Decks, keymap.DecksCopy, keymap.DecksCopyBoth),
 			hint("delete/cut/yank/put", keymap.Decks, keymap.DecksDelete, keymap.DecksCut, keymap.DecksYank, keymap.DecksPut),
 			{gotoHint(keymap.GotoVersions), "versions"},
+			{gotoHint(keymap.GotoImage), "open on moxfield"},
 		}},
 	}
 }

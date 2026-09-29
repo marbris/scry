@@ -50,6 +50,13 @@ type Model struct {
 	// have since scrolled past can be recognised as stale.
 	hoverSeq int
 
+	// images are the pictures gx has fetched, by card; imageSeq does for
+	// them what hoverSeq does for rulings; kitty is what the terminal is
+	// holding to draw.
+	images   map[string]*cardImage
+	imageSeq int
+	kitty    kittyShown
+
 	// notice is a one-line result — "copied", "deleted" — shown along the
 	// bottom until the next keypress.
 	notice string
@@ -78,6 +85,7 @@ func New() Model {
 		history:   LoadQueryHistory(),
 		stats:     statsState{},
 		histories: map[string]*cardHistory{},
+		images:    map[string]*cardImage{},
 	}
 }
 
@@ -138,6 +146,10 @@ func NewRestored() (Model, tea.Cmd) {
 func (m Model) quit() tea.Cmd {
 	m.saveSession()
 	SaveQueryHistory(m.history)
+	// The terminal outlives scry; the picture it was holding for gx needn't.
+	if m.kitty.key != "" {
+		writeTerminal([]byte(kittyDelete()))
+	}
 	return tea.Quit
 }
 
@@ -159,6 +171,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// in that order, here, rather than by every handler that could change it.
 	if updated, ok := next.(Model); ok {
 		updated.resortInclusion()
+		// And the picture gx put up is the one the terminal holds, at the
+		// size the panel now has room for.
+		synced, imgCmd := updated.syncImage()
+		return synced, tea.Batch(cmd, imgCmd)
 	}
 	return next, cmd
 }
@@ -186,8 +202,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// history belongs to, rather than a check in every key that moves.
 		if updated, ok := next.(Model); ok {
 			updated.info.leaveVersions(updated.focusedOracle())
+			// The picture, unlike the printed history, follows the cursor.
+			img := updated.imageHover()
 			// And one place to write whatever the key changed.
-			return updated, tea.Batch(cmd, updated.autosave())
+			return updated, tea.Batch(cmd, img, updated.autosave())
 		}
 		return next, cmd
 
@@ -232,6 +250,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case rulingsTickMsg:
 		return m.handleRulingsTick(msg)
+
+	case imageTickMsg:
+		return m.handleImageTick(msg)
+
+	case imageMsg:
+		return m.handleImage(msg)
 
 	case rulingsMsg:
 		return m.handleRulings(msg)
