@@ -41,7 +41,7 @@ var leaderMenu = []leaderCmd{
 	{keymap.LeaderDecks, "decks", nil}, // opens the list and checks it, so it needs a command
 	{keymap.LeaderRules, "rules", nil}, // needs a command, so it is run below
 	{keymap.LeaderNew, "new", func(m *Model) { m.ws.open(KindNew) }},
-	{keymap.LeaderSync, "git push", nil},             // hands back a command, so it is run below
+	{keymap.LeaderSync, "git push", nil},              // hands back a command, so it is run below
 	{keymap.LeaderCommitAll, "commit all lists", nil}, // so does this
 	{keymap.LeaderClose, "close", func(m *Model) { m.ws.close() }},
 	{keymap.LeaderUndoClose, "undo close", func(m *Model) { m.ws.restoreClosed() }},
