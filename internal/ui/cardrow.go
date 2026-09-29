@@ -68,7 +68,7 @@ func renderRowCol(c deck.Card, order cardSort, st rowState, width, nameCol int) 
 		return ""
 	}
 
-	mark, markStyle := marker(c, st)
+	mark, markCol := marker(c, st)
 	body := maxInt(width-gutter, 1)
 
 	name := cardName(c)
@@ -83,21 +83,36 @@ func renderRowCol(c deck.Card, order cardSort, st rowState, width, nameCol int) 
 	// The sort decides what the row is about, so it decides what is worth
 	// colouring. Sorting by colour and reading a column of grey names tells
 	// you nothing the order didn't already.
-	nameStyle := lipgloss.NewStyle().Foreground(nameColour(c.Card, order, st.then))
-	if st.cursor {
-		nameStyle = lipgloss.NewStyle().Foreground(theme.SelectionFg).Bold(true)
-	}
+	hue := nameColour(c.Card, order, st.then)
 
-	painted := paintColumn(colText, c.Card, order, st.cursor)
-
-	line := markStyle.Render(pad(mark, gutter)) + nameStyle.Render(text) + painted
 	if st.cursor {
 		// The cursor is a background so it reads at a glance across four
-		// panels, where a colour change alone gets lost — and it has to run
-		// the whole row, not stop at the marker.
-		return highlightLine(line, width, theme.SelectionBg)
+		// panels, where a colour change alone gets lost. It takes the row's
+		// own colours rather than a neutral grey, so the row you're looking
+		// at says the most, not the least: the name on the name's colour,
+		// the column on the column's, each written in whichever of dark or
+		// light stands out from it. The marker does the same, its glyph
+		// becoming the block's text; a row with no marker keeps the plain
+		// highlight there.
+		gutterCell := highlightLine(pad(mark, gutter), gutter, theme.SelectionBg)
+		if markCol != "" {
+			gutterCell = onColour(markCol).Bold(st.selected).Render(pad(mark, gutter))
+		}
+		line := gutterCell + onColour(hue).Bold(true).Render(text)
+		if colText != "" {
+			line += onColour(columnColour(c.Card, order)).Render(colText)
+		}
+		return line
 	}
-	return line
+
+	nameStyle := lipgloss.NewStyle().Foreground(hue)
+	markStyle := lipgloss.NewStyle().Foreground(markCol).Bold(st.selected)
+	return markStyle.Render(pad(mark, gutter)) + nameStyle.Render(text) + paintColumn(colText, c.Card, order)
+}
+
+// onColour is a block of colour with legible text on it.
+func onColour(bg lipgloss.Color) lipgloss.Style {
+	return lipgloss.NewStyle().Background(bg).Foreground(theme.OnColour(bg))
 }
 
 // nameColour is what the card's name is written in.
@@ -202,24 +217,30 @@ func edhrecBand(rank int) int {
 // symbol, which is how you read a curve at a glance; anything else takes the
 // colour the order gives the card — a type's, a rarity's, or a step on the
 // ramp for a price, a rank, a power or a toughness.
-func paintColumn(text string, c mtg.Card, order cardSort, under bool) string {
+func paintColumn(text string, c mtg.Card, order cardSort) string {
 	if text == "" {
 		return ""
 	}
-	if under {
-		return lipgloss.NewStyle().Foreground(theme.SelectionFg).Render(text)
-	}
-
 	if order.showsMana() {
 		return paintMana(text)
 	}
 	// Everything else takes the colour its order gives the card: a type's,
 	// a rarity's, or a place on the ramp for a number — the same colour the
 	// name takes when the order is second, so the two sorts read alike.
-	if col, ok := sortColour(c, order); ok {
-		return lipgloss.NewStyle().Foreground(col).Render(text)
+	return lipgloss.NewStyle().Foreground(columnColour(c, order)).Render(text)
+}
+
+// columnColour is the second column's colour as one colour. A mana cost is
+// painted symbol by symbol, which a background can't be, so as a block it
+// takes the card's colour instead.
+func columnColour(c mtg.Card, order cardSort) lipgloss.Color {
+	if order.showsMana() {
+		return colourForCard(c.DisplayColors())
 	}
-	return lipgloss.NewStyle().Foreground(theme.TextDim).Render(text)
+	if col, ok := sortColour(c, order); ok {
+		return col
+	}
+	return theme.TextDim
 }
 
 // paintMana colours a rendered cost symbol by symbol. It works from the text
@@ -462,16 +483,16 @@ func cardName(c deck.Card) string {
 //
 // One character, so there is a precedence: what you just picked out matters
 // more than what the card is, which matters more than where else it lives.
-func marker(c deck.Card, st rowState) (string, lipgloss.Style) {
+func marker(c deck.Card, st rowState) (string, lipgloss.Color) {
 	switch {
 	case st.selected:
-		return "▸", lipgloss.NewStyle().Foreground(theme.Marked).Bold(true)
+		return "▸", theme.Marked
 	case c.Commander:
-		return "★", lipgloss.NewStyle().Foreground(theme.Accent)
+		return "★", theme.Accent
 	case st.member == inTarget:
-		return "•", lipgloss.NewStyle().Foreground(theme.Member)
+		return "•", theme.Accent
 	case st.member == inOther:
-		return "◦", lipgloss.NewStyle().Foreground(theme.TextDim)
+		return "•", theme.Member
 	}
-	return " ", lipgloss.NewStyle()
+	return " ", ""
 }

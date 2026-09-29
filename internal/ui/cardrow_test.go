@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"scry/internal/theme"
 	"testing"
@@ -216,7 +217,7 @@ func TestTheMarkerSaysOneThingAtATime(t *testing.T) {
 	if got, _ := marker(plain, rowState{member: inTarget}); got != "•" {
 		t.Errorf("a card in the editing deck shows %q", got)
 	}
-	if got, _ := marker(plain, rowState{member: inOther}); got != "◦" {
+	if got, _ := marker(plain, rowState{member: inOther}); got != "•" {
 		t.Errorf("a card in another list shows %q", got)
 	}
 	if got, _ := marker(plain, rowState{}); got != " " {
@@ -362,5 +363,41 @@ func TestPaintingNeverChangesAColumnsWidth(t *testing.T) {
 				t.Errorf("order %v at width %d rendered %d columns", order, width, textWidth(got))
 			}
 		}
+	}
+}
+
+func TestTheCursorRowWearsItsOwnColours(t *testing.T) {
+	// Under the cursor the name and the column become blocks of their own
+	// colours, rather than one neutral bar that hides what the sort says.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	c := deck.Card{Qty: 1, Card: mtg.Card{
+		Name: "Merfolk Looter", TypeLine: "Creature — Merfolk Rogue",
+		Colors: []string{"U"}, ManaCost: "{1}{U}",
+	}}
+	st := rowState{cursor: true, then: sortColor, member: inTarget}
+	const width = 50
+	got := renderRow(c, sortType, st, width)
+
+	nameBg := nameColour(c.Card, sortType, sortColor)
+	colBg := columnColour(c.Card, sortType)
+	if nameBg == colBg {
+		t.Fatalf("test needs two different colours, both are %s", nameBg)
+	}
+	for what, bg := range map[string]lipgloss.Color{"marker": theme.Accent, "name": nameBg, "column": colBg} {
+		// lipgloss folds the foreground into the same sequence, so look for
+		// the background's parameter rather than a whole sequence.
+		param := strings.TrimSuffix(strings.TrimPrefix(bgStart(bg), "\x1b["), "m")
+		if param == "" || !strings.Contains(got, param) {
+			t.Errorf("the %s isn't on its own colour (%s): %q", what, bg, got)
+		}
+	}
+	if plain := stripANSI(got); textWidth(plain) != width {
+		t.Errorf("cursor row is %d wide, want %d: %q", textWidth(plain), width, plain)
+	}
+	if stripANSI(got) != stripANSI(renderRow(c, sortType, rowState{then: sortColor, member: inTarget}, width)) {
+		t.Error("the cursor changed the row's text, not just its colours")
 	}
 }

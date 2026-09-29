@@ -314,7 +314,7 @@ func TestTheFirstOrderColoursANumericColumn(t *testing.T) {
 	dear := mtg.Card{Name: "Mox", Prices: mtg.Prices{USD: "900.00"}, EDHRECRank: 3, Power: "6", Toughness: "1"}
 	for _, order := range []cardSort{sortUSD, sortEDHREC, sortPower, sortToughness} {
 		want, _ := sortColour(dear, order)
-		got := paintColumn("x", dear, order, false)
+		got := paintColumn("x", dear, order)
 		if got != lipgloss.NewStyle().Foreground(want).Render("x") || got == dim {
 			t.Errorf("%v: the column isn't painted with the order's colour: %q", order, got)
 		}

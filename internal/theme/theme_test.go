@@ -215,3 +215,24 @@ func TestExportWritesEveryRole(t *testing.T) {
 		}
 	}
 }
+
+func TestOnColourPicksTheLegibleSide(t *testing.T) {
+	Use(Theme{Palette: fallbackPalette})
+	for bg, want := range map[lipgloss.Color]lipgloss.Color{
+		"#fabd2f": Bg,    // yellow wants dark text
+		"#ebdbb2": Bg,    // the light foreground, as a bar
+		"#282828": White, // near-black wants light text
+		"#076678": White, // dark blue
+		"#fff":    Bg,    // short hex
+		"11":      Bg,    // bright yellow, from the terminal's scheme
+		"4":       White, // blue, from the terminal's scheme
+	} {
+		if got := OnColour(bg); got != want {
+			t.Errorf("OnColour(%s) = %s, want %s", bg, got, want)
+		}
+	}
+	// Something unreadable still gets an answer rather than a panic.
+	if OnColour("nonsense") == "" {
+		t.Error("an unreadable colour got no text colour")
+	}
+}
