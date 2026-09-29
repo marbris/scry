@@ -50,7 +50,7 @@ Scroll a search and the panel on the right fills in with the highlighted card: o
 
 ### Search on the left, deck on the right
 
-Open a search beside the deck you're building. Cards already in the deck are marked, so you can see your coverage as you scan. Each dot takes the colour of the panel's border that the card is also in: aqua for the deck you're editing, orange for the panel you're in, grey for any other list. The deck wins when a card is in several. `a` adds the highlighted card, `x` removes a copy, `u` undoes.
+Open a search beside the deck you're building. Cards already in the deck are marked, so you can see your coverage as you scan. Each mark takes the colour of the border of the panel the card is also in, and a shape of its own: an aqua ● for the deck you're editing, an orange ◆ for the panel you're in, a grey ▲ for any other list. The deck wins when a card is in several. `a` adds the highlighted card, `x` removes a copy, `u` undoes.
 
 ![A search panel beside the editing deck, with cards marked as already in the deck](screenshots/add-to-deck.png)
 

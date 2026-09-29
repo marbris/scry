@@ -496,12 +496,14 @@ func marker(c deck.Card, st rowState) (string, lipgloss.Color) {
 		return "▸", theme.Marked
 	case c.Commander:
 		return "★", theme.Accent
+	// A shape each as well as a colour, so the three read apart at a glance
+	// — and for anyone who can't tell aqua from grey.
 	case st.member == inEditing:
-		return "•", theme.BorderEditing
+		return "●", theme.BorderEditing
 	case st.member == inFocused:
-		return "•", theme.BorderFocus
+		return "◆", theme.BorderFocus
 	case st.member == inOther:
-		return "•", theme.MemberOther
+		return "▲", theme.MemberOther
 	}
 	return " ", ""
 }

@@ -213,11 +213,10 @@ func TestTheMarkerSaysOneThingAtATime(t *testing.T) {
 		t.Errorf("a commander shows %q", got)
 	}
 	plain := deck.Card{Card: mtg.Card{Name: "Sol Ring"}}
-	if got, _ := marker(plain, rowState{member: inEditing}); got != "•" {
-		t.Errorf("a card in the editing deck shows %q", got)
-	}
-	if got, _ := marker(plain, rowState{member: inOther}); got != "•" {
-		t.Errorf("a card in another list shows %q", got)
+	for member, want := range map[membership]string{inEditing: "●", inFocused: "◆", inOther: "▲"} {
+		if got, _ := marker(plain, rowState{member: member}); got != want {
+			t.Errorf("mark %v shows %q, want %q", member, got, want)
+		}
 	}
 	if got, _ := marker(plain, rowState{}); got != " " {
 		t.Errorf("an ordinary card shows %q, want nothing", got)
