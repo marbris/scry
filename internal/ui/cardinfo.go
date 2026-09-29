@@ -344,15 +344,16 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		if line := typeLine(f, width); line != "" {
 			out = append(out, dim.Render(line))
 		}
-		// Power/toughness on its own row rather than trailing the type line:
-		// the type line is the thing that runs long, and a narrow panel used
-		// to cut the "2/3" off the end of it.
-		if pt := statsLine(f, width); pt != "" {
-			out = append(out, dim.Render(pt))
-		}
 		if text := f.OracleText; text != "" {
 			out = append(out, "")
 			out = append(out, highlightOracle(text, f, width, rd)...)
+		}
+		// Power/toughness below the text and flush right, where the card
+		// prints it — on its own row rather than trailing the type line,
+		// which is the thing that runs long and used to cut the "2/3" off.
+		if pt := statsLine(f, width); pt != "" {
+			out = append(out, lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).
+				Render(strings.Repeat(" ", maxInt(width-textWidth(pt), 0))+pt))
 		}
 	}
 
@@ -426,14 +427,14 @@ func typeLine(f mtg.Card, width int) string {
 	return fit(f.TypeLine, width)
 }
 
-// statsLine is power/toughness, or a planeswalker's loyalty, on a row of its
-// own — the numbers a card prints in its bottom-right corner.
+// statsLine is power/toughness, or a planeswalker's loyalty — the numbers a
+// card prints in its bottom-right corner.
 func statsLine(f mtg.Card, width int) string {
 	switch {
 	case f.Power != "" || f.Toughness != "":
-		return fit(f.Power+"/"+f.Toughness, width)
+		return truncate(f.Power+"/"+f.Toughness, width)
 	case f.Loyalty != "":
-		return fit("loyalty "+f.Loyalty, width)
+		return truncate("loyalty "+f.Loyalty, width)
 	}
 	return ""
 }

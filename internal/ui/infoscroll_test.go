@@ -6,7 +6,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"scry/internal/deck"
 	"scry/internal/mtg"
+	"scry/internal/rules"
 )
 
 // longInfo is a search whose highlighted card has far more to read than the
@@ -99,5 +101,35 @@ func TestTheInfoPanelHintsHalfAPage(t *testing.T) {
 	m := drive(longInfo(t), "?")
 	if !strings.Contains(stripANSI(m.View()), "half page") {
 		t.Error("K J aren't offered as half a page")
+	}
+}
+
+func TestPowerToughnessSitsUnderTheTextOnTheRight(t *testing.T) {
+	// Where the card prints it: after the rules text, in the bottom-right.
+	c := deck.Card{Qty: 1, Card: mtg.Card{
+		Name: "Grizzly Bears", TypeLine: "Creature — Bear",
+		OracleText: "Trample", Power: "2", Toughness: "2",
+	}}
+	const width = 30
+	lines := cardInfo(c, width, rules.Data{}, []mtg.Ruling{}, nil)
+
+	text, pt := -1, -1
+	for i, l := range lines {
+		plain := stripANSI(l)
+		switch {
+		case strings.Contains(plain, "Trample"):
+			text = i
+		case strings.TrimSpace(plain) == "2/2":
+			pt = i
+			if !strings.HasSuffix(plain, "2/2") || textWidth(plain) != width {
+				t.Errorf("2/2 isn't flush right: %q", plain)
+			}
+		}
+	}
+	if text < 0 || pt < 0 {
+		t.Fatalf("missing the text (%d) or the 2/2 (%d)", text, pt)
+	}
+	if pt != text+1 {
+		t.Errorf("2/2 on line %d, want straight after the text on %d", pt, text)
 	}
 }
