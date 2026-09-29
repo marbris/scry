@@ -148,24 +148,27 @@ func fillTo(lines []string, width, height int) []string {
 	return lines
 }
 
-// membership is how a card in one list relates to the others on screen.
+// membership is how a card in one list relates to the others on screen:
+// which other list it is also in, the strongest of them if several. Each is
+// marked in the colour of that list's border, so a dot says which panel.
 type membership int
 
 const (
 	notElsewhere membership = iota
-	// inOther is in some other list on screen — the weaker mark.
+	// inOther is in some list that is neither of the two below: grey, like
+	// the border of a panel that is neither.
 	inOther
-	// inTarget is in the list that matters most from here: the editing
-	// deck, seen from any other list; the focused list, seen from the deck.
-	inTarget
+	// inFocused is in the list you're in: orange, like its border.
+	inFocused
+	// inEditing is in the deck being edited: aqua, like its border. It
+	// outranks the others — whether a card is already in the deck is the
+	// question every list is being read to answer.
+	inEditing
 )
 
-// membersFor is what a panel should flag as living somewhere else too.
-//
-// Two marks, a strong and a weak. Every other list marks what's already in
-// the deck you're building, strongly, and what any other list on screen has
-// too, weakly. The editing deck turns it round: it marks strongly what the
-// list you're looking at has, and weakly what any other list has.
+// membersFor is what a list should flag as living somewhere else too, and
+// where. A list never marks itself: the editing deck marks what the focused
+// list has, and the focused list marks what the editing deck has.
 func (m Model) membersFor(l *cardList) map[string]membership {
 	editing := m.ws.editingList()
 	var focused *cardList
@@ -176,23 +179,20 @@ func (m Model) membersFor(l *cardList) map[string]membership {
 	out := map[string]membership{}
 	for _, other := range m.ws.panels {
 		o := other.cardsView()
-		if o == nil || o == l || o == editing {
+		if o == nil || o == l {
 			continue
 		}
-		for name := range o.names() {
-			out[name] = inOther
+		level := inOther
+		switch o {
+		case editing:
+			level = inEditing
+		case focused:
+			level = inFocused
 		}
-	}
-
-	// The deck is a list on screen too, but seen from elsewhere it's the
-	// strong mark, never the weak one — which is why it was skipped above.
-	target := editing
-	if l == editing {
-		target = focused
-	}
-	if target != nil && target != l {
-		for name := range target.names() {
-			out[name] = inTarget
+		for name := range o.names() {
+			if level > out[name] {
+				out[name] = level
+			}
 		}
 	}
 	return out

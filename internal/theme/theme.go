@@ -92,6 +92,10 @@ var (
 	SelectionFg lipgloss.Color
 	Marked      lipgloss.Color
 	Member      lipgloss.Color
+	// MemberOther marks a card that is also in a list that is neither the
+	// editing deck nor the focused one. Those two mark theirs in their own
+	// border colours.
+	MemberOther lipgloss.Color
 
 	// Mana
 	ManaW     lipgloss.Color
@@ -129,7 +133,7 @@ var roleVars = map[string]*lipgloss.Color{
 	"error": &Error, "info": &Info, "special": &Special,
 
 	"selectionBg": &SelectionBg, "selectionFg": &SelectionFg,
-	"marked": &Marked, "member": &Member,
+	"marked": &Marked, "member": &Member, "memberOther": &MemberOther,
 
 	"manaW": &ManaW, "manaU": &ManaU, "manaB": &ManaB, "manaR": &ManaR,
 	"manaG": &ManaG, "manaC": &ManaC, "manaMulti": &ManaMulti,
@@ -148,7 +152,7 @@ var roleVars = map[string]*lipgloss.Color{
 // because these say accent is *the orange one*, whatever orange means to it.
 var defaultRoles = map[string]string{
 	"surface": "bg", "surfaceAlt": "bgAlt",
-	"border": "bgAlt", "borderFocus": "orange", "borderEditing": "green",
+	"border": "bgAlt", "borderFocus": "orange", "borderEditing": "aqua",
 
 	"text": "fg", "textBright": "white", "textDim": "fgDim", "textMuted": "gray",
 
@@ -156,7 +160,7 @@ var defaultRoles = map[string]string{
 	"error": "red", "info": "blue", "special": "purple",
 
 	"selectionBg": "bgAlt", "selectionFg": "white",
-	"marked": "yellow", "member": "aqua",
+	"marked": "yellow", "member": "aqua", "memberOther": "gray",
 
 	// Black mana is drawn grey: a glyph in the terminal's background colour
 	// is a glyph you can't see.

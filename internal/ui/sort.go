@@ -33,7 +33,8 @@ const (
 	sortToughness
 	sortUSD
 	// sortInclusion groups a list by where else its cards are: in the deck
-	// being edited first, then in some other list on screen, then only here.
+	// being edited first, then in the focused list, then in some other list
+	// on screen, then only here.
 	sortInclusion
 )
 
@@ -336,15 +337,9 @@ func sortKey(s cardSort, members map[string]membership, dc deck.Card) (float64, 
 	case sortUSD:
 		return c.USD()
 	case sortInclusion:
-		// In the deck being edited, then elsewhere on screen, then only
-		// here: the closer a card already is to the deck, the higher.
-		switch members[markKey(dc)] {
-		case inTarget:
-			return 0, true
-		case inOther:
-			return 1, true
-		}
-		return 2, true
+		// The order the markers rank in: in the deck being edited, then in
+		// the list you're in, then in some other list, then only here.
+		return float64(inEditing - members[markKey(dc)]), true
 	}
 	return 0, true
 }

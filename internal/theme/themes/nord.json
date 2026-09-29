@@ -16,6 +16,7 @@
     "orange": "#d08770"
   },
   "roles": {
-    "borderFocus": "aqua"
+    "borderFocus": "aqua",
+    "borderEditing": "green"
   }
 }

@@ -479,7 +479,7 @@ func TestEveryListFlagsWhatTheEditingDeckHolds(t *testing.T) {
 	if members["sol ring"] != notElsewhere {
 		t.Error("Sol Ring is not in the deck but was flagged")
 	}
-	if members["llanowar elves"] != inTarget {
+	if members["llanowar elves"] != inEditing {
 		t.Error("Llanowar Elves is in the deck and should be flagged in the search")
 	}
 }
@@ -495,7 +495,7 @@ func TestOtherListsGetTheWeakerMark(t *testing.T) {
 	if members["sol ring"] != inOther {
 		t.Errorf("Sol Ring is in the other search: %v, want the weak mark", members["sol ring"])
 	}
-	if members["llanowar elves"] != inTarget {
+	if members["llanowar elves"] != inEditing {
 		t.Error("the deck's card should keep the strong mark")
 	}
 	if members["dwynen, gilt-leaf daen"] != notElsewhere {
@@ -503,7 +503,7 @@ func TestOtherListsGetTheWeakerMark(t *testing.T) {
 	}
 }
 
-func TestTheEditingDeckMarksTheFocusedListStrongly(t *testing.T) {
+func TestTheEditingDeckMarksTheFocusedListInOrange(t *testing.T) {
 	m := sized(200, 30)
 	m = withCards(m, "f", sample()[2:3], sortArrival) // Sol Ring
 	m = withCards(m, "f", sample()[3:], sortArrival)  // Forest
@@ -512,8 +512,8 @@ func TestTheEditingDeckMarksTheFocusedListStrongly(t *testing.T) {
 	m.ws.editing = 2
 
 	members := m.membersFor(m.ws.panels[2].cardsView())
-	if members["forest"] != inTarget {
-		t.Error("the focused list's card should be marked strongly in the deck")
+	if members["forest"] != inFocused {
+		t.Error("the focused list's card should carry the focused mark in the deck")
 	}
 	if members["sol ring"] != inOther {
 		t.Error("another list's card should be marked weakly in the deck")

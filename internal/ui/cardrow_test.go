@@ -213,7 +213,7 @@ func TestTheMarkerSaysOneThingAtATime(t *testing.T) {
 		t.Errorf("a commander shows %q", got)
 	}
 	plain := deck.Card{Card: mtg.Card{Name: "Sol Ring"}}
-	if got, _ := marker(plain, rowState{member: inTarget}); got != "•" {
+	if got, _ := marker(plain, rowState{member: inEditing}); got != "•" {
 		t.Errorf("a card in the editing deck shows %q", got)
 	}
 	if got, _ := marker(plain, rowState{member: inOther}); got != "•" {
@@ -380,7 +380,7 @@ func TestTheCursorRowWearsItsOwnColours(t *testing.T) {
 		Name: "Merfolk Looter", TypeLine: "Creature — Merfolk Rogue",
 		Colors: []string{"U"}, ManaCost: "{1}{U}",
 	}}
-	st := rowState{cursor: true, then: sortColor, member: inTarget}
+	st := rowState{cursor: true, then: sortColor, member: inEditing}
 	const width = 50
 	got := renderRow(c, sortType, st, width)
 
@@ -389,7 +389,7 @@ func TestTheCursorRowWearsItsOwnColours(t *testing.T) {
 	if nameBg == colBg {
 		t.Fatalf("test needs two different colours, both are %s", nameBg)
 	}
-	for what, bg := range map[string]lipgloss.Color{"marker": theme.Accent, "name": nameBg, "column": colBg} {
+	for what, bg := range map[string]lipgloss.Color{"marker": theme.BorderEditing, "name": nameBg, "column": colBg} {
 		// lipgloss folds the foreground into the same sequence, so look for
 		// the background's parameter rather than a whole sequence.
 		param := strings.TrimSuffix(strings.TrimPrefix(bgStart(bg), "\x1b["), "m")
@@ -400,7 +400,7 @@ func TestTheCursorRowWearsItsOwnColours(t *testing.T) {
 	if plain := stripANSI(got); textWidth(plain) != width {
 		t.Errorf("cursor row is %d wide, want %d: %q", textWidth(plain), width, plain)
 	}
-	if stripANSI(got) != stripANSI(renderRow(c, sortType, rowState{then: sortColor, member: inTarget}, width)) {
+	if stripANSI(got) != stripANSI(renderRow(c, sortType, rowState{then: sortColor, member: inEditing}, width)) {
 		t.Error("the cursor changed the row's text, not just its colours")
 	}
 }

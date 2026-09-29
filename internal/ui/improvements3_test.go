@@ -8,6 +8,7 @@ import (
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
 	"ttr/internal/prints"
+	"ttr/internal/theme"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -285,5 +286,41 @@ func TestFirstAndLastAreOffered(t *testing.T) {
 	m := withCards(sized(140, 30), "f", sample(), sortArrival)
 	if got := offered(m, "first/last"); got != "gg G" {
 		t.Errorf("gg G offered as %q", got)
+	}
+}
+
+func TestTheMarkersRankEditingThenFocusedThenOther(t *testing.T) {
+	m := sized(240, 30)
+	m = withCards(m, "f", sample(), sortArrival)     // 0: the list being marked
+	m = withCards(m, "f", sample()[1:], sortArrival) // 1: focused — elves, Sol Ring, Forest
+	m = withCards(m, "f", sample()[2:], sortArrival) // 2: another — Sol Ring, Forest
+	m = withCards(m, "d", sample()[3:], sortArrival) // 3: the editing deck — Forest
+	m.ws.panels[3].cardsView().deck = &deck.Info{Name: "Deck", Slug: "deck", Format: "commander"}
+	m.ws.editing = 3
+	m = focusOn(m, 1)
+
+	members := m.membersFor(m.ws.panels[0].cardsView())
+	for name, want := range map[string]membership{
+		"forest":                 inEditing, // in all three: the editing deck wins
+		"sol ring":               inFocused, // focused and another: focused wins
+		"llanowar elves":         inFocused,
+		"dwynen, gilt-leaf daen": notElsewhere,
+	} {
+		if members[name] != want {
+			t.Errorf("%s is marked %v, want %v", name, members[name], want)
+		}
+	}
+
+	// Each mark wears its panel's border colour.
+	plain := deck.Card{Card: mtg.Card{Name: "Sol Ring"}}
+	for member, want := range map[membership]string{
+		inEditing: string(theme.BorderEditing), inFocused: string(theme.BorderFocus), inOther: string(theme.MemberOther),
+	} {
+		if _, col := marker(plain, rowState{member: member}); string(col) != want {
+			t.Errorf("mark %v is %s, want %s", member, col, want)
+		}
+	}
+	if theme.BorderEditing == theme.BorderFocus || theme.BorderEditing == theme.MemberOther {
+		t.Error("the three marks aren't three colours")
 	}
 }
