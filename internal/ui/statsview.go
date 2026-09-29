@@ -148,6 +148,12 @@ func (m *Model) pointAt(r stats.Row) {
 }
 
 // moveStat walks the categories. Only moving; nothing narrows until you add.
+//
+// The groups are a ring, so the walk never stops. k on the first row turns
+// the ring back a group, the way K does, and lands on the last row of the
+// group that comes round to the top — the row that was out of sight above.
+// j on the last row turns it forward, and lands on the first row of the
+// group that has gone round to the bottom.
 func (m *Model) moveStat(delta int) {
 	groups := m.statGroups()
 	rows := statRows(groups)
@@ -155,7 +161,18 @@ func (m *Model) moveStat(delta int) {
 		return
 	}
 	at := m.statCursor(groups) + delta
-	m.pointAt(rows[max(0, min(at, len(rows)-1))])
+	switch {
+	case at < 0:
+		m.rotateStat(-1)
+		top := m.statGroups()[0]
+		m.pointAt(top.Rows[len(top.Rows)-1])
+	case at >= len(rows):
+		m.rotateStat(1)
+		groups = m.statGroups()
+		m.pointAt(groups[len(groups)-1].Rows[0])
+	default:
+		m.pointAt(rows[at])
+	}
 }
 
 // rotateStat turns the group order over by one: J brings the next group to
@@ -512,22 +529,23 @@ func (b statBar) render() string {
 	}
 	filled = min(filled, b.barWidth)
 
-	bar := lipgloss.NewStyle().Foreground(b.row.Color).Render(strings.Repeat("█", filled)) +
-		lipgloss.NewStyle().Foreground(theme.BarEmpty).Render(strings.Repeat("─", maxInt(b.barWidth-filled, 0)))
-
-	labelStyle := lipgloss.NewStyle().Foreground(theme.Text)
-	if b.under {
-		labelStyle = labelStyle.Foreground(theme.SelectionFg).Bold(true)
-	}
-
-	line := lipgloss.NewStyle().Foreground(theme.Marked).Bold(true).Render(b.mark) + " " +
-		labelStyle.Render(fit(b.row.Label, b.labelWidth)) + " " + bar + " " +
-		lipgloss.NewStyle().Foreground(theme.TextDim).Render(pad(b.value, b.countWidth))
+	full, empty := strings.Repeat("█", filled), strings.Repeat("─", maxInt(b.barWidth-filled, 0))
+	label, value := fit(b.row.Label, b.labelWidth), pad(b.value, b.countWidth)
 
 	if b.under {
-		return lipgloss.NewStyle().Background(theme.SelectionBg).Render(line)
+		// The highlight is the bar's own colour, run under the whole row,
+		// with the text and the bar in whichever of dark or light stands out
+		// from it — the way the card lists draw their cursor. A neutral grey
+		// said which row but not which category.
+		return onColour(b.row.Color).Bold(true).
+			Render(b.mark + " " + label + " " + full + empty + " " + value)
 	}
-	return line
+
+	bar := lipgloss.NewStyle().Foreground(b.row.Color).Render(full) +
+		lipgloss.NewStyle().Foreground(theme.BarEmpty).Render(empty)
+	return lipgloss.NewStyle().Foreground(theme.Marked).Bold(true).Render(b.mark) + " " +
+		lipgloss.NewStyle().Foreground(theme.Text).Render(label) + " " + bar + " " +
+		lipgloss.NewStyle().Foreground(theme.TextDim).Render(value)
 }
 
 // statOffset is how far the panel is scrolled for the highlighted category,

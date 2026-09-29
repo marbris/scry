@@ -5,10 +5,13 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"scry/internal/deck"
 	"scry/internal/mtg"
 	"scry/internal/stats"
+	"scry/internal/theme"
 )
 
 func deckSample() []deck.Card {
@@ -510,5 +513,73 @@ func TestStatHeadingIsTheGroupsFirstLine(t *testing.T) {
 	first := len(groups[0].Rows)
 	if statHeading(groups, first) != statLine(groups, first)-1 {
 		t.Error("a group's first category isn't directly under its heading")
+	}
+}
+
+func TestTheHighlightedStatWearsItsBarsColour(t *testing.T) {
+	// Under the cursor the row takes its bar's colour as the background, so
+	// the highlight says which category as well as which row.
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
+
+	b := statBar{
+		row:  stats.Row{Label: "Blue", Color: theme.ManaU},
+		mark: " ", fraction: 0.5, value: "12",
+		labelWidth: 8, barWidth: 10, countWidth: 3,
+	}
+	plain := b.render()
+	b.under = true
+	got := b.render()
+
+	param := strings.TrimSuffix(strings.TrimPrefix(bgStart(theme.ManaU), "\x1b["), "m")
+	if param == "" || !strings.Contains(got, param) {
+		t.Errorf("the highlighted row isn't on the bar's colour: %q", got)
+	}
+	if stripANSI(got) != stripANSI(plain) {
+		t.Errorf("the highlight changed the row's text:\n%q\n%q", stripANSI(got), stripANSI(plain))
+	}
+}
+
+func TestJAndKWalkRoundTheGroups(t *testing.T) {
+	// The groups are a ring: k off the top brings the group before round to
+	// the top and lands on its last row; j off the bottom sends the top group
+	// round to the bottom and lands on its first. Either way the highlight
+	// moves one row, never jumps.
+	m := withCards(sized(90, 40), "d", deckSample(), sortArrival)
+	m = drive(m, "s")
+
+	groups := m.statGroups()
+	if len(groups) < 2 {
+		t.Fatalf("need two groups to wrap between, have %d", len(groups))
+	}
+	first, last := groups[0], groups[len(groups)-1]
+
+	m = drive(m, "k")
+	got := m.statGroups()
+	if got[0].Title != last.Title {
+		t.Errorf("k off the top brought %q to the top, want %q", got[0].Title, last.Title)
+	}
+	if r, _ := m.statUnder(); r.Group != last.Rows[0].Group || r.Label != last.Rows[len(last.Rows)-1].Label {
+		t.Errorf("k off the top landed on %s/%s, want the last row of %s", r.Group, r.Label, last.Title)
+	}
+	if got[1].Title != first.Title {
+		t.Errorf("the old top group isn't just below: %q", got[1].Title)
+	}
+
+	// And back down: j off the last row sends the top group to the bottom.
+	m = drive(m, "j") // onto what was the first row
+	rows := statRows(m.statGroups())
+	for m.statCursor(m.statGroups()) < len(rows)-1 {
+		m = drive(m, "j")
+	}
+	top := m.statGroups()[0]
+	m = drive(m, "j")
+	got = m.statGroups()
+	if got[len(got)-1].Title != top.Title {
+		t.Errorf("j off the bottom sent %q to the bottom, want %q", got[len(got)-1].Title, top.Title)
+	}
+	if r, _ := m.statUnder(); r.Label != top.Rows[0].Label || r.Group != top.Rows[0].Group {
+		t.Errorf("j off the bottom landed on %s/%s, want the first row of %s", r.Group, r.Label, top.Title)
 	}
 }
