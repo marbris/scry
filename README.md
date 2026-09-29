@@ -241,6 +241,8 @@ scry theme <name>               # switch theme
 scry keys                       # list every key binding
 scry keys --defaults            # print the defaults as a keys.json to edit
 scry init                       # write commented-out templates of every settings file
+scry cache                      # what's downloaded, and how much room it takes
+scry cache clear [kind]         # empty it — all of it, or pictures, texts, rules…
 ```
 
 Because every deck is a file in a git repository, `git log`, `git diff`, and friends work on your decks directly.

@@ -80,6 +80,10 @@ func main() {
 		runInit(args[1:])
 		return
 
+	case "cache":
+		runCache(args[1:])
+		return
+
 	case "rules":
 		runRules(args[1:])
 		return

@@ -14,6 +14,7 @@ Usage:
   scry theme …              Colours — see ` + "`scry theme`" + `
   scry keys …               Keybindings — see ` + "`scry keys -h`" + `
   scry init                 Write commented-out templates of every settings file
+  scry cache                What's downloaded, and how much room it takes; clear empties it
   scry -v, --version        Print the version
   scry -h, --help           This
 
