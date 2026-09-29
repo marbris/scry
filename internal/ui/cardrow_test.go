@@ -2,15 +2,14 @@ package ui
 
 import (
 	"strings"
+	"testing"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"scry/internal/theme"
-	"testing"
-
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/theme"
 )
 
 func TestInitialismsFromTheDesign(t *testing.T) {

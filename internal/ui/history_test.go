@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
-	"scry/internal/prints"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/prints"
 )
 
 func historyCard() mtg.Card {

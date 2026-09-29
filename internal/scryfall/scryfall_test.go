@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // pagedServer stands in for Scryfall: a fixed number of cards handed out a

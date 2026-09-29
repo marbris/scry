@@ -22,9 +22,9 @@ import (
 	"sort"
 	"strings"
 
-	"scry/internal/fetch"
-	"scry/internal/mtg"
-	"scry/internal/paths"
+	"ttr/internal/fetch"
+	"ttr/internal/mtg"
+	"ttr/internal/paths"
 )
 
 // sem keeps set downloads to a civilised number at a time.

@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	"scry/internal/deck"
+	"ttr/internal/deck"
 )
 
 func TestVersionListWiresRevertAndCopy(t *testing.T) {

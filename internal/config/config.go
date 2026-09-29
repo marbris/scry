@@ -1,4 +1,4 @@
-// Package config is scry's settings file: one small JSON object in the config
+// Package config is ttr's settings file: one small JSON object in the config
 // directory, holding the handful of choices that outlive a session.
 //
 // It is deliberately one owner for one file. The theme lived here first and
@@ -13,8 +13,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"scry/internal/jsonc"
-	"scry/internal/paths"
+	"ttr/internal/jsonc"
+	"ttr/internal/paths"
 )
 
 // Config is the whole settings file. Every field carries omitempty, so a file
@@ -39,7 +39,7 @@ type Sort struct {
 }
 
 // Sync is where your decks are mirrored: a git remote you own, and the branch
-// they live on. Absent until `scry sync` is set up.
+// they live on. Absent until `ttr sync` is set up.
 type Sync struct {
 	Remote string `json:"remote"`
 	Branch string `json:"branch,omitempty"`

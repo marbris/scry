@@ -1,7 +1,7 @@
 package deck
 
 import (
-	"scry/internal/paths"
+	"ttr/internal/paths"
 
 	"bufio"
 	"fmt"
@@ -318,9 +318,13 @@ func (d *File) Counts() (total, unique int) {
 // ── The decks directory ─────────────────────────────────────────
 
 // Dir is where deck files live, and in phase 3 the git repo tracking
-// them. SCRY_DECKS_DIR moves it somewhere you'd rather back up.
+// them. TTR_DECKS_DIR moves it somewhere you'd rather back up —
+// SCRY_DECKS_DIR, from before the rename, still does.
 func Dir() string {
-	dir := os.Getenv("SCRY_DECKS_DIR")
+	dir := os.Getenv("TTR_DECKS_DIR")
+	if dir == "" {
+		dir = os.Getenv("SCRY_DECKS_DIR")
+	}
 	if dir == "" {
 		dir = filepath.Join(paths.Data(), "decks")
 	}

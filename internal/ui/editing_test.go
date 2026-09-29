@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 // twoDecks opens two decks of yours and a search, with nothing chosen.

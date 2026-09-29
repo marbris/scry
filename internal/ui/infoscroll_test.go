@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
-	"scry/internal/rules"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/rules"
 )
 
 // longInfo is a search whose highlighted card has far more to read than the

@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/config"
-	"scry/internal/deck"
-	"scry/internal/mtg"
-	"scry/internal/prints"
+	"ttr/internal/config"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/prints"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

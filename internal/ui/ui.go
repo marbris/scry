@@ -11,9 +11,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/rules"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/rules"
+	"ttr/internal/theme"
 )
 
 // Model is the Bubbletea model for the whole program.
@@ -89,7 +89,7 @@ func New() Model {
 	}
 }
 
-// NewWithQuery opens straight onto a search, for `scry --panels <query>`.
+// NewWithQuery opens straight onto a search, for `ttr --panels <query>`.
 func NewWithQuery(query string) (Model, tea.Cmd) {
 	m := New()
 	p := m.ws.open(KindFind)
@@ -146,7 +146,7 @@ func NewRestored() (Model, tea.Cmd) {
 func (m Model) quit() tea.Cmd {
 	m.saveSession()
 	SaveQueryHistory(m.history)
-	// The terminal outlives scry; the picture it was holding for gx needn't.
+	// The terminal outlives ttr; the picture it was holding for gx needn't.
 	if m.kitty.key != "" {
 		writeTerminal([]byte(kittyDelete()))
 	}

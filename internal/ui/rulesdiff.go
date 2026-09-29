@@ -4,9 +4,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/keymap"
-	"scry/internal/rules"
-	"scry/internal/theme"
+	"ttr/internal/keymap"
+	"ttr/internal/rules"
+	"ttr/internal/theme"
 )
 
 // The diff between two releases of the rules, as a rules panel.

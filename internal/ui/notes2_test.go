@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 // The changes from notes/post-implementation-notes-2.md (outside the repo) that are worth a test

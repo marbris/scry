@@ -25,8 +25,8 @@ import (
 	"sort"
 	"strings"
 
-	"scry/internal/jsonc"
-	"scry/internal/paths"
+	"ttr/internal/jsonc"
+	"ttr/internal/paths"
 )
 
 // Scope is a place keys mean something.
@@ -162,7 +162,7 @@ type binding struct {
 	keys   []string
 }
 
-// defaults is the keymap as it ships, in the order `scry keys` lists it.
+// defaults is the keymap as it ships, in the order `ttr keys` lists it.
 var defaults = []binding{
 	{Global, GlobalLeader, k(" ")},
 	{Global, GlobalGoto, k("g")},
@@ -378,7 +378,7 @@ func Load() error {
 	if err != nil {
 		return err
 	}
-	// A file of nothing but comments is the template `scry init` writes,
+	// A file of nothing but comments is the template `ttr init` writes,
 	// with nothing uncommented yet: the defaults, as they are.
 	if jsonc.Empty(body) {
 		return nil

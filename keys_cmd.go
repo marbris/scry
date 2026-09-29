@@ -7,13 +7,13 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/keymap"
-	"scry/internal/theme"
+	"ttr/internal/keymap"
+	"ttr/internal/theme"
 )
 
 const keysUsage = `Usage:
-  scry keys                 List every key, as it is bound now
-  scry keys --defaults      Print the default keymap as a keys.json
+  ttr keys                  List every key, as it is bound now
+  ttr keys --defaults       Print the default keymap as a keys.json
 
 Your rebindings go in %s,
 grouped by where a key acts, then by what it does. Name only what you change;

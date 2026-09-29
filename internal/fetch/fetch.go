@@ -1,4 +1,4 @@
-// Package fetch is the one place scry talks to the network.
+// Package fetch is the one place ttr talks to the network.
 //
 // Four services are involved — Scryfall for cards, Moxfield for decks,
 // MTGJSON for printed text, and Wizards for the rules — and they all want the
@@ -15,8 +15,8 @@ import (
 	"strings"
 )
 
-// UserAgent identifies scry to every service it calls.
-const UserAgent = "scry/2.1"
+// UserAgent identifies ttr to every service it calls.
+const UserAgent = "ttr/2.1"
 
 // NotFound is a 404, which several callers treat as an answer rather than a
 // failure: no such card, no such deck, no results.

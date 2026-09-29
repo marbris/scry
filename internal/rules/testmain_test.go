@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"scry/internal/paths"
+	"ttr/internal/paths"
 )
 
 // TestMain isolates the test run the same way every other package does, with
@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	root, err := os.MkdirTemp("", "scry-test-*")
+	root, err := os.MkdirTemp("", "ttr-test-*")
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	os.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
 	os.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
-	os.Setenv("SCRY_DECKS_DIR", filepath.Join(root, "decks"))
+	os.Setenv("TTR_DECKS_DIR", filepath.Join(root, "decks"))
 
 	if existing != "" {
 		os.MkdirAll(paths.Cache(), 0755)

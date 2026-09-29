@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/mtg"
-	"scry/internal/rules"
+	"ttr/internal/mtg"
+	"ttr/internal/rules"
 )
 
 // Getting hold of the rulebook.

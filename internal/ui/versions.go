@@ -6,9 +6,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/keymap"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
+	"ttr/internal/theme"
 )
 
 // A deck's versions.

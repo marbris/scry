@@ -7,10 +7,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/keymap"
-	"scry/internal/mtg"
-	"scry/internal/rules"
-	"scry/internal/theme"
+	"ttr/internal/keymap"
+	"ttr/internal/mtg"
+	"ttr/internal/rules"
+	"ttr/internal/theme"
 )
 
 // The comprehensive rules, in a panel.

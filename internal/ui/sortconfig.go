@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"scry/internal/config"
+	"ttr/internal/config"
 )
 
 // The orders as config.json sets them. Like keys.json, a setting that can't

@@ -3,7 +3,7 @@ package prints
 import (
 	"testing"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // ── Printed-text history ────────────────────────────────────────

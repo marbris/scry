@@ -2,31 +2,31 @@ package main
 
 import "fmt"
 
-const cliUsage = `scry — Magic: The Gathering cards, rules and decks in the terminal
+const cliUsage = `Tutor (ttr) — Magic: The Gathering cards, rules and decks in the terminal
 
 Usage:
-  scry                      Come back to the panels you left
-  scry <query>              Run a Scryfall query; one result prints to stdout
-  scry <moxfield url>       Look at a deck on Moxfield
-  scry deck …               Your decks — see ` + "`scry deck`" + `
-  scry sync …               Mirror your decks to a git remote — see ` + "`scry sync`" + `
-  scry rules …              The comprehensive rules — see ` + "`scry rules`" + `
-  scry theme …              Colours — see ` + "`scry theme`" + `
-  scry keys …               Keybindings — see ` + "`scry keys -h`" + `
-  scry init                 Write commented-out templates of every settings file
-  scry cache                What's downloaded, and how much room it takes; clear empties it
-  scry -v, --version        Print the version
-  scry -h, --help           This
+  ttr                      Come back to the panels you left
+  ttr <query>               Run a Scryfall query; one result prints to stdout
+  ttr <moxfield url>        Look at a deck on Moxfield
+  ttr deck …                Your decks — see ` + "`ttr deck`" + `
+  ttr sync …                Mirror your decks to a git remote — see ` + "`ttr sync`" + `
+  ttr rules …               The comprehensive rules — see ` + "`ttr rules`" + `
+  ttr theme …               Colours — see ` + "`ttr theme`" + `
+  ttr keys …                Keybindings — see ` + "`ttr keys -h`" + `
+  ttr init                  Write commented-out templates of every settings file
+  ttr cache                 What's downloaded, and how much room it takes; clear empties it
+  ttr -v, --version         Print the version
+  ttr -h, --help            This
 
 Queries use Scryfall's own syntax:
-  scry 't:creature c:rw cmc<=3'
-  scry 'o:"draw a card" f:commander'
+  ttr 't:creature c:rw cmc<=3'
+  ttr 'o:"draw a card" f:commander'
 
 The app is a row of panels. space opens the menu, ? shows the keys.
 
 Files follow the XDG directories: decks in the data directory, settings,
 keys and themes in the config directory, session state in the state
 directory, and everything re-downloadable in the cache. Decks are files in a
-git repository — SCRY_DECKS_DIR moves them somewhere else.`
+git repository — TTR_DECKS_DIR moves them somewhere else.`
 
 func printUsage() { fmt.Println(cliUsage) }

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/config"
+	"ttr/internal/config"
 )
 
 // runGit runs a git command in dir, failing the test on error. Used to stand
@@ -156,7 +156,7 @@ func TestSyncConflictAbortsCleanly(t *testing.T) {
 	}
 
 	// The abort must leave the tree clean — no merge in progress, no markers —
-	// so the next scry commit isn't poisoned.
+	// so the next ttr commit isn't poisoned.
 	if _, err := os.Stat(filepath.Join(RepoPath(), ".git", "MERGE_HEAD")); err == nil {
 		t.Fatal("a merge is still in progress after the aborted sync")
 	}

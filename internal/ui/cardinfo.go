@@ -6,10 +6,10 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
-	"scry/internal/rules"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/rules"
+	"ttr/internal/theme"
 )
 
 // A card, in the information panel.

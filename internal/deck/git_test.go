@@ -18,7 +18,7 @@ func gitRepo(t *testing.T) string {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SCRY_DECKS_DIR", dir)
+	t.Setenv("TTR_DECKS_DIR", dir)
 	// Keep the test off whatever the machine's git identity is.
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(dir, "nonexistent-gitconfig"))
 	t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(dir, "nonexistent-gitconfig"))
@@ -199,7 +199,7 @@ func TestSaveDeckVersioned(t *testing.T) {
 }
 
 func TestCommitDescribesTheChangeSinceTheLastCommit(t *testing.T) {
-	// scry writes the file on every edit, so by the time w commits, the file
+	// ttr writes the file on every edit, so by the time w commits, the file
 	// already holds the change. The message has to come from the last
 	// commit, or every commit would say nothing changed.
 	gitRepo(t)
@@ -259,7 +259,7 @@ func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Then scry writes over it. The editor's work must be in the history,
+	// Then ttr writes over it. The editor's work must be in the history,
 	// not lost — the whole point of versioning the decks.
 	if _, _, err := SaveVersioned("ghen", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 	}
 	var found bool
 	for _, c := range commits {
-		if strings.Contains(c.Subject, "outside scry") {
+		if strings.Contains(c.Subject, "outside ttr") {
 			found = true
 		}
 	}
@@ -281,7 +281,7 @@ func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 
 	// And they can be got back.
 	for _, c := range commits {
-		if strings.Contains(c.Subject, "outside scry") {
+		if strings.Contains(c.Subject, "outside ttr") {
 			d, err := At("ghen", c.Hash)
 			if err != nil {
 				t.Fatal(err)

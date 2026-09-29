@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/ui"
+	"ttr/internal/ui"
 )
 
 // Running the workspace. Every way into the program ends here with a model

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 func sample() []deck.Card {

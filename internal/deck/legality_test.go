@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // commanderDeck builds a legal 100-card Commander deck to bend out of shape.

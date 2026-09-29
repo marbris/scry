@@ -5,18 +5,18 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/keymap"
-	"scry/internal/theme"
+	"ttr/internal/keymap"
+	"ttr/internal/theme"
 )
 
 // The splash.
 //
-// The splash is what `scry` opens to with nothing restored: no panels, and
+// The splash is what `ttr` opens to with nothing restored: no panels, and
 // therefore nothing to look at but the way in. It says the three keys that
 // open something and gets out of the way.
 
 func (m Model) viewSplash() string {
-	name := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render("scry")
+	name := lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).Render("Tutor")
 	tag := lipgloss.NewStyle().Foreground(theme.TextDim).
 		Render("Magic: The Gathering — cards, decks and rules")
 

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // loadTestRules skips rather than fails when the rules haven't been

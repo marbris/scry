@@ -1,7 +1,7 @@
-// Package jsonc lets scry's settings files carry comments.
+// Package jsonc lets ttr's settings files carry comments.
 //
 // JSON has none, which makes a settings file a poor place to learn what the
-// settings are. `scry init` writes each file with every default in it,
+// settings are. `ttr init` writes each file with every default in it,
 // commented out, so the file reads as its own documentation and changes
 // nothing until a line is uncommented. This is what makes those files
 // loadable: // to the end of the line is dropped, anywhere outside a string.

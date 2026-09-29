@@ -6,8 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 // tagging opens the tag prompt on a deck whose cards carry some tags already,

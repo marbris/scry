@@ -1,7 +1,7 @@
 package deck
 
 import (
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 
 	"os"
 	"path/filepath"
@@ -261,7 +261,7 @@ func TestParseDeckFileReportsLineNumbers(t *testing.T) {
 
 func TestDeckStoreRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("SCRY_DECKS_DIR", dir)
+	t.Setenv("TTR_DECKS_DIR", dir)
 
 	if decks, err := List(); err != nil || len(decks) != 0 {
 		t.Fatalf("List() on an empty dir = %v, %v", decks, err)
@@ -319,7 +319,7 @@ func TestDeckStoreRoundTrip(t *testing.T) {
 
 func TestReadDeckNamesItselfAfterItsFile(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("SCRY_DECKS_DIR", dir)
+	t.Setenv("TTR_DECKS_DIR", dir)
 
 	if err := os.WriteFile(filepath.Join(dir, "untitled.deck"),
 		[]byte("[mainboard]\n1 Sol Ring\n"), 0644); err != nil {

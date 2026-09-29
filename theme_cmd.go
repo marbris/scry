@@ -9,13 +9,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 
-	"scry/internal/theme"
+	"ttr/internal/theme"
 )
 
 const themeUsage = `Usage:
-  scry theme                List the themes available
-  scry theme <name>         Use a theme
-  scry theme edit <name>    Copy a theme into your config to edit
+  ttr theme                 List the themes available
+  ttr theme <name>          Use a theme
+  ttr theme edit <name>     Copy a theme into your config to edit
 
 Themes are JSON files in %s.
 A theme names its colours; every role — accent, borders, mana, rarity —
@@ -72,7 +72,7 @@ func listThemes() {
 	}
 
 	fmt.Println()
-	fmt.Println(dim.Render("scry theme <name> to switch · scry theme edit <name> to copy one and change it"))
+	fmt.Println(dim.Render("ttr theme <name> to switch · ttr theme edit <name> to copy one and change it"))
 }
 
 // paletteBar draws a theme's colours as blocks. Piped to a file there is no
@@ -124,5 +124,5 @@ func editTheme(name string) {
 	}
 
 	fmt.Printf("Wrote %s\n", path)
-	fmt.Println("It shadows the built-in of the same name. Edit and run `scry theme " + name + "`.")
+	fmt.Println("It shadows the built-in of the same name. Edit and run `ttr theme " + name + "`.")
 }

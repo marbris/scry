@@ -7,16 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"scry/internal/paths"
+	"ttr/internal/paths"
 )
 
-// scry cache: what's been downloaded and kept, and how much room it takes.
+// ttr cache: what's been downloaded and kept, and how much room it takes.
 // Everything in the cache can be fetched again, so all of it is safe to
 // clear — the only cost is the next fetch.
 
 const cacheUsage = `Usage:
-  scry cache                What's in the cache, and how much room it takes
-  scry cache clear [kind]   Empty the cache, or only one kind: %s
+  ttr cache                 What's in the cache, and how much room it takes
+  ttr cache clear [kind]    Empty the cache, or only one kind: %s
 
 Everything in %s
 can be downloaded again, so clearing it loses nothing but time: the next
@@ -25,7 +25,7 @@ time something is needed, it is fetched.`
 // cacheKind is one kind of thing the cache holds, and how to recognise its
 // files by their path inside the cache directory.
 type cacheKind struct {
-	name  string // what `scry cache clear` calls it
+	name  string // what `ttr cache clear` calls it
 	what  string // what the listing calls it
 	match func(rel string) bool
 	// refetch is what clearing it costs.
@@ -142,7 +142,7 @@ func listCache() {
 		fmt.Printf("  %-9s %9s  %-26s %d files\n", "other", humanSize(size["other"]), "anything else", count["other"])
 	}
 	fmt.Printf("\n  %-9s %9s\n", "total", humanSize(total))
-	fmt.Println("\nscry cache clear empties it, or scry cache clear <kind> one kind of it.")
+	fmt.Println("\nttr cache clear empties it, or ttr cache clear <kind> one kind of it.")
 }
 
 // clearCache deletes the cache's files — all of them, or one kind's — and

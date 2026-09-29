@@ -9,10 +9,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/keymap"
-	"scry/internal/moxfield"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
+	"ttr/internal/moxfield"
+	"ttr/internal/theme"
 )
 
 // The decks panel: everything you can open, in one list.

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/mtg"
-	"scry/internal/rules"
+	"ttr/internal/mtg"
+	"ttr/internal/rules"
 )
 
 // fakeRules is a rulebook in miniature — the real document's markers and a

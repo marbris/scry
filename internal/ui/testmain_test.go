@@ -14,7 +14,7 @@ import (
 // decks. A test run that found the real directory would be editing someone's
 // collection.
 func TestMain(m *testing.M) {
-	root, err := os.MkdirTemp("", "scry-ui-test-*")
+	root, err := os.MkdirTemp("", "ttr-ui-test-*")
 	if err != nil {
 		panic(err)
 	}
@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	os.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
 	os.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
-	os.Setenv("SCRY_DECKS_DIR", filepath.Join(root, "decks"))
+	os.Setenv("TTR_DECKS_DIR", filepath.Join(root, "decks"))
 
 	code := m.Run()
 	os.RemoveAll(root)

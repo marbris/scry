@@ -1,9 +1,9 @@
 package deck
 
 import (
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 
-	"scry/internal/scryfall"
+	"ttr/internal/scryfall"
 
 	"encoding/json"
 	"os"

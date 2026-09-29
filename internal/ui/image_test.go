@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // withKitty pretends the terminal can draw pictures, and catches what would

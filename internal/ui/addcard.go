@@ -5,9 +5,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/deck"
-	"scry/internal/fetch"
-	"scry/internal/scryfall"
+	"ttr/internal/deck"
+	"ttr/internal/fetch"
+	"ttr/internal/scryfall"
 )
 
 // i on a deck: one card, fetched from Scryfall straight into the deck in

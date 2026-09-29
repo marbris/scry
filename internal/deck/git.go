@@ -68,7 +68,7 @@ func firstLine(s string) string {
 
 // ensureRepo makes the decks directory a git repository the first time
 // it's needed. If it already sits inside one — someone pointed
-// SCRY_DECKS_DIR at a checkout they keep themselves — that repository is
+// TTR_DECKS_DIR at a checkout they keep themselves — that repository is
 // used as it is, rather than nesting a second one inside it.
 func ensureRepo() error {
 	if !GitAvailable() {
@@ -86,10 +86,10 @@ func ensureRepo() error {
 	// version anything, fall back to one scoped to this repository, leaving
 	// a configured identity — global or otherwise — well alone.
 	if out, err := git("config", "user.email"); err != nil || strings.TrimSpace(out) == "" {
-		if _, err := git("config", "user.email", "scry@localhost"); err != nil {
+		if _, err := git("config", "user.email", "ttr@localhost"); err != nil {
 			return err
 		}
-		if _, err := git("config", "user.name", "scry"); err != nil {
+		if _, err := git("config", "user.name", "ttr"); err != nil {
 			return err
 		}
 	}
@@ -305,7 +305,7 @@ func SaveVersioned(slug string, d *File) (subject, warning string, err error) {
 	before, _ := Read(slug) // nil when the deck is new, which is fine
 
 	// A deck file is meant to be edited in your own editor too, and those
-	// edits are only ever committed the next time scry writes. Record them
+	// edits are only ever committed the next time ttr writes. Record them
 	// first, or writing over them would lose them for good — the one thing
 	// keeping the history is supposed to prevent.
 	RecordOutsideEdits(slug)
@@ -325,7 +325,7 @@ func SaveVersioned(slug string, d *File) (subject, warning string, err error) {
 }
 
 // CommitDeck writes a deck and commits it, describing the change against the
-// last commit rather than against the file — which scry has been writing on
+// last commit rather than against the file — which ttr has been writing on
 // every edit, so the file already holds the change and says nothing about it.
 // Like SaveVersioned, the write is the only thing that can fail it.
 func CommitDeck(slug string, d *File) (subject, warning string, err error) {
@@ -349,7 +349,7 @@ func CommitDeck(slug string, d *File) (subject, warning string, err error) {
 // since it was last committed, so the next write over it can't lose it.
 func RecordOutsideEdits(slug string) {
 	if HasUncommittedEdits(slug) {
-		_ = record(slug, "Edit "+slug+" outside scry")
+		_ = record(slug, "Edit "+slug+" outside ttr")
 	}
 }
 

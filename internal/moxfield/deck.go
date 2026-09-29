@@ -1,11 +1,11 @@
 package moxfield
 
 import (
-	"scry/internal/scryfall"
+	"ttr/internal/scryfall"
 
-	"scry/internal/fetch"
+	"ttr/internal/fetch"
 
-	"scry/internal/deck"
+	"ttr/internal/deck"
 
 	"encoding/json"
 	"fmt"
@@ -83,7 +83,7 @@ func URLID(s string) (string, bool) {
 // Moxfield. A full URL is always taken as one, however short.
 const idLen = 16
 
-// Ref accepts either form `scry deck` takes: a full URL, or just the id
+// Ref accepts either form `ttr deck` takes: a full URL, or just the id
 // out of one.
 func Ref(s string) (string, bool) {
 	s = strings.TrimSpace(s)

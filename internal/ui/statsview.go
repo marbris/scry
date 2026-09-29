@@ -6,10 +6,10 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/keymap"
-	"scry/internal/stats"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
+	"ttr/internal/stats"
+	"ttr/internal/theme"
 )
 
 // Statistics, in the information panel.

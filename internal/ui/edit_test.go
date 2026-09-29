@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 // editing sets up the usual arrangement: a search on the left, a deck of

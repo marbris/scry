@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/theme"
+	"ttr/internal/theme"
 )
 
 // A one-line question, asked in the panel's header where the search bar

@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/mtg"
-	"scry/internal/scryfall"
+	"ttr/internal/mtg"
+	"ttr/internal/scryfall"
 )
 
 // Rulings, fetched as the cursor settles.

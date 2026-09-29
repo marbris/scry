@@ -9,7 +9,7 @@ import (
 
 func TestListWalksFoldersAndReturnsPathSlugs(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("SCRY_DECKS_DIR", dir)
+	t.Setenv("TTR_DECKS_DIR", dir)
 
 	for _, slug := range []string{"loose", "aggro/mono-red", "aggro/mono-red-budget", "control/azorius"} {
 		if err := Write(slug, deckOf(t, "name: X\nformat: commander\n")); err != nil {
@@ -29,7 +29,7 @@ func TestListWalksFoldersAndReturnsPathSlugs(t *testing.T) {
 
 func TestWriteReadRoundTripInAFolder(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("SCRY_DECKS_DIR", dir)
+	t.Setenv("TTR_DECKS_DIR", dir)
 
 	if err := Write("aggro/mono-red", deckOf(t, gitBaseDeck)); err != nil {
 		t.Fatal(err)
@@ -122,7 +122,7 @@ func TestMoveFolderRelocatesEveryDeckUnderIt(t *testing.T) {
 
 func TestNewFolderMakesAnEmptyDirectoryTheTreeCanSee(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("SCRY_DECKS_DIR", dir)
+	t.Setenv("TTR_DECKS_DIR", dir)
 
 	slug, err := NewFolder("Aggro / Mono Red")
 	if err != nil {

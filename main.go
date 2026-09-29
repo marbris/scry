@@ -7,18 +7,18 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/config"
-	"scry/internal/deck"
-	"scry/internal/keymap"
-	"scry/internal/moxfield"
-	"scry/internal/paths"
-	"scry/internal/rules"
-	"scry/internal/theme"
-	"scry/internal/ui"
+	"ttr/internal/config"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
+	"ttr/internal/moxfield"
+	"ttr/internal/paths"
+	"ttr/internal/rules"
+	"ttr/internal/theme"
+	"ttr/internal/ui"
 )
 
 // The entry point and the non-TUI paths out of it: the one-shot card lookup
-// that prints to stdout, and the `scry rules` / `scry deck` subcommands.
+// that prints to stdout, and the `ttr rules` / `ttr deck` subcommands.
 
 // version is the release, set at build time with
 // -ldflags "-X main.version=$(VERSION)". It stays "dev" for a plain go build.
@@ -65,7 +65,7 @@ func main() {
 		return
 
 	case "-v", "--version", "version":
-		fmt.Println("scry " + version)
+		fmt.Println("ttr " + version)
 		return
 
 	case "theme":
@@ -114,16 +114,16 @@ func main() {
 }
 
 const deckUsage = `Usage:
-  scry deck <name>                Open one of your decks
-  scry deck <id | url>            Browse a deck on Moxfield, without saving it
-  scry deck list                  List your decks
-  scry deck new <name> [format]   Start an empty deck
-  scry deck import <id|url> [as]  Copy a Moxfield deck in so you can edit it
-  scry deck rm <name>             Delete a deck
-  scry deck log <name>            What you've changed, and when
-  scry deck restore <name> <ref>  Bring back an earlier version
+  ttr deck <name>                 Open one of your decks
+  ttr deck <id | url>             Browse a deck on Moxfield, without saving it
+  ttr deck list                   List your decks
+  ttr deck new <name> [format]    Start an empty deck
+  ttr deck import <id|url> [as]   Copy a Moxfield deck in so you can edit it
+  ttr deck rm <name>              Delete a deck
+  ttr deck log <name>             What you've changed, and when
+  ttr deck restore <name> <ref>   Bring back an earlier version
 
-Decks are files in ` + "`" + `scry deck dir` + "`" + `, one card per line — edit them here or in
+Decks are files in ` + "`" + `ttr deck dir` + "`" + `, one card per line — edit them here or in
 your editor. That directory is a git repository, so every change is kept and
 ` + "`" + `git log` + "`" + ` works on your decks like anything else. Inside the app, w imports
 the Moxfield deck you're looking at.`
@@ -189,7 +189,7 @@ func runDeckList() {
 
 	if len(slugs) == 0 {
 		fmt.Println("No decks yet. Copy one in from Moxfield with:")
-		fmt.Println("  scry deck import <moxfield url>")
+		fmt.Println("  ttr deck import <moxfield url>")
 		return
 	}
 
@@ -224,14 +224,14 @@ func runDeckList() {
 
 func runDeckNew(args []string) {
 	if len(args) < 1 {
-		fmt.Println("Usage: scry deck new <name> [format]")
+		fmt.Println("Usage: ttr deck new <name> [format]")
 		os.Exit(1)
 	}
 
 	format := ""
 	name := strings.Join(args, " ")
-	// A trailing format is a convenience, not a requirement: "scry deck new
-	// Ghen commander" and "scry deck new Ghen" both work.
+	// A trailing format is a convenience, not a requirement: "ttr deck new
+	// Ghen commander" and "ttr deck new Ghen" both work.
 	if len(args) > 1 && knownFormat(args[len(args)-1]) {
 		format = strings.ToLower(args[len(args)-1])
 		name = strings.Join(args[:len(args)-1], " ")
@@ -251,7 +251,7 @@ func runDeckNew(args []string) {
 
 	fmt.Printf("Created %q (%s)\n", d.Name, d.Format)
 	fmt.Printf("  %s\n", deck.Path(slug))
-	fmt.Printf("Open it with: scry deck %s\n", slug)
+	fmt.Printf("Open it with: ttr deck %s\n", slug)
 	fmt.Println(lipgloss.NewStyle().Foreground(theme.TextMuted).
 		Render("Search for a card and press a to add it, or c to make it a commander."))
 }
@@ -268,7 +268,7 @@ func knownFormat(s string) bool {
 
 func runDeckImport(args []string) {
 	if len(args) < 1 {
-		fmt.Println("Usage: scry deck import <deck-id | moxfield url> [name]")
+		fmt.Println("Usage: ttr deck import <deck-id | moxfield url> [name]")
 		os.Exit(1)
 	}
 
@@ -311,14 +311,14 @@ func runDeckImport(args []string) {
 	} else {
 		fmt.Printf("  %s\n", lipgloss.NewStyle().Foreground(theme.TextMuted).Render("committed: "+subject))
 	}
-	fmt.Printf("Open it with: scry deck %s\n", slug)
+	fmt.Printf("Open it with: ttr deck %s\n", slug)
 }
 
 const deckLogLimit = 50
 
 func runDeckLog(args []string) {
 	if len(args) != 1 {
-		fmt.Println("Usage: scry deck log <name>")
+		fmt.Println("Usage: ttr deck log <name>")
 		os.Exit(1)
 	}
 	slug := args[0]
@@ -343,12 +343,12 @@ func runDeckLog(args []string) {
 		fmt.Printf("%s  %s\n", hashStyle.Render(c.Short), c.Subject)
 		fmt.Printf("%s  %s\n", strings.Repeat(" ", len(c.Short)), dimStyle.Render(c.When))
 	}
-	fmt.Printf("\n%s\n", dimStyle.Render("scry deck restore "+slug+" <ref>  ·  git -C "+deck.RepoPath()+" show <ref>"))
+	fmt.Printf("\n%s\n", dimStyle.Render("ttr deck restore "+slug+" <ref>  ·  git -C "+deck.RepoPath()+" show <ref>"))
 }
 
 func runDeckRestore(args []string) {
 	if len(args) != 2 {
-		fmt.Println("Usage: scry deck restore <name> <ref>")
+		fmt.Println("Usage: ttr deck restore <name> <ref>")
 		os.Exit(1)
 	}
 	slug, ref := args[0], args[1]
@@ -377,7 +377,7 @@ func runDeckRestore(args []string) {
 
 func runDeckRemove(args []string) {
 	if len(args) != 1 {
-		fmt.Println("Usage: scry deck rm <name>")
+		fmt.Println("Usage: ttr deck rm <name>")
 		os.Exit(1)
 	}
 	name := args[0]

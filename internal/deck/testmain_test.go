@@ -15,7 +15,7 @@ import (
 // being enough when the paths started honouring XDG_*, and the first thing
 // that happened was a test fixture appearing in a real deck directory.
 func TestMain(m *testing.M) {
-	root, err := os.MkdirTemp("", "scry-test-*")
+	root, err := os.MkdirTemp("", "ttr-test-*")
 	if err != nil {
 		panic(err)
 	}
@@ -27,7 +27,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
 	// Belt and braces: decks have their own override, and they are the one
 	// thing here that would be someone's own work.
-	os.Setenv("SCRY_DECKS_DIR", filepath.Join(root, "decks"))
+	os.Setenv("TTR_DECKS_DIR", filepath.Join(root, "decks"))
 
 	code := m.Run()
 	os.RemoveAll(root)
@@ -45,7 +45,7 @@ func isolate(t *testing.T) string {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 	t.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(root, "cache"))
-	t.Setenv("SCRY_DECKS_DIR", filepath.Join(root, "decks"))
+	t.Setenv("TTR_DECKS_DIR", filepath.Join(root, "decks"))
 	return root
 }
 

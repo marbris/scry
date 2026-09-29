@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // printingsServer serves one page of Scryfall printings.

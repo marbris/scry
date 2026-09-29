@@ -1,11 +1,11 @@
 package deck
 
 import (
-	"scry/internal/scryfall"
+	"ttr/internal/scryfall"
 
-	"scry/internal/paths"
+	"ttr/internal/paths"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 
 	"encoding/json"
 	"fmt"

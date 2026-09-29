@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	"scry/internal/config"
-	"scry/internal/jsonc"
-	"scry/internal/paths"
+	"ttr/internal/config"
+	"ttr/internal/jsonc"
+	"ttr/internal/paths"
 )
 
 //go:embed themes/*.json
@@ -117,7 +117,7 @@ func Find(name string) (Theme, error) {
 	}
 	t, err := builtinTheme(name)
 	if err != nil {
-		return Theme{}, fmt.Errorf("no theme called %q — try `scry theme`", name)
+		return Theme{}, fmt.Errorf("no theme called %q — try `ttr theme`", name)
 	}
 	return t, nil
 }
@@ -183,7 +183,7 @@ func readTheme(path string) (Theme, error) {
 }
 
 // parse reads a theme file, which may carry comments. One that is nothing
-// but comments — the template `scry init` writes — is a theme that changes
+// but comments — the template `ttr init` writes — is a theme that changes
 // nothing, so everything falls back to the default.
 func parse(body []byte) (Theme, error) {
 	var t Theme

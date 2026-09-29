@@ -49,7 +49,7 @@ var (
 	Orange lipgloss.Color
 )
 
-// paletteNames is every colour a theme may name, in the order `scry theme`
+// paletteNames is every colour a theme may name, in the order `ttr theme`
 // prints them.
 var paletteNames = []string{
 	"bg", "bgAlt", "fg", "fgDim", "white", "gray",

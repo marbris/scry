@@ -3,11 +3,11 @@ package ui
 import (
 	"strings"
 
-	"scry/internal/deck"
-	"scry/internal/keymap"
-	"scry/internal/mtg"
-	"scry/internal/rules"
-	"scry/internal/stats"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
+	"ttr/internal/mtg"
+	"ttr/internal/rules"
+	"ttr/internal/stats"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -83,7 +83,7 @@ type cardList struct {
 	// key that made it, and written off the main thread.
 	unwritten bool
 	// wasClean is set by the first edit since the last commit, which is
-	// when edits made in another editor get committed before scry writes
+	// when edits made in another editor get committed before ttr writes
 	// over them.
 	wasClean bool
 	// undo holds the deck as it stood before each edit.

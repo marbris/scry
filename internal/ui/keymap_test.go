@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/keymap"
+	"ttr/internal/keymap"
 )
 
 // rebind puts a keys.json in force for one test.

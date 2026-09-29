@@ -13,9 +13,9 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/theme"
 )
 
 // The statistics panel is a list you can walk with J/K. Every row carries

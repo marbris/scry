@@ -7,11 +7,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/deck"
-	"scry/internal/paths"
+	"ttr/internal/deck"
+	"ttr/internal/paths"
 )
 
-// What `scry` on its own comes back to.
+// What `ttr` on its own comes back to.
 //
 // The workspace is the thing worth restoring: which panels were open, what
 // each was showing, and which deck you were building. Not the cursor, and

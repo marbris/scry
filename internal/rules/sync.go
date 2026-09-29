@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"scry/internal/fetch"
-	"scry/internal/paths"
+	"ttr/internal/fetch"
+	"ttr/internal/paths"
 )
 
 // rulesPage lists the current download. The link on it is what we actually

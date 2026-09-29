@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"scry/internal/config"
+	"ttr/internal/config"
 )
 
 // Syncing the decks directory with a git remote you own — GitHub, or anything
@@ -14,7 +14,7 @@ import (
 // There is nothing bespoke here: the decks directory is already a git
 // repository (git.go), so "sync" is git fetch, merge, and push, wrapped so the
 // TUI and the CLI can both drive it. The remote you choose is recorded in
-// scry's own config file, which is the one setting that has to survive a fresh
+// ttr's own config file, which is the one setting that has to survive a fresh
 // checkout — the .git/config that git keeps is rebuilt from it on the next
 // sync, so a decks directory copied to a new machine only needs the config to
 // find its way home.
@@ -26,7 +26,7 @@ import (
 // git, in a repository you already own.
 
 const (
-	// RemoteName is the git remote scry manages. Named the usual thing so the
+	// RemoteName is the git remote ttr manages. Named the usual thing so the
 	// repository reads like any other from the terminal.
 	RemoteName = "origin"
 
@@ -80,7 +80,7 @@ func Connect(url, branch string) error {
 	return config.Save(c)
 }
 
-// Disconnect forgets the remote, in scry's config and in the repository. It
+// Disconnect forgets the remote, in ttr's config and in the repository. It
 // touches neither the decks nor their history: syncing is a mirror, and
 // unplugging the mirror leaves the thing it reflected exactly as it was.
 func Disconnect() error {
@@ -153,14 +153,14 @@ func (r SyncResult) Summary() string {
 
 // Sync brings the decks repository and its remote into step: local edits are
 // committed, the remote is merged in, and the result is pushed. It is the one
-// call behind both `scry sync` and the s key in the decks list.
+// call behind both `ttr sync` and the s key in the decks list.
 func Sync() (SyncResult, error) {
 	if !GitAvailable() {
 		return SyncResult{}, fmt.Errorf("git isn't installed, so there's nothing to sync with")
 	}
 	url, branch, ok := SyncRemote()
 	if !ok {
-		return SyncResult{}, fmt.Errorf("syncing isn't set up — run `scry sync remote <url>`")
+		return SyncResult{}, fmt.Errorf("syncing isn't set up — run `ttr sync remote <url>`")
 	}
 	if err := ensureRepo(); err != nil {
 		return SyncResult{}, err
@@ -171,8 +171,8 @@ func Sync() (SyncResult, error) {
 
 	res := SyncResult{Remote: url, Branch: branch}
 
-	// Commit anything edited outside scry, so the push carries every change and
-	// not just the ones scry itself wrote.
+	// Commit anything edited outside ttr, so the push carries every change and
+	// not just the ones ttr itself wrote.
 	if err := commitPending(); err != nil {
 		return res, err
 	}
@@ -204,7 +204,7 @@ func Sync() (SyncResult, error) {
 			}
 			if out, err := git(merge...); err != nil {
 				// Leave the working tree clean rather than dropping the user
-				// into a half-merged repository the next scry commit would
+				// into a half-merged repository the next ttr commit would
 				// trip over. The two versions are both safe in the history.
 				git("merge", "--abort")
 				return res, fmt.Errorf(
@@ -227,7 +227,7 @@ func Sync() (SyncResult, error) {
 	return res, nil
 }
 
-// SyncStatus is what `scry sync status` reports without changing anything.
+// SyncStatus is what `ttr sync status` reports without changing anything.
 type SyncStatus struct {
 	Remote          string
 	Branch          string

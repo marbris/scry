@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/deck"
-	"scry/internal/keymap"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
 )
 
 // Editing the deck you're building.

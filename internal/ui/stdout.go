@@ -8,10 +8,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 
-	"scry/internal/mtg"
-	"scry/internal/rules"
-	"scry/internal/scryfall"
-	"scry/internal/theme"
+	"ttr/internal/mtg"
+	"ttr/internal/rules"
+	"ttr/internal/scryfall"
+	"ttr/internal/theme"
 )
 
 // One card, printed and gone.

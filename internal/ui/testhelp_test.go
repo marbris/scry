@@ -3,7 +3,7 @@ package ui
 import (
 	"strings"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

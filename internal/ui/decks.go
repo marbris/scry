@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/deck"
-	"scry/internal/moxfield"
+	"ttr/internal/deck"
+	"ttr/internal/moxfield"
 )
 
 // What the decks panel actually does: opening things, and changing them.
@@ -549,13 +549,13 @@ func follow(input string) tea.Cmd {
 }
 
 // syncDecks mirrors the decks directory to its git remote — the s key in the
-// decks panel. Setting the remote up is a terminal job (`scry sync init`); this
+// decks panel. Setting the remote up is a terminal job (`ttr sync init`); this
 // is only the recurring push-and-pull, so the whole of it is one background
 // call whose result becomes a notice. The reload that follows any notice picks
 // up whatever a pull brought in.
 func syncDecks() tea.Msg {
 	if !deck.SyncConfigured() {
-		return noticeMsg{err: fmt.Errorf("syncing isn't set up — run `scry sync remote <url>` in your shell")}
+		return noticeMsg{err: fmt.Errorf("syncing isn't set up — run `ttr sync remote <url>` in your shell")}
 	}
 	res, err := deck.Sync()
 	if err != nil {

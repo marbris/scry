@@ -7,20 +7,20 @@ import (
 	"path/filepath"
 	"strings"
 
-	"scry/internal/config"
-	"scry/internal/keymap"
-	"scry/internal/paths"
-	"scry/internal/theme"
-	"scry/internal/ui"
+	"ttr/internal/config"
+	"ttr/internal/keymap"
+	"ttr/internal/paths"
+	"ttr/internal/theme"
+	"ttr/internal/ui"
 )
 
-// scry init: the settings files, written out with every default in them and
+// ttr init: the settings files, written out with every default in them and
 // every line commented out. A file like that changes nothing, and says
 // everything: what can be set, what it is now, and how it's written.
 // Uncommenting a line is how a setting is changed.
 
 const initUsage = `Usage:
-  scry init                 Write commented-out templates of every settings file
+  ttr init                  Write commented-out templates of every settings file
 
 Writes config.json, keys.json and themes/custom.json into %s,
 each holding every default with every line commented out — so nothing
@@ -92,7 +92,7 @@ func initTemplates() ([]template, error) {
 	}, nil
 }
 
-const configHeader = `scry's settings, every one at its default. Everything is commented out, so
+const configHeader = `ttr's settings, every one at its default. Everything is commented out, so
 this file changes nothing: uncomment the lines you want — the braces too —
 and edit them. // to the end of a line is ignored.
 
@@ -100,17 +100,17 @@ and edit them. // to the end of a line is ignored.
 that order — leave one out and it isn't offered; "name" is left out as it
 ships. "direction" is which way each starts, "asc" or "desc".
 
-"sync" is where scry sync pushes your decks; set it with scry sync remote.
-Note that scry theme and scry sync rewrite this file, and drop its comments.`
+"sync" is where ttr sync pushes your decks; set it with ttr sync remote.
+Note that ttr theme and ttr sync rewrite this file, and drop its comments.`
 
-const keysHeader = `Every key scry has, at its default. Everything is commented out, so this
+const keysHeader = `Every key ttr has, at its default. Everything is commented out, so this
 file changes nothing: uncomment a scope's braces and the actions you want to
 move, and change their keys. An action you leave out keeps its default; an
-empty list unbinds it. See scry keys -h.`
+empty list unbinds it. See ttr keys -h.`
 
 const themeHeader = `A theme to start from: the default one, every colour and role written
 out, all commented out — so as it stands it is the default theme. Uncomment
-it, change what you like, and choose it with scry theme custom.`
+it, change what you like, and choose it with ttr theme custom.`
 
 // commentOut is a file of commented lines: the header, then the body.
 func commentOut(header string, body []byte) string {

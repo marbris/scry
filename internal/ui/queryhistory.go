@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"scry/internal/paths"
+	"ttr/internal/paths"
 )
 
 // The queries you've run, kept between sessions so the search bar behaves

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"scry/internal/paths"
+	"ttr/internal/paths"
 )
 
 // Decks and people you keep an eye on without keeping a copy.

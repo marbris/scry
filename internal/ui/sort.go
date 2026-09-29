@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 // How a list is ordered on screen, which is a different thing from the order

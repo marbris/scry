@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"scry/internal/paths"
+	"ttr/internal/paths"
 )
 
 // The public decks of the people you follow, as last fetched.

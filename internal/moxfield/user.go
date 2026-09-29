@@ -1,9 +1,9 @@
 package moxfield
 
 import (
-	"scry/internal/fetch"
+	"ttr/internal/fetch"
 
-	"scry/internal/scryfall"
+	"ttr/internal/scryfall"
 
 	"encoding/json"
 	"fmt"

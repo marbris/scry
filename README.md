@@ -1,6 +1,6 @@
 <div align="center">
 
-# scry
+# Tutor
 
 **Build Magic: The Gathering decks from your terminal.**
 
@@ -10,19 +10,19 @@ A fast, keyboard-driven TUI that puts Scryfall search, your Moxfield decks, card
 ![Platform: Linux · macOS · Windows](https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-blue)
 ![Go 1.26+](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go&logoColor=white)
 
-![The scry workspace: a Scryfall search, the deck being built, and the card info panel side by side](screenshots/hero.png)
+![The Tutor workspace: a Scryfall search, the deck being built, and the card info panel side by side](screenshots/hero.png)
 
 </div>
 
 ## What is this?
 
-`scry` is a deck-building tool for Magic: The Gathering. It runs entirely in the terminal and is driven by the keyboard.
+**Tutor** is a deck-building tool for Magic: The Gathering — `ttr` on the command line. It runs entirely in the terminal and is driven by the keyboard.
 
-I search for cards on Scryfall and build decks on Moxfield, and juggling two web apps in two browser tabs had accumulated a pile of small frictions. `scry` is my attempt to file them all off at once: the search results and the decklist live in the same window, the rulings sit right next to the card, and adding a card to a deck is a single keystroke.
+I search for cards on Scryfall and build decks on Moxfield, and juggling two web apps in two browser tabs had accumulated a pile of small frictions. Tutor is my attempt to file them all off at once: the search results and the decklist live in the same window, the rulings sit right next to the card, and adding a card to a deck is a single keystroke.
 
 ## Why not just use Scryfall and Moxfield?
 
-You still can — `scry` reads from both. It just fixes the parts of that workflow that used to slow me down:
+You still can — Tutor reads from both. It just fixes the parts of that workflow that used to slow me down:
 
 - **Search and decklist, side by side.** Any number of panels in one window: several Scryfall searches, several decklists, the rules — all open at once, all keyboard-navigable.
 - **Add cards with a keystroke.** Scroll a search, press `a`, and the card lands in the deck you're editing. `x` takes it back out.
@@ -31,7 +31,7 @@ You still can — `scry` reads from both. It just fixes the parts of that workfl
 - **Tag cards in bulk.** Select a whole theme with one key and tag them together — then filter and sort by those tags.
 - **Statistics you can drill into.** Filter a list by tag or category and watch the histograms recompute for exactly that subset.
 - **Version-controlled decks.** Every deck is a plain file in a git repository, so every change is kept and `git log` works on your decks like anything else.
-- **Sync across machines.** Because that repository is ordinary git, `scry` can mirror your whole collection to a private remote you own — GitHub, Codeberg, GitLab, self-hosted — and pull it back anywhere else. Set it up once, then `s` in the decks panel keeps both ends in step.
+- **Sync across machines.** Because that repository is ordinary git, Tutor can mirror your whole collection to a private remote you own — GitHub, Codeberg, GitLab, self-hosted — and pull it back anywhere else. Set it up once, then `s` in the decks panel keeps both ends in step.
 - **Moxfield built in.** Follow a deck by URL, or browse someone's decks by username, and pull a copy in to edit.
 - **A couple of extras I find handy:** the comprehensive rules are searchable and drive keyword highlighting in card text, and you can see how a card's wording has changed across printings.
 
@@ -104,59 +104,59 @@ The decks panel lists your local decks alongside the Moxfield decks and users yo
 
 ### Every change, kept
 
-Each deck is a file in a git repository, so `scry` keeps every version. Press `gv` on a deck to walk its history and read the diff for each change — what you added, what you cut, and when.
+Each deck is a file in a git repository, so Tutor keeps every version. Press `gv` on a deck to walk its history and read the diff for each change — what you added, what you cut, and when.
 
 ![A deck's version history, with the diff for the selected version shown in the info panel](screenshots/deck-git.png)
 
-And because it's a git repository, it can sync. Point `scry` at a private remote you own — `scry sync remote <url>` — and `space s` from anywhere (or `scry sync`) mirrors your whole collection to it and pulls back whatever you changed on another machine. It's plain git, so any host works — GitHub, Codeberg, GitLab, or your own server — and there's nothing to install beyond the git you already have. A remote you seeded with a README merges in cleanly on the first sync; the one thing git can't decide for you — the same deck edited two places at once — surfaces as a conflict to resolve with git, never a silent overwrite. Make the repo **private**; your decks are yours.
+And because it's a git repository, it can sync. Point Tutor at a private remote you own — `ttr sync remote <url>` — and `space s` from anywhere (or `ttr sync`) mirrors your whole collection to it and pulls back whatever you changed on another machine. It's plain git, so any host works — GitHub, Codeberg, GitLab, or your own server — and there's nothing to install beyond the git you already have. A remote you seeded with a README merges in cleanly on the first sync; the one thing git can't decide for you — the same deck edited two places at once — surfaces as a conflict to resolve with git, never a silent overwrite. Make the repo **private**; your decks are yours.
 
 ## Install
 
-`scry` is a single self-contained binary. Grab a prebuilt one, or build from source.
+Tutor is a single self-contained binary, `ttr`. Grab a prebuilt one, or build from source.
 
 ### Prebuilt binaries
 
-Download the right file for your machine from the [latest release](https://github.com/marbris/scry/releases):
+Download the right file for your machine from the [latest release](https://github.com/marbris/tutor/releases):
 
 | Platform | File |
 | --- | --- |
-| Linux (x86-64) | `scry-linux-amd64` |
-| Linux (ARM64) | `scry-linux-arm64` |
-| macOS (Apple Silicon) | `scry-darwin-arm64` |
-| macOS (Intel) | `scry-darwin-amd64` |
-| Windows (x86-64) | `scry-windows-amd64.exe` |
+| Linux (x86-64) | `ttr-linux-amd64` |
+| Linux (ARM64) | `ttr-linux-arm64` |
+| macOS (Apple Silicon) | `ttr-darwin-arm64` |
+| macOS (Intel) | `ttr-darwin-amd64` |
+| Windows (x86-64) | `ttr-windows-amd64.exe` |
 
 **Linux**
 
 ```bash
-chmod +x scry-linux-amd64
-mv scry-linux-amd64 ~/.local/bin/scry   # make sure ~/.local/bin is on your PATH
+chmod +x ttr-linux-amd64
+mv ttr-linux-amd64 ~/.local/bin/ttr   # make sure ~/.local/bin is on your PATH
 ```
 
 **macOS**
 
 ```bash
-chmod +x scry-darwin-arm64
-xattr -d com.apple.quarantine scry-darwin-arm64   # clears the "unidentified developer" block
-mv scry-darwin-arm64 /usr/local/bin/scry
+chmod +x ttr-darwin-arm64
+xattr -d com.apple.quarantine ttr-darwin-arm64   # clears the "unidentified developer" block
+mv ttr-darwin-arm64 /usr/local/bin/ttr
 ```
 
 **Windows**
 
-Download `scry-windows-amd64.exe`, rename it to `scry.exe`, and put it somewhere on your `PATH`.
+Download `ttr-windows-amd64.exe`, rename it to `ttr.exe`, and put it somewhere on your `PATH`.
 
 ### From source
 
 Requires [Go 1.26+](https://go.dev/dl/).
 
 ```bash
-git clone https://github.com/marbris/scry.git
-cd scry
-go build -o scry .
+git clone https://github.com/marbris/tutor.git
+cd tutor
+go build -o ttr .
 
 # Then put it on your PATH — a symlink means rebuilds are picked up automatically:
-ln -s "$(pwd)/scry" ~/.local/bin/scry
-# ...or just move it:  mv scry /usr/local/bin/
+ln -s "$(pwd)/ttr" ~/.local/bin/ttr
+# ...or just move it:  mv ttr /usr/local/bin/
 ```
 
 To build binaries for every platform at once (they land in `dist/`):
@@ -170,7 +170,7 @@ make all
 Just run it:
 
 ```bash
-scry
+ttr
 ```
 
 You'll land on a splash screen. Everything is discoverable from three keys:
@@ -207,42 +207,42 @@ Open panels straight to what you want:
 
 ## Command line
 
-`scry` is useful without opening the interface at all:
+`ttr` is useful without opening the interface at all:
 
 ```bash
-scry                                  # come back to the panels you left
-scry 't:creature c:rw cmc<=3'         # run a Scryfall query
-scry Isshin                           # one exact match prints straight to the terminal
-scry https://moxfield.com/decks/...   # open a deck on Moxfield
+ttr                                   # come back to the panels you left
+ttr 't:creature c:rw cmc<=3'          # run a Scryfall query
+ttr Isshin                            # one exact match prints straight to the terminal
+ttr https://moxfield.com/decks/...    # open a deck on Moxfield
 ```
 
-![scry printing a single card's details to stdout, no interface](screenshots/quick-lookup.png)
+![ttr printing a single card's details to stdout, no interface](screenshots/quick-lookup.png)
 
 Queries use [Scryfall's own syntax](https://scryfall.com/docs/syntax), so anything that works on the website works here.
 
 There are a few subcommands, each with its own `-h`:
 
 ```bash
-scry deck list                  # your decks
-scry deck new <name> [format]   # start an empty deck
-scry deck import <id|url> [as]  # copy a Moxfield deck in so you can edit it
-scry deck log <name>            # what you've changed, and when (it's git)
-scry deck restore <name> <ref>  # bring back an earlier version
-scry deck dir                   # where your decks live on disk
+ttr deck list                   # your decks
+ttr deck new <name> [format]    # start an empty deck
+ttr deck import <id|url> [as]   # copy a Moxfield deck in so you can edit it
+ttr deck log <name>             # what you've changed, and when (it's git)
+ttr deck restore <name> <ref>   # bring back an earlier version
+ttr deck dir                    # where your decks live on disk
 
-scry sync                       # push and pull your decks
-scry sync remote <url>          # connect a private git remote you own
-scry sync status                # what's ahead or behind
-scry sync off                   # disconnect (your decks are untouched)
+ttr sync                        # push and pull your decks
+ttr sync remote <url>           # connect a private git remote you own
+ttr sync status                 # what's ahead or behind
+ttr sync off                    # disconnect (your decks are untouched)
 
-scry rules <query>              # search the comprehensive rules
-scry theme                      # list colour themes
-scry theme <name>               # switch theme
-scry keys                       # list every key binding
-scry keys --defaults            # print the defaults as a keys.json to edit
-scry init                       # write commented-out templates of every settings file
-scry cache                      # what's downloaded, and how much room it takes
-scry cache clear [kind]         # empty it — all of it, or pictures, texts, rules…
+ttr rules <query>               # search the comprehensive rules
+ttr theme                       # list colour themes
+ttr theme <name>                # switch theme
+ttr keys                        # list every key binding
+ttr keys --defaults             # print the defaults as a keys.json to edit
+ttr init                        # write commented-out templates of every settings file
+ttr cache                       # what's downloaded, and how much room it takes
+ttr cache clear [kind]          # empty it — all of it, or pictures, texts, rules…
 ```
 
 Because every deck is a file in a git repository, `git log`, `git diff`, and friends work on your decks directly.
@@ -338,7 +338,7 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 
 ### Rebinding keys
 
-Every key is a default you can move. Put the ones you want changed in `~/.config/scry/keys.json`, grouped by where the key acts. To put the sorts back on the keys they used to have, and bring back `,` as a second leader:
+Every key is a default you can move. Put the ones you want changed in `~/.config/ttr/keys.json`, grouped by where the key acts. To put the sorts back on the keys they used to have, and bring back `,` as a second leader:
 
 ```json
 {
@@ -348,11 +348,11 @@ Every key is a default you can move. Put the ones you want changed in `~/.config
 }
 ```
 
-`scry keys` lists every scope, action and key as they're bound now, and `scry keys --defaults` prints the whole keymap as a file to start from — or run `scry init`, which writes it into place with every line commented out. The hints on screen follow your bindings. A clash within one scope is reported on startup, and that scope keeps its defaults until it's fixed. `scry keys -h` has the details.
+`ttr keys` lists every scope, action and key as they're bound now, and `ttr keys --defaults` prints the whole keymap as a file to start from — or run `ttr init`, which writes it into place with every line commented out. The hints on screen follow your bindings. A clash within one scope is reported on startup, and that scope keeps its defaults until it's fixed. `ttr keys -h` has the details.
 
 ### Sort orders
 
-Which sorts `.` and `,` step through, in what order, and which way each starts, live in `~/.config/scry/config.json`. Leave a sort out of the cycle and it isn't offered. `name` is left out as it ships:
+Which sorts `.` and `,` step through, in what order, and which way each starts, live in `~/.config/ttr/config.json`. Leave a sort out of the cycle and it isn't offered. `name` is left out as it ships:
 
 ```json
 {
@@ -364,33 +364,35 @@ Which sorts `.` and `,` step through, in what order, and which way each starts, 
 }
 ```
 
-`scry init` writes every settings file — `config.json`, `keys.json` and a theme to start from — with all the defaults in them, commented out: they change nothing until you uncomment a line, and they show you everything there is to change. Settings files may carry `//` comments.
+`ttr init` writes every settings file — `config.json`, `keys.json` and a theme to start from — with all the defaults in them, commented out: they change nothing until you uncomment a line, and they show you everything there is to change. Settings files may carry `//` comments.
 
 ## Where your files live, and how to uninstall
 
-`scry` follows the standard per-user directories for your OS. Four kinds of file live in four places, which is what tells a backup what to keep and an uninstall what's safe to delete:
+*Tutor used to be called scry. If you used it under that name, your decks, settings and downloads move to the new directories below the first time `ttr` runs. Nothing is left behind, and nothing needs doing.*
+
+Tutor follows the standard per-user directories for your OS. Four kinds of file live in four places, which is what tells a backup what to keep and an uninstall what's safe to delete:
 
 | | Holds | Linux | macOS | Windows |
 | --- | --- | --- | --- | --- |
-| **Data** | your decks (back this up!) | `~/.local/share/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
-| **Config** | settings, keys and themes | `~/.config/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
-| **State** | session, query history | `~/.local/state/scry` | `~/Library/Application Support/scry` | `%AppData%\scry` |
-| **Cache** | downloaded card data, rules | `~/.cache/scry` | `~/Library/Caches/scry` | `%LocalAppData%\scry` |
+| **Data** | your decks (back this up!) | `~/.local/share/ttr` | `~/Library/Application Support/ttr` | `%AppData%\ttr` |
+| **Config** | settings, keys and themes | `~/.config/ttr` | `~/Library/Application Support/ttr` | `%AppData%\ttr` |
+| **State** | session, query history | `~/.local/state/ttr` | `~/Library/Application Support/ttr` | `%AppData%\ttr` |
+| **Cache** | downloaded card data, rules | `~/.cache/ttr` | `~/Library/Caches/ttr` | `%LocalAppData%\ttr` |
 
-`scry deck dir` prints your decks directory. Set `SCRY_DECKS_DIR` to keep them somewhere else.
+`ttr deck dir` prints your decks directory. Set `TTR_DECKS_DIR` to keep them somewhere else.
 
 **To uninstall:** delete the binary, then remove the directories above. On Linux:
 
 ```bash
-rm ~/.local/bin/scry                       # the binary (wherever you put it)
-rm -rf ~/.local/share/scry ~/.config/scry ~/.local/state/scry ~/.cache/scry
+rm ~/.local/bin/ttr                       # the binary (wherever you put it)
+rm -rf ~/.local/share/ttr ~/.config/ttr ~/.local/state/ttr ~/.cache/ttr
 ```
 
 ⚠️ The **data** directory is your decks. Copy it somewhere first if you want to keep them.
 
 ## Credits and sources
 
-`scry` is a client for other people's excellent, freely available data. It wouldn't exist without:
+Tutor is a client for other people's excellent, freely available data. It wouldn't exist without:
 
 - **[Scryfall](https://scryfall.com/)** — card data and the search syntax, via their [free API](https://scryfall.com/docs/api).
 - **[Moxfield](https://moxfield.com/)** — public decklists and user decks.
@@ -407,4 +409,4 @@ MIT — see [LICENSE](LICENSE).
 
 ---
 
-*Magic: The Gathering is © Wizards of the Coast. `scry` is an unofficial fan-made tool, not produced by, endorsed by, or affiliated with Wizards of the Coast. All card names, rules text, and related content are property of their respective owners.*
+*Magic: The Gathering is © Wizards of the Coast. Tutor is an unofficial fan-made tool, not produced by, endorsed by, or affiliated with Wizards of the Coast. All card names, rules text, and related content are property of their respective owners.*

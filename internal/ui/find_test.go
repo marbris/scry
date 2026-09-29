@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/fetch"
-	"scry/internal/mtg"
-	"scry/internal/scryfall"
+	"ttr/internal/deck"
+	"ttr/internal/fetch"
+	"ttr/internal/mtg"
+	"ttr/internal/scryfall"
 )
 
 // answer files a result as though it had come back from Scryfall, in reply

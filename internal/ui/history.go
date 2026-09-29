@@ -6,10 +6,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/keymap"
-	"scry/internal/mtg"
-	"scry/internal/prints"
-	"scry/internal/theme"
+	"ttr/internal/keymap"
+	"ttr/internal/mtg"
+	"ttr/internal/prints"
+	"ttr/internal/theme"
 )
 
 // A card's printed text, through the years.

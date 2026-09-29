@@ -8,10 +8,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
-	"scry/internal/stats"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/stats"
+	"ttr/internal/theme"
 )
 
 func deckSample() []deck.Card {

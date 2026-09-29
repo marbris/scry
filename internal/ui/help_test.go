@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/keymap"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
 )
 
 func TestTheLeaderMenuShowsEveryEntry(t *testing.T) {

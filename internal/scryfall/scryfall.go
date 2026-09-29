@@ -12,8 +12,8 @@ import (
 	"net/url"
 	"time"
 
-	"scry/internal/fetch"
-	"scry/internal/mtg"
+	"ttr/internal/fetch"
+	"ttr/internal/mtg"
 )
 
 // SortOptions is the order a query can ask Scryfall for. This decides which

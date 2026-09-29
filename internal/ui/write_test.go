@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 // openDeckPanel puts a real deck of yours in a panel and marks it the one

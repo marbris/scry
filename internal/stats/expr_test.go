@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
 )
 
 func find(t *testing.T, rows []Row, label string) Row {

@@ -4,7 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/theme"
+	"ttr/internal/theme"
 )
 
 // A panel is one vertical strip of the workspace: a search bar over whatever

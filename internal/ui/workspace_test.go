@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/deck"
+	"ttr/internal/deck"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

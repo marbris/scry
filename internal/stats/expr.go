@@ -4,7 +4,7 @@ import (
 	"math"
 	"strings"
 
-	"scry/internal/deck"
+	"ttr/internal/deck"
 )
 
 // ── Narrowing by more than one category ─────────────────────────

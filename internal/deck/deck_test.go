@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 func TestSlugify(t *testing.T) {

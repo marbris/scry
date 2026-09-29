@@ -3,7 +3,7 @@ package prints
 import (
 	"testing"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 func printing(set, setType string, edit func(*mtg.Card)) mtg.Card {

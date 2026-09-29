@@ -3,8 +3,8 @@ package ui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/keymap"
-	"scry/internal/rules"
+	"ttr/internal/keymap"
+	"ttr/internal/rules"
 )
 
 // Keys, in two spaces.

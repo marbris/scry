@@ -1,4 +1,4 @@
-module scry
+module ttr
 
 go 1.26.2
 

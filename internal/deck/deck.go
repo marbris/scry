@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // A deck as the program holds it while you work on it: what it is, and the
@@ -77,7 +77,7 @@ func Open(slug string) (Info, []Card, error) {
 		return Info{}, nil, err
 	}
 
-	// An empty deck is a deck — `scry deck new` makes one, and you fill it
+	// An empty deck is a deck — `ttr deck new` makes one, and you fill it
 	// by adding cards to it. Only a deck whose cards all failed to resolve
 	// is a problem worth refusing to open.
 	cards, resolveErr := Resolve(d.MainEntries())

@@ -5,10 +5,10 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/mtg"
-	"scry/internal/stats"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/mtg"
+	"ttr/internal/stats"
+	"ttr/internal/theme"
 )
 
 // One card, on one line, in a column that may be very narrow.

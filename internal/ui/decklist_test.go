@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"scry/internal/deck"
+	"ttr/internal/deck"
 )
 
 // seedDeck writes a deck into the isolated decks directory.

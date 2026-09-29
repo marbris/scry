@@ -3,9 +3,9 @@ package ui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/deck"
-	"scry/internal/fetch"
-	"scry/internal/scryfall"
+	"ttr/internal/deck"
+	"ttr/internal/fetch"
+	"ttr/internal/scryfall"
 )
 
 // Searching Scryfall.

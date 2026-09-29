@@ -1,4 +1,4 @@
-APP=scry
+APP=ttr
 VERSION=3.7.3
 LDFLAGS=-ldflags "-X main.version=$(VERSION)"
 

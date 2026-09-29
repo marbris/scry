@@ -3,7 +3,7 @@ package ui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/keymap"
+	"ttr/internal/keymap"
 )
 
 // What a panel is showing.

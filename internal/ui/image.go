@@ -14,11 +14,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/browser"
-	"scry/internal/fetch"
-	"scry/internal/mtg"
-	"scry/internal/paths"
-	"scry/internal/prints"
+	"ttr/internal/browser"
+	"ttr/internal/fetch"
+	"ttr/internal/mtg"
+	"ttr/internal/paths"
+	"ttr/internal/prints"
 )
 
 // gx: the card as printed, in the information panel.
@@ -37,7 +37,7 @@ import (
 // the way the text around it is, and Bubbletea's redrawing never has to know
 // there is a picture at all.
 
-// kittyImageID is the one image scry keeps in the terminal. It is carried in
+// kittyImageID is the one image ttr keeps in the terminal. It is carried in
 // the placeholder's 256-colour foreground, so it has to be under 256; one
 // picture is on screen at a time, so one number is all it needs.
 const kittyImageID = 219

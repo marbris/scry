@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"scry/internal/mtg"
+	"ttr/internal/mtg"
 )
 
 // Whether a deck is legal, and if not, what is wrong with it.

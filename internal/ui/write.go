@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"scry/internal/deck"
+	"ttr/internal/deck"
 )
 
 // Writing a list to disk.

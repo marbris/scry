@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"scry/internal/rules"
+	"ttr/internal/rules"
 )
 
 func changeSet() []rules.RuleChange {

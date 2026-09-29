@@ -6,16 +6,16 @@ package rules
 
 import (
 	"os"
-
 	"path/filepath"
 	"regexp"
-	"scry/internal/fetch"
-	"scry/internal/mtg"
-	"scry/internal/paths"
 	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"ttr/internal/fetch"
+	"ttr/internal/mtg"
+	"ttr/internal/paths"
 )
 
 // ── Rules data ──────────────────────────────────────────────────

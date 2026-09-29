@@ -5,9 +5,9 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"scry/internal/deck"
-	"scry/internal/keymap"
-	"scry/internal/theme"
+	"ttr/internal/deck"
+	"ttr/internal/keymap"
+	"ttr/internal/theme"
 )
 
 // Drawing the workspace: the row of panels, the information panel beside

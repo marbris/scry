@@ -3,7 +3,7 @@ package ui
 import (
 	"strings"
 
-	"scry/internal/keymap"
+	"ttr/internal/keymap"
 )
 
 // What works right now.

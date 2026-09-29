@@ -1,4 +1,4 @@
-// Package paths is where scry keeps its files.
+// Package paths is where ttr keeps its files.
 //
 // Four kinds of file, four places, following the XDG Base Directory spec on
 // Linux and the platform convention elsewhere:
@@ -22,54 +22,69 @@ import (
 	"runtime"
 )
 
-const app = "scry"
+const app = "ttr"
+
+// oldApp is what the directories were called before the program was renamed
+// from scry to Tutor. MigrateName moves them.
+const oldApp = "scry"
 
 // Config holds settings and themes.
-func Config() string {
+func Config() string { return ensure(configDir(app)) }
+
+// Data holds your decks — the one directory here worth backing up.
+func Data() string { return ensure(dataDir(app)) }
+
+// State holds the session and the query history.
+func State() string { return ensure(stateDir(app)) }
+
+// Cache holds everything re-downloadable.
+func Cache() string { return ensure(cacheDir(app)) }
+
+// The four directories for a name, worked out without being made — so the
+// old names can be looked for without leaving empty directories behind.
+
+func configDir(name string) string {
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
-		return ensure(filepath.Join(dir, app))
+		return filepath.Join(dir, name)
 	}
 	// Handles macOS (~/Library/Application Support) and Windows (%AppData%).
 	if dir, err := os.UserConfigDir(); err == nil {
-		return ensure(filepath.Join(dir, app))
+		return filepath.Join(dir, name)
 	}
-	return ensure(filepath.Join(home(), ".config", app))
+	return filepath.Join(home(), ".config", name)
 }
 
-// Data holds your decks — the one directory here worth backing up.
-func Data() string {
+func dataDir(name string) string {
 	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
-		return ensure(filepath.Join(dir, app))
+		return filepath.Join(dir, name)
 	}
 	if unixish() {
-		return ensure(filepath.Join(home(), ".local", "share", app))
+		return filepath.Join(home(), ".local", "share", name)
 	}
 	// macOS and Windows draw no line between config and data; the platform
 	// convention is that application support holds both.
-	return Config()
+	return configDir(name)
 }
 
-// State holds the session and the query history.
-func State() string {
+func stateDir(name string) string {
 	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
-		return ensure(filepath.Join(dir, app))
+		return filepath.Join(dir, name)
 	}
 	if unixish() {
-		return ensure(filepath.Join(home(), ".local", "state", app))
+		return filepath.Join(home(), ".local", "state", name)
 	}
-	return Data()
+	return dataDir(name)
 }
 
-// Cache holds everything re-downloadable.
-func Cache() string {
+func cacheDir(name string) string {
 	if dir := os.Getenv("XDG_CACHE_HOME"); dir != "" {
-		return ensure(filepath.Join(dir, app))
+		return filepath.Join(dir, name)
 	}
 	// Handles macOS (~/Library/Caches) and Windows (%LocalAppData%).
 	if dir, err := os.UserCacheDir(); err == nil {
-		return ensure(filepath.Join(dir, app))
+		return filepath.Join(dir, name)
 	}
-	return ensure(filepath.Join(home(), ".cache", app))
+	return filepath.Join(home(), ".cache", name)
 }
 
 func unixish() bool {
