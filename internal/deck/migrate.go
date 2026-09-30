@@ -65,7 +65,13 @@ func MigrateExt() (int, error) {
 		n++
 	}
 	if len(staged) > 0 {
-		args := append([]string{"commit", "-q", "-m", "Rename deck files to .list", "--"}, staged...)
+		args := []string{"commit", "-q", "-m", "Rename deck files to .list", "--"}
+		// Committing fails outright with no identity; fall back to the one
+		// ensureRepo would have given a repository ttr made itself.
+		if out, err := git("config", "user.email"); err != nil || strings.TrimSpace(out) == "" {
+			args = append([]string{"-c", "user.name=ttr", "-c", "user.email=ttr@localhost"}, args...)
+		}
+		args = append(args, staged...)
 		if _, err := git(args...); err != nil {
 			return n, err
 		}
