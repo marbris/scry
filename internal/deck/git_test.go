@@ -255,7 +255,7 @@ func TestSaveCommitsEditorChangesBeforeOverwriting(t *testing.T) {
 
 	// Someone edits the file in vim and doesn't commit it.
 	edited := strings.Replace(gitBaseDeck, "7 Plains", "7 Plains\n1 Smothering Tithe [ramp]", 1)
-	if err := os.WriteFile(filepath.Join(dir, "ghen.deck"), []byte(edited), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "ghen.list"), []byte(edited), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -425,7 +425,7 @@ func TestOnlyTheNamedDeckIsCommitted(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("private"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "other.deck"), []byte("name: Other\n[mainboard]\n1 Plains\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "other.list"), []byte("name: Other\n[mainboard]\n1 Plains\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -439,7 +439,7 @@ func TestOnlyTheNamedDeckIsCommitted(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := strings.Fields(out)
-	if len(files) != 1 || files[0] != "ghen.deck" {
-		t.Errorf("commit touched %v, want only ghen.deck", files)
+	if len(files) != 1 || files[0] != "ghen.list" {
+		t.Errorf("commit touched %v, want only ghen.list", files)
 	}
 }

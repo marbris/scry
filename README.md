@@ -379,6 +379,8 @@ Tutor follows the standard per-user directories for your OS. Four kinds of file 
 | **State** | session, query history | `~/.local/state/ttr` | `~/Library/Application Support/ttr` | `%AppData%\ttr` |
 | **Cache** | downloaded card data, rules | `~/.cache/ttr` | `~/Library/Caches/ttr` | `%LocalAppData%\ttr` |
 
+Each deck is a plain-text `.list` file, and a tag list (below) is one too. Files from before 4.2 were called `.deck`; the first run renames them in one git commit, history and all.
+
 `ttr deck dir` prints your decks directory. Set `TTR_DECKS_DIR` to keep them somewhere else.
 
 **To uninstall:** delete the binary, then remove the directories above. On Linux:

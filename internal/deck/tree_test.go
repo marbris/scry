@@ -35,7 +35,7 @@ func TestWriteReadRoundTripInAFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The folder was created for it, and the file sits inside.
-	if _, err := os.Stat(filepath.Join(dir, "aggro", "mono-red.deck")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "aggro", "mono-red.list")); err != nil {
 		t.Fatalf("file not written into its folder: %v", err)
 	}
 	d, err := Read("aggro/mono-red")

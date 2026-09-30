@@ -157,10 +157,10 @@ func TestADeckVersionShowsWhatItChanged(t *testing.T) {
 func TestTheDiffLeavesOutGitsOwnBookkeeping(t *testing.T) {
 	// There is one file and you know which; the headers are noise.
 	got := strings.Join(renderDiff(strings.Join([]string{
-		"diff --git a/ghen.deck b/ghen.deck",
+		"diff --git a/ghen.list b/ghen.list",
 		"index 1234567..89abcde 100644",
-		"--- a/ghen.deck",
-		"+++ b/ghen.deck",
+		"--- a/ghen.list",
+		"+++ b/ghen.list",
 		"@@ -1,4 +1,5 @@",
 		" [mainboard]",
 		"+1 Llanowar Elves",

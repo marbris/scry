@@ -278,7 +278,7 @@ func TestDeckStoreRoundTrip(t *testing.T) {
 		t.Fatalf("Write: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(dir, "ghen.deck")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "ghen.list")); err != nil {
 		t.Fatalf("deck file not where it should be: %v", err)
 	}
 	if !Exists("ghen") {
@@ -321,7 +321,7 @@ func TestReadDeckNamesItselfAfterItsFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("TTR_DECKS_DIR", dir)
 
-	if err := os.WriteFile(filepath.Join(dir, "untitled.deck"),
+	if err := os.WriteFile(filepath.Join(dir, "untitled.list"),
 		[]byte("[mainboard]\n1 Sol Ring\n"), 0644); err != nil {
 		t.Fatal(err)
 	}

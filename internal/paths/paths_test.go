@@ -96,7 +96,7 @@ func TestMigrateLeavesDecksAlone(t *testing.T) {
 	if err := os.MkdirAll(legacy, 0755); err != nil {
 		t.Fatal(err)
 	}
-	deck := filepath.Join(legacy, "ghen.deck")
+	deck := filepath.Join(legacy, "ghen.list")
 	if err := os.WriteFile(deck, []byte("name: Ghen\n"), 0644); err != nil {
 		t.Fatal(err)
 	}

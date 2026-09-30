@@ -32,6 +32,10 @@ func main() {
 	// Files used to live in one directory; put any left there where they
 	// now belong, before anything goes looking for them.
 	paths.Migrate()
+	// Deck files are .list files now, since they hold tag lists too.
+	if _, err := deck.MigrateExt(); err != nil {
+		fmt.Fprintln(os.Stderr, "Warning: renaming .deck files to .list:", err)
+	}
 
 	// A broken theme file is worth saying so about, but not worth refusing
 	// to start over: the default is already in force.

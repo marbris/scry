@@ -16,9 +16,9 @@ import (
 	"strings"
 )
 
-// A deck on disk. One `.deck` file per deck, line-oriented so that git diffs
-// read the way the change did — adding a card is a one-line diff — and so the
-// file is worth opening in an editor:
+// A deck on disk. One `.list` file per deck or tag list, line-oriented so
+// that git diffs read the way the change did — adding a card is a one-line
+// diff — and so the file is worth opening in an editor:
 //
 //	# a note to self, kept as-is
 //	name: Ghen, Arcanum Weaver
@@ -42,7 +42,7 @@ import (
 // the card lines are regenerated in a canonical order so that two people —
 // or the TUI and your editor — always produce the same bytes.
 
-const FileExt = ".deck"
+const FileExt = ".list"
 
 // Sections a deck file can carry. Anything else found in a file is kept and
 // written back after these, so a hand-added section survives a rewrite.

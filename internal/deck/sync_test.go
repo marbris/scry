@@ -87,7 +87,7 @@ func TestSyncFirstPushThenPull(t *testing.T) {
 	// The bare remote's HEAD needn't point at our branch, so pin the checkout
 	// to it rather than trusting clone's default.
 	runGit(t, other, "checkout", "-q", "-B", DefaultBranch, "origin/"+DefaultBranch)
-	if err := os.WriteFile(filepath.Join(other, "izzet.deck"),
+	if err := os.WriteFile(filepath.Join(other, "izzet.list"),
 		[]byte("name: Izzet\nformat: commander\n\n[mainboard]\n1 Opt\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestSyncConflictAbortsCleanly(t *testing.T) {
 	other := t.TempDir()
 	runGit(t, filepath.Dir(other), "clone", "-q", remote, filepath.Base(other))
 	runGit(t, other, "checkout", "-q", "-B", DefaultBranch, "origin/"+DefaultBranch)
-	if err := os.WriteFile(filepath.Join(other, "ghen.deck"),
+	if err := os.WriteFile(filepath.Join(other, "ghen.list"),
 		[]byte("name: Ghen\nformat: commander\n\n[commander]\n1 Ghen, Arcanum Weaver [theirs]\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
