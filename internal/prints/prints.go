@@ -159,8 +159,11 @@ func download(set string) (map[string]string, error) {
 	var payload struct {
 		Data struct {
 			Cards []struct {
-				Name         string `json:"name"`
-				OriginalText string `json:"originalText"`
+				Name         string   `json:"name"`
+				OriginalText string   `json:"originalText"`
+				OriginalType string   `json:"originalType"`
+				Types        []string `json:"types"`
+				Subtypes     []string `json:"subtypes"`
 			} `json:"cards"`
 		} `json:"data"`
 	}
@@ -168,17 +171,104 @@ func download(set string) (map[string]string, error) {
 		return nil, err
 	}
 
-	cards := make(map[string]string)
+	// A multi-faced card is one entry per face, each with its own current
+	// type but the same original type, so a face is judged against the
+	// types of the whole card.
+	type entry struct {
+		text, origType  string
+		types, subtypes []string
+	}
+	byName := make(map[string]*entry)
+	var order []string
 	for _, c := range payload.Data.Cards {
-		if c.OriginalText == "" {
-			continue
-		}
 		key := strings.ToLower(c.Name)
-		if _, dup := cards[key]; !dup {
-			cards[key] = c.OriginalText
+		e, ok := byName[key]
+		if !ok {
+			e = &entry{}
+			byName[key] = e
+			order = append(order, key)
+		}
+		e.types = append(e.types, c.Types...)
+		e.subtypes = append(e.subtypes, c.Subtypes...)
+		if e.text == "" && c.OriginalText != "" {
+			e.text, e.origType = c.OriginalText, c.OriginalType
 		}
 	}
+
+	cards := make(map[string]string)
+	for _, key := range order {
+		e := byName[key]
+		if e.text == "" || !plausibleOriginal(e.origType, e.types, e.subtypes) {
+			continue
+		}
+		cards[key] = e.text
+	}
 	return cards, nil
+}
+
+// plausibleOriginal reports whether a printing's original type line could
+// belong to a card that is today of the given types.
+//
+// MTGJSON takes originalText from Gatherer by multiverse id, and Gatherer
+// has been known to hand ids on to newer cards: Forgotten Realms Commander's
+// Rancor came through with the text of Avatar's Secret of Bloodbending. The
+// original type came from the same place, so a Sorcery — Lesson filed under
+// an Aura gives the swap away. Card types don't change between printings
+// once the old names ("Summon", "Enchant Creature", "Interrupt") are read
+// as what they became, and a subtype line always keeps at least one word in
+// common with today's, the Grand Creature Type Update included.
+func plausibleOriginal(origType string, types, subtypes []string) bool {
+	if origType == "" {
+		return true // nothing to check against
+	}
+
+	s := strings.ToLower(strings.ReplaceAll(origType, "’", "'"))
+	s = strings.NewReplacer("mana source", "instant", "–", "—", " - ", " — ").Replace(s)
+	main, sub, hasSub := strings.Cut(s, "—")
+
+	words := make(map[string]bool)
+	for _, w := range strings.Fields(main) {
+		words[w] = true
+		if alias, ok := oldTypeNames[w]; ok {
+			words[alias] = true
+		}
+	}
+	typeMatch := false
+	for _, t := range types {
+		if words[strings.ToLower(t)] {
+			typeMatch = true
+			break
+		}
+	}
+	if !typeMatch {
+		return false
+	}
+
+	if !hasSub {
+		return true
+	}
+	current := make(map[string]bool)
+	for _, t := range subtypes {
+		for _, w := range strings.Fields(strings.ToLower(strings.ReplaceAll(t, "’", "'"))) {
+			current[w] = true
+		}
+	}
+	for _, w := range strings.Fields(sub) {
+		if current[w] {
+			return true
+		}
+	}
+	return false
+}
+
+// oldTypeNames maps type words printed on older cards to the card type they
+// became.
+var oldTypeNames = map[string]string{
+	"summon":    "creature",
+	"enchant":   "enchantment",
+	"interrupt": "instant",
+	"tribal":    "kindred",
+	"kindred":   "tribal",
 }
 
 // ── Disk cache ──────────────────────────────────────────────────

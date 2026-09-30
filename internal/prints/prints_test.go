@@ -81,3 +81,43 @@ func TestBuildRevisionsAppendsCurrentOracle(t *testing.T) {
 }
 
 // Nothing is downloaded just by moving the cursor — only the key does that.
+
+// Gatherer has reused multiverse ids, so MTGJSON sometimes files a newer
+// card's text under an older printing. The original type line gives it away.
+func TestPlausibleOriginal(t *testing.T) {
+	cases := []struct {
+		origType string
+		types    []string
+		subtypes []string
+		want     bool
+	}{
+		// Forgotten Realms Commander's Rancor, carrying Secret of Bloodbending.
+		{"Sorcery - Lesson", []string{"Enchantment"}, []string{"Aura"}, false},
+		// Same card type, but the subtypes have nothing in common: Appa in
+		// place of Paradise Druid.
+		{"Legendary Creature - Bison Ally", []string{"Creature"}, []string{"Elf", "Druid"}, false},
+		// A subtype where today there is none.
+		{"Instant - Lesson", []string{"Instant"}, nil, false},
+
+		{"Enchantment — Aura", []string{"Enchantment"}, []string{"Aura"}, true},
+		{"", []string{"Enchantment"}, []string{"Aura"}, true},
+		// The names older cards were printed with.
+		{"Enchant Creature", []string{"Enchantment"}, []string{"Aura"}, true},
+		{"Summon Wizard", []string{"Creature"}, []string{"Human", "Wizard"}, true},
+		{"Interrupt", []string{"Instant"}, nil, true},
+		{"Mana Source", []string{"Instant"}, nil, true},
+		{"Tribal Instant – Goblin", []string{"Kindred", "Instant"}, []string{"Goblin"}, true},
+		{"Mono Artifact", []string{"Artifact"}, nil, true},
+		// Creature types that grew, and curly apostrophes.
+		{"Creature – Orc Shaman", []string{"Creature"}, []string{"Orc", "Shaman", "Sorcerer"}, true},
+		{"Land – Urza’s", []string{"Land"}, []string{"Urza's"}, true},
+		// An adventure is judged against both halves.
+		{"Creature – Giant", []string{"Creature", "Sorcery"}, []string{"Giant", "Adventure"}, true},
+	}
+	for _, c := range cases {
+		if got := plausibleOriginal(c.origType, c.types, c.subtypes); got != c.want {
+			t.Errorf("plausibleOriginal(%q, %v, %v) = %v, want %v",
+				c.origType, c.types, c.subtypes, got, c.want)
+		}
+	}
+}
