@@ -139,3 +139,21 @@ func TestNumericAndTypeBarsTakeTheCardListsColours(t *testing.T) {
 		}
 	}
 }
+
+func TestPriceBandEdges(t *testing.T) {
+	// Each band is [lo, hi): a price on a boundary belongs to the band above,
+	// and the last band has no ceiling.
+	for v, want := range map[float64]string{
+		0: "<$0.5", 0.49: "<$0.5", 0.5: "$0.5–1", 0.99: "$0.5–1", 1: "$1–5",
+		99.99: "$50–100", 100: ">$100", 25000: ">$100",
+	} {
+		if got := priceBands[PriceBand(v)].label; got != want {
+			t.Errorf("$%v: band %q, want %q", v, got, want)
+		}
+	}
+	for i := 1; i < len(priceBands); i++ {
+		if priceBands[i].lo != priceBands[i-1].hi {
+			t.Errorf("gap between %q and %q", priceBands[i-1].label, priceBands[i].label)
+		}
+	}
+}
