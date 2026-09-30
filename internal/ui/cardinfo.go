@@ -351,9 +351,8 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		// Power/toughness below the text and flush right, where the card
 		// prints it — on its own row rather than trailing the type line,
 		// which is the thing that runs long and used to cut the "2/3" off.
-		if pt := statsLine(f, width); pt != "" {
-			out = append(out, lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).
-				Render(strings.Repeat(" ", maxInt(width-textWidth(pt), 0))+pt))
+		if pt := statsRow(f, width); pt != "" {
+			out = append(out, pt)
 		}
 	}
 
@@ -370,20 +369,11 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		out = append(out, "", lipgloss.NewStyle().MaxWidth(width).Render(line))
 	}
 
-	// Printing details: what set, how rare, how often it's played.
-	var facts []string
-	if c.Card.SetName != "" {
-		facts = append(facts, c.Card.SetName)
-	}
-	if c.Card.Rarity != "" {
-		facts = append(facts, c.Card.Rarity)
-	}
-	if c.Card.EDHRECRank > 0 {
-		facts = append(facts, "edhrec #"+itoa(c.Card.EDHRECRank))
-	}
-	if len(facts) > 0 {
+	if facts := printingFacts(c.Card); len(facts) > 0 {
 		out = append(out, "")
-		out = append(out, wrapStyled(strings.Join(facts, " · "), width, muted)...)
+		for _, line := range facts {
+			out = append(out, wrapStyled(line, width, muted)...)
+		}
 	}
 
 	if legal := legalities(c.Card, width); len(legal) > 0 {
@@ -445,6 +435,44 @@ func statsLine(f mtg.Card, width int) string {
 		return truncate("loyalty "+f.Loyalty, width)
 	}
 	return ""
+}
+
+// statsRow is statsLine rendered flush right, where the card prints it, or
+// "" for a face that has no numbers.
+func statsRow(f mtg.Card, width int) string {
+	pt := statsLine(f, width)
+	if pt == "" {
+		return ""
+	}
+	return lipgloss.NewStyle().Foreground(theme.Accent).Bold(true).
+		Render(strings.Repeat(" ", maxInt(width-textWidth(pt), 0)) + pt)
+}
+
+// printingFacts is the bookkeeping under a card's text, a line per kind:
+// which printing it is (set · rarity), then what it's worth to you
+// (edhrec rank · price). Whatever a card lacks is left out, and so is a
+// line left with nothing on it.
+func printingFacts(c mtg.Card) []string {
+	var printing, worth []string
+	if c.SetName != "" {
+		printing = append(printing, c.SetName)
+	}
+	if c.Rarity != "" {
+		printing = append(printing, c.Rarity)
+	}
+	if c.EDHRECRank > 0 {
+		worth = append(worth, "edhrec #"+itoa(c.EDHRECRank))
+	}
+	if _, ok := c.USD(); ok {
+		worth = append(worth, usdText(c))
+	}
+	var out []string
+	for _, facts := range [][]string{printing, worth} {
+		if len(facts) > 0 {
+			out = append(out, strings.Join(facts, " · "))
+		}
+	}
+	return out
 }
 
 // formats are the ones worth reporting. Scryfall knows twenty; a Commander

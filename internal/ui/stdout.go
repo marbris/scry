@@ -28,6 +28,9 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 	width := stdoutWidth()
 	head := lipgloss.NewStyle().Bold(true).Foreground(theme.Info)
 
+	// The numbers in the corner close off the card, so the facts follow
+	// straight on from them; without them, a blank line does the job.
+	endsInStats := false
 	for i, f := range c.Faces() {
 		if i > 0 {
 			fmt.Println()
@@ -40,22 +43,21 @@ func PrintCard(c mtg.Card, rd rules.Data) {
 				fmt.Println(line)
 			}
 		}
+		pt := statsRow(f, width)
+		if pt != "" {
+			fmt.Println(pt)
+		}
+		endsInStats = pt != ""
 	}
 
 	dim := lipgloss.NewStyle().Foreground(theme.TextMuted)
-	var facts []string
-	if c.SetName != "" {
-		facts = append(facts, c.SetName)
-	}
-	if c.Rarity != "" {
-		facts = append(facts, c.Rarity)
-	}
-	if c.EDHRECRank > 0 {
-		facts = append(facts, "edhrec #"+itoa(c.EDHRECRank))
-	}
-	if len(facts) > 0 {
-		fmt.Println()
-		fmt.Println(dim.Render(strings.Join(facts, " · ")))
+	if facts := printingFacts(c); len(facts) > 0 {
+		if !endsInStats {
+			fmt.Println()
+		}
+		for _, line := range facts {
+			fmt.Println(dim.Render(line))
+		}
 	}
 
 	if legal := legalities(c, width); len(legal) > 0 {
