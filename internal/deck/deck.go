@@ -3,6 +3,7 @@ package deck
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"ttr/internal/mtg"
 )
@@ -63,6 +64,58 @@ func FileFrom(info Info, cards []Card) *File {
 		})
 	}
 	return d
+}
+
+// Merge builds a deck file out of a deck that's already open, on top of the
+// file it was opened from. What the screen doesn't show is kept as the file
+// had it: the comments and header keys, the maybeboard and any section of
+// your own, which board each card was on, and the printing pinned with
+// (set) collector. Only the cards and their counts and tags come from the
+// screen. With no file to build on, it is FileFrom.
+func Merge(old *File, info Info, cards []Card) *File {
+	d := FileFrom(info, cards)
+	if old == nil {
+		return d
+	}
+	d.Notes, d.Extra = old.Notes, old.Extra
+	if d.Source == "" {
+		d.Source = old.Source
+	}
+
+	was := map[string]Entry{}
+	for _, e := range old.MainEntries() {
+		k := strings.ToLower(e.Name)
+		if _, seen := was[k]; !seen {
+			was[k] = e
+		}
+	}
+	for i, e := range d.Entries {
+		o, ok := was[strings.ToLower(e.Name)]
+		if !ok {
+			front, _, _ := strings.Cut(e.Name, " // ")
+			o, ok = was[strings.ToLower(front)]
+		}
+		if !ok {
+			continue
+		}
+		d.Entries[i].Set, d.Entries[i].Collector = o.Set, o.Collector
+		if e.Section == "mainboard" && o.Section != "commander" {
+			d.Entries[i].Section = o.Section
+		}
+	}
+	for _, e := range old.Entries {
+		if e.Section == "maybeboard" {
+			d.Entries = append(d.Entries, e)
+		}
+	}
+	return d
+}
+
+// Updated is the file a deck's slug should now hold: the open deck, merged
+// onto what is on disk.
+func Updated(info Info, cards []Card) *File {
+	old, _ := Read(info.Slug)
+	return Merge(old, info, cards)
 }
 
 // Open reads a deck file and resolves its card names. Cards that won't

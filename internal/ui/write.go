@@ -61,7 +61,7 @@ func saveDeck(panelID int, info deck.Info, cards []deck.Card) tea.Cmd {
 	return func() tea.Msg {
 		writeMu.Lock()
 		defer writeMu.Unlock()
-		file := deck.FileFrom(info, cards)
+		file := deck.Updated(info, cards)
 		subject, warning, err := deck.CommitDeck(info.Slug, file)
 		if err == nil {
 			written[info.Slug] = seq
@@ -120,7 +120,7 @@ func autosaveDeck(info deck.Info, cards []deck.Card, wasClean bool) tea.Cmd {
 		if wasClean {
 			deck.RecordOutsideEdits(info.Slug)
 		}
-		err := deck.Write(info.Slug, deck.FileFrom(info, cards))
+		err := deck.Write(info.Slug, deck.Updated(info, cards))
 		if err == nil {
 			written[info.Slug] = seq
 		}

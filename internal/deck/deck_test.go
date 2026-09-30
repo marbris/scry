@@ -333,3 +333,38 @@ func TestImportNameDropsSlashes(t *testing.T) {
 		}
 	}
 }
+
+func TestSavingKeepsWhatTheScreenDoesntShow(t *testing.T) {
+	old, err := ParseFile(strings.NewReader(strings.Join([]string{
+		"# my notes", "name: Ghen", "format: commander", "source: https://example.com/d", "bracket: 3", "",
+		"[commander]", "1 Ghen, Arcanum Weaver", "",
+		"[mainboard]", "1 Sol Ring (c21) 263 [ramp]", "1 Delver of Secrets", "",
+		"[sideboard]", "1 Pyroblast", "",
+		"[maybeboard]", "1 Mana Crypt", "",
+	}, "\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := Info{Name: "Ghen", Format: "commander", Slug: "ghen"}
+	cards := []Card{
+		{Qty: 1, Commander: true, Card: mtg.Card{Name: "Ghen, Arcanum Weaver"}},
+		{Qty: 1, Tags: []string{"ramp", "rock"}, Card: mtg.Card{Name: "Sol Ring"}},
+		{Qty: 1, Card: mtg.Card{Name: "Delver of Secrets // Insectile Aberration"}},
+		{Qty: 2, Card: mtg.Card{Name: "Pyroblast"}},
+		{Qty: 1, Card: mtg.Card{Name: "Lightning Bolt"}},
+	}
+	body := Merge(old, info, cards).String()
+
+	for _, want := range []string{
+		"# my notes", "source: https://example.com/d", "bracket: 3",
+		"1 Sol Ring (c21) 263 [ramp, rock]",
+		"[sideboard]\n2 Pyroblast",
+		"[maybeboard]\n1 Mana Crypt",
+		"1 Lightning Bolt",
+		"[commander]\n1 Ghen, Arcanum Weaver",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("lost %q:\n%s", want, body)
+		}
+	}
+}
