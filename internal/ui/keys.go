@@ -229,7 +229,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.notice = "that deck isn't yours — " + keymap.Hint(keymap.Cards, keymap.CardsWrite) + " takes a copy you can add to"
 				return m, nil
 			}
-			p.ask(askAddCard, "add from scryfall", "")
+			p.askAdd("")
 			return m, nil
 		}
 		// The bar keeps the query that produced what's on screen, so i is

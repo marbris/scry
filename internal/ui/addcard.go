@@ -92,7 +92,7 @@ func (m Model) handleAddCard(msg addCardMsg) (tea.Model, tea.Cmd) {
 		// rather than starting over. Not over another prompt, though — the
 		// answer came back after you'd moved on to asking something else.
 		if p.asking == askNone && !p.filtering {
-			p.ask(askAddCard, "add from scryfall", msg.query)
+			p.askAdd(msg.query)
 		}
 		return m, nil
 	}

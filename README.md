@@ -274,7 +274,7 @@ The bottom of the screen shows `?` and `q`. Press `?` and each panel shows its o
 | `.` `>` | cycle the sort order, which fills the right-hand column |
 | `,` `<` | cycle the second sort order, which colours the names on the left |
 | `alt+.` `alt+,` | turn the first / second sort round (ascending ↑, descending ↓) |
-| `i` | edit the search · on a deck of yours, add a card from Scryfall |
+| `i` | edit the search · on a deck of yours, add a card from Scryfall — `tab` there tags the deck by oracle tag instead: `removal` tags every card Scryfall calls `otag:removal` with `otag-removal` |
 | `v` `V` | select one / all shown |
 | `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
 | `t` `x` | tag the selection (`tab` completes a tag you already use) · remove a copy |

@@ -266,7 +266,7 @@ func (m Model) iHint(p *panel) (string, bool) {
 		if !l.deck.Local() {
 			return "", false
 		}
-		return "add from scryfall", true
+		return addCardLabel, true
 	}
 	return p.kind.barLabel(), true
 }

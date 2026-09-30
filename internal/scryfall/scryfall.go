@@ -57,6 +57,9 @@ func Search(query, sort, dir string, limit int) ([]mtg.Card, int, error) {
 	var all []mtg.Card
 
 	for page := 1; ; page++ {
+		if page > 1 {
+			time.Sleep(PageDelay)
+		}
 		u := fmt.Sprintf("%s?q=%s&order=%s&dir=%s&page=%d",
 			SearchURL, url.QueryEscape(query), url.QueryEscape(sort), url.QueryEscape(dir), page,
 		)
