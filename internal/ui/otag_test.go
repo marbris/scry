@@ -36,7 +36,7 @@ func TestOtagQueriesQuoteEachNameAndStayShort(t *testing.T) {
 	}
 	n := 0
 	for _, q := range qs {
-		if len(q) > otagQueryLen {
+		if len(q) > otagQueryLen || len(q) > 1024 {
 			t.Errorf("query is %d long", len(q))
 		}
 		n += strings.Count(q, "!\"")

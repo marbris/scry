@@ -22,8 +22,11 @@ import (
 // worth is paged through, which only happens when the first page came back
 // full.
 
-// otagQueryLen is roughly how long one query is allowed to grow.
-const otagQueryLen = 1500
+// otagQueryLen is how long one query is allowed to grow. Scryfall reads
+// only the first 1024 characters of a query and drops the rest, which cuts
+// off the closing parenthesis: "Your search contains unclosed parentheses."
+// Lengths here are bytes, which are never fewer than characters.
+const otagQueryLen = 1000
 
 // otagPrefix is put in front of an oracle tag to make it one of yours.
 const otagPrefix = "otag-"
