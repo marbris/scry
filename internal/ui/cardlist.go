@@ -166,7 +166,7 @@ func (l *cardList) narrowed() []deck.Card {
 	if len(l.statFilter) > 0 {
 		kept := make([]deck.Card, 0, len(rows))
 		for _, c := range rows {
-			if l.statFilter.Match(c) {
+			if l.statFilter.Match(effective(c)) {
 				kept = append(kept, c)
 			}
 		}
@@ -175,7 +175,7 @@ func (l *cardList) narrowed() []deck.Card {
 	if terms := filterTerms(l.filter); len(terms) > 0 {
 		kept := make([]deck.Card, 0, len(rows))
 		for _, c := range rows {
-			if matches(c, terms) {
+			if matches(effective(c), terms) {
 				kept = append(kept, c)
 			}
 		}
@@ -607,6 +607,9 @@ func (l *cardList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	case keymap.CardsWriteNew:
 		return true, m.write(l, p, true)
 
+	case keymap.CardsTagMove:
+		m.tagPrefix = true
+
 	default:
 		return false, nil
 	}
@@ -665,6 +668,7 @@ func (l *cardList) keys() []hintGroup {
 		sel = append(sel, hint("put", keymap.Cards, keymap.CardsPut))
 	}
 	sel = append(sel, hint("tag", keymap.Cards, keymap.CardsTag))
+	sel = append(sel, hint("move tags…", keymap.Cards, keymap.CardsTagMove))
 	if local {
 		sel = append(sel, hint("commit", keymap.Cards, keymap.CardsWrite))
 	} else {

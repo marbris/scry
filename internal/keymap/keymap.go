@@ -46,6 +46,7 @@ const (
 	Stats    Scope = "stats"    // the statistics, while they're up
 	Leader   Scope = "leader"   // after the leader
 	Goto     Scope = "goto"     // after g
+	TagMove  Scope = "tagmove"  // after T: moving tags between lists
 	Search   Scope = "search"   // a search bar, which is a text field first
 )
 
@@ -93,6 +94,7 @@ const (
 	CardsUndo      Action = "undo"
 	CardsWrite     Action = "write"
 	CardsWriteNew  Action = "write-new"
+	CardsTagMove   Action = "tag-move"
 
 	DecksSortNext   Action = "sort.next"
 	DecksSortPrev   Action = "sort.prev"
@@ -107,6 +109,7 @@ const (
 	DecksCut        Action = "cut"
 	DecksPut        Action = "put"
 	DecksDelete     Action = "delete"
+	DecksTagList    Action = "tag-list"
 
 	RulesOrderNext Action = "order.next"
 	RulesOrderPrev Action = "order.prev"
@@ -145,6 +148,11 @@ const (
 	GotoEditing  Action = "editing"
 	GotoVersions Action = "versions"
 	GotoImage    Action = "image"
+
+	TagMoveJoin   Action = "join"
+	TagMoveUpsert Action = "upsert"
+	TagMoveGlobal Action = "global"
+	TagMoveMerge  Action = "merge"
 
 	SearchNextTarget  Action = "target.next"
 	SearchPrevTarget  Action = "target.prev"
@@ -211,6 +219,8 @@ var defaults = []binding{
 	{Cards, CardsUndo, k("u")},
 	{Cards, CardsWrite, k("w")},
 	{Cards, CardsWriteNew, k("W")},
+	// T is a prefix: the tags of a whole list at once, moved between lists.
+	{Cards, CardsTagMove, k("T")},
 
 	{Decks, DecksSortNext, k(".")},
 	{Decks, DecksSortPrev, k(">")},
@@ -225,6 +235,7 @@ var defaults = []binding{
 	{Decks, DecksCut, k("x")},
 	{Decks, DecksYank, k("y")},
 	{Decks, DecksPut, k("p")},
+	{Decks, DecksTagList, k("t")},
 
 	{Rules, RulesOrderNext, k(".")},
 	{Rules, RulesOrderPrev, k(">")},
@@ -263,6 +274,13 @@ var defaults = []binding{
 	{Goto, GotoEditing, k("d")},
 	{Goto, GotoVersions, k("v")},
 	{Goto, GotoImage, k("x")},
+
+	// After T, the second key is the verb it echoes: t tags only what's
+	// there, a adds what isn't.
+	{TagMove, TagMoveJoin, k("t")},
+	{TagMove, TagMoveUpsert, k("a")},
+	{TagMove, TagMoveGlobal, k("g")},
+	{TagMove, TagMoveMerge, k("m")},
 
 	{Search, SearchNextTarget, k("tab")},
 	{Search, SearchPrevTarget, k("shift+tab")},

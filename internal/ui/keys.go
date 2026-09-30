@@ -90,6 +90,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.goPrefix = false
 		return m.handleGoto(key)
 	}
+	if m.tagPrefix {
+		m.tagPrefix = false
+		return m.handleTagMove(key)
+	}
 
 	// The unsaved-changes question takes every key until it's answered.
 	if m.quitting {

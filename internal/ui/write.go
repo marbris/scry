@@ -91,10 +91,14 @@ type deckAutosavedMsg struct {
 // autosave writes every deck with an edit the file hasn't had.
 func (m Model) autosave() tea.Cmd {
 	var cmds []tea.Cmd
+	tagListEdited := false
 	for _, p := range m.ws.panels {
 		l := p.cardsView()
 		if l == nil || !l.unwritten {
 			continue
+		}
+		if l.deck != nil && globalTags.active(l.deck.Slug) {
+			tagListEdited = true
 		}
 		l.unwritten = false
 		if l.deck == nil || !l.deck.Local() {
@@ -102,6 +106,10 @@ func (m Model) autosave() tea.Cmd {
 		}
 		cmds = append(cmds, autosaveDeck(*l.deck, l.all, l.wasClean))
 		l.wasClean = false
+	}
+	// An edit to a tag list changes what every other list counts.
+	if tagListEdited {
+		m.refreshGlobalTags()
 	}
 	return tea.Batch(cmds...)
 }

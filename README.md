@@ -64,7 +64,18 @@ The *inclusion* sort orders a list by where else its cards are: first the ones a
 
 ### Tag a whole theme at once
 
-Narrow a list with `/`, select what's left with `V`, and tag them together with `t`. `T` adds them to the deck and tags them in one stroke — sorting a search into a deck is dozens of these.
+Narrow a list with `/`, select what's left with `V`, and tag them together with `t`. `A` adds them to the deck and tags them in one stroke — sorting a search into a deck is dozens of these.
+
+**Tag lists.** Any `.list` file can hold tags for other lists to use — `f-edh-id-rbg-otag-removal.list`, say, with a line per card and its tags, in the same format as a deck, so it uploads to Moxfield like one. Press `t` on it in the decks panel and its tags count in every list: a deck where you've tagged nothing as removal still shows removal in its statistics, and `/` and the statistics filter find it. The tags aren't written into the deck. The tag lists that are on show under a `tag lists` folder at the top of the decks panel.
+
+**Moving tags between lists.** `T` moves the tags of a whole list at once. It uses the cards you picked with `v`, or else every card showing, so filter first to move only some:
+
+| Keys | Does |
+| --- | --- |
+| `T t` | this list's tags onto the editing deck, for the cards it already has |
+| `T a` | the same, and the cards the editing deck lacks are added with their tags — for growing a tag list |
+| `T g` | the tag lists' tags, written into this list's own |
+| `T m` | every list on screen gets the others' tags, for the cards it has (only your own lists change) |
 
 ![Selecting several cards in a search and tagging them in bulk](screenshots/tagging.png)
 
@@ -278,6 +289,7 @@ The bottom of the screen shows `?` and `q`. Press `?` and each panel shows its o
 | `v` `V` | select one / all shown |
 | `a` `A` | add a copy to the editing deck · add-and-tag with the last tag |
 | `t` `x` | tag the selection (`tab` completes a tag you already use) · remove a copy |
+| `T` then `t` `a` `g` `m` | move tags a whole list at a time — see *Tag a whole theme at once* |
 | `c` | set as the editing deck's commander |
 | `u` | undo the last edit |
 | `y` `p` | yank the selection · put it into this list |
@@ -313,6 +325,7 @@ from Moxfield never lands in a folder: a slash in its title becomes a space.
 | `c` `C` | copy deck · copy deck & its considering list |
 | `y` `x` `p` | yank (copy) · cut (move) · put into the folder you're on |
 | `d` | delete |
+| `t` | use this list as a tag list, or stop |
 | `gv` | git versions of the deck |
 | `gx` | open a Moxfield deck on moxfield.com |
 

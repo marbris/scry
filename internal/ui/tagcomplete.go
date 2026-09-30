@@ -50,6 +50,14 @@ func (m Model) knownTags() []string {
 			}
 		}
 	}
+	for _, tags := range globalTags.tags {
+		for _, t := range tags {
+			if !seen[t] {
+				seen[t] = true
+				out = append(out, t)
+			}
+		}
+	}
 	sort.Strings(out)
 	return out
 }

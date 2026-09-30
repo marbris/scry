@@ -58,6 +58,15 @@ func (k entryKind) letter() string {
 // sorts first, and in its own colour, so it never passes for one of yours.
 const moxFolder = "moxfield"
 
+// tagListsFolder is the virtual folder the tag lists that are on show in, as
+// a second row each: the file stays in its own folder too. Its name has a
+// space, which a folder on disk never does, so it can't be mistaken for one.
+const tagListsFolder = "tag lists"
+
+// virtualFolder reports whether a folder is built by the panel rather than
+// found on disk.
+func virtualFolder(f string) bool { return f == moxFolder || f == tagListsFolder }
+
 // userFolder is where a followed person's decks sit in the tree.
 func userFolder(user string) string { return moxFolder + "/" + strings.ToLower(user) }
 
@@ -91,6 +100,9 @@ type deckEntry struct {
 	open  bool
 	// loading is a person whose decks are being fetched.
 	loading bool
+
+	// tagRef is the second row a tag list gets, under the tag lists folder.
+	tagRef bool
 
 	// folder is a local deck's location — the folder part of its slug, empty at
 	// the top level. The grouped tree shows it as the branch a deck sits under;
@@ -305,13 +317,19 @@ func (l *deckList) buildTree() []deckEntry {
 		dir string
 	}
 	var leaves []leaf
-	hasMox := false
+	hasMox, hasTags := false, false
 	// A person is a folder in the tree, holding their decks.
 	people := map[string]deckEntry{}
 	for _, e := range l.all {
 		switch e.kind {
 		case entryLocal:
 			leaves = append(leaves, leaf{e, folderOf(e.slug)})
+			if globalTags.active(e.slug) {
+				ref := e
+				ref.tagRef = true
+				leaves = append(leaves, leaf{ref, tagListsFolder})
+				hasTags = true
+			}
 		case entryRemote:
 			hasMox = true
 			leaves = append(leaves, leaf{e, moxFolder})
@@ -357,6 +375,9 @@ func (l *deckList) buildTree() []deckEntry {
 	if hasMox {
 		addFolder(moxFolder)
 	}
+	if hasTags {
+		addFolder(tagListsFolder)
+	}
 	for f := range people {
 		addFolder(f)
 	}
@@ -365,9 +386,19 @@ func (l *deckList) buildTree() []deckEntry {
 	var walk func(dir string, depth int)
 	walk = func(dir string, depth int) {
 		subs := append([]string(nil), subfolders[dir]...)
+		// The virtual folders come first: moxfield, then the tag lists.
+		rank := func(f string) int {
+			switch f {
+			case moxFolder:
+				return 0
+			case tagListsFolder:
+				return 1
+			}
+			return 2
+		}
 		sort.Slice(subs, func(i, j int) bool {
-			if (subs[i] == moxFolder) != (subs[j] == moxFolder) {
-				return subs[i] == moxFolder
+			if rank(subs[i]) != rank(subs[j]) {
+				return rank(subs[i]) < rank(subs[j])
 			}
 			return subs[i] < subs[j]
 		})
@@ -472,7 +503,7 @@ func (l *deckList) title() string { return "decks" }
 func (l *deckList) subtitle() string {
 	leaves := 0
 	for _, r := range l.rows {
-		if r.kind != entryFolder && r.kind != entryUser {
+		if r.kind != entryFolder && r.kind != entryUser && !r.tagRef {
 			leaves++
 		}
 	}
@@ -700,6 +731,8 @@ func renderFolderRow(e deckEntry, indent string, width int, under bool) string {
 		colour = theme.Info
 	case e.slug == moxFolder:
 		colour = theme.Special
+	case e.slug == tagListsFolder && e.kind == entryFolder, e.tagRef:
+		colour = theme.Highlight
 	}
 	nameStyle := lipgloss.NewStyle().Foreground(colour).Bold(true)
 	if under {
@@ -775,7 +808,7 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 			switch {
 			case e.kind == entryLocal || e.kind == entryRemote:
 				p.ask(askRename, "rename", e.name)
-			case e.kind == entryFolder && e.slug != moxFolder:
+			case e.kind == entryFolder && !virtualFolder(e.slug):
 				p.ask(askRename, "rename folder", e.name)
 			}
 		}
@@ -808,6 +841,12 @@ func (l *deckList) key(k string, m *Model, p *panel) (bool, tea.Cmd) {
 	case keymap.DecksCut:
 		if e, ok := l.current(); ok && e.kind == entryLocal {
 			l.moving = &deckMove{slug: e.slug, name: e.name, cut: true}
+		}
+
+	case keymap.DecksTagList:
+		if e, ok := l.current(); ok && e.kind == entryLocal {
+			m.toggleTagList(e.slug, e.name)
+			l.refresh()
 		}
 
 	case keymap.DecksDelete:
@@ -881,10 +920,16 @@ func (l *deckList) info(width int) []string {
 		if !e.open {
 			state = "enter: expand"
 		}
-		out = append(out, "", mutedLine(state, width),
-			mutedLine("p put", width))
+		out = append(out, "", mutedLine(state, width))
+		if !virtualFolder(e.slug) {
+			out = append(out, mutedLine("p put", width))
+		}
 	case entryLocal:
 		out = append(out, dim.Render(fit("local deck", width)))
+		if globalTags.active(e.slug) {
+			out = append(out, lipgloss.NewStyle().Foreground(theme.Highlight).
+				Render(fit("tag list: its tags count in every list", width)))
+		}
 		location := "top level"
 		if e.folder != "" {
 			location = "in " + e.folder
@@ -897,6 +942,11 @@ func (l *deckList) info(width int) []string {
 		out = append(out, "")
 		out = append(out, legalityLines(e.legal, width)...)
 		out = append(out, "", mutedLine("enter: open", width))
+		toggle := "t: use as a tag list"
+		if globalTags.active(e.slug) {
+			toggle = "t: stop using as a tag list"
+		}
+		out = append(out, mutedLine(toggle, width))
 		out = append(out, "", mutedLine("gv: versions", width))
 	case entryRemote, entryUserDeck:
 		out = append(out, dim.Render(fit("Moxfield", width)))
@@ -993,6 +1043,7 @@ func (l *deckList) keys() []hintGroup {
 			hint("rename", keymap.Decks, keymap.DecksRename),
 			hint("copy deck/&considering", keymap.Decks, keymap.DecksCopy, keymap.DecksCopyBoth),
 			hint("delete/cut/yank/put", keymap.Decks, keymap.DecksDelete, keymap.DecksCut, keymap.DecksYank, keymap.DecksPut),
+			hint("tag list on/off", keymap.Decks, keymap.DecksTagList),
 			{gotoHint(keymap.GotoVersions), "versions"},
 			{gotoHint(keymap.GotoImage), "open on moxfield"},
 		}},

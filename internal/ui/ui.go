@@ -24,8 +24,10 @@ type Model struct {
 	// leader is set between pressing the leader key and the key that says
 	// what to do with it; hintsExpanded grows the hint bar from its resting
 	// three keys to the whole contextual keymap, which ? toggles.
-	leader        bool
-	goPrefix      bool
+	leader   bool
+	goPrefix bool
+	// tagPrefix is T waiting for its second key.
+	tagPrefix     bool
 	hintsExpanded bool
 
 	// register is what y picked up, waiting for p. Whole deck cards, so a
@@ -83,6 +85,8 @@ type Model struct {
 const defaultQuerySort = 9
 
 func New() Model {
+	globalTags = &tagIndex{slugs: loadTagLists()}
+	globalTags.rebuild(nil)
 	return Model{
 		ws:        newWorkspace(),
 		history:   LoadQueryHistory(),

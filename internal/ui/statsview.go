@@ -106,7 +106,7 @@ func groupIndex(title string) int {
 // editing deck when S asked for it.
 func (m Model) statCards() (counted, source []deck.Card) {
 	if l := m.statList(); l != nil {
-		return l.narrowed(), l.all
+		return effectiveAll(l.narrowed()), effectiveAll(l.all)
 	}
 	return nil, nil
 }

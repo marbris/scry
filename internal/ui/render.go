@@ -442,6 +442,12 @@ func (m Model) viewFooter(l layout) string {
 		return m.viewQuitQuestion()
 	case m.leader:
 		return m.viewLeaderBar()
+	case m.tagPrefix:
+		lines := m.tagMoveBarLines()
+		for i := range lines {
+			lines[i] = " " + lines[i]
+		}
+		return strings.Join(lines, "\n")
 	}
 	// The notice used to replace this line rather than sit beside it, so
 	// the result of what you had just done stood on top of the keys for
@@ -533,6 +539,9 @@ func (m Model) leaderReference(width int) []string {
 func (m Model) footerHeight() int {
 	if m.leader {
 		return maxInt(len(m.leaderBarLines()), 1)
+	}
+	if m.tagPrefix {
+		return maxInt(len(m.tagMoveBarLines()), 1)
 	}
 	if m.quitting {
 		return 1

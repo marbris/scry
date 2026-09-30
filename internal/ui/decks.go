@@ -360,7 +360,7 @@ func newFolderCmd(dir, name string) tea.Cmd {
 // inFolder puts a name inside a folder, for slugifying into a path. A name that
 // already carries its own slashes nests under the folder all the same.
 func inFolder(dir, name string) string {
-	if dir == "" || dir == moxFolder {
+	if dir == "" || virtualFolder(dir) {
 		return name
 	}
 	return dir + "/" + name
@@ -372,6 +372,11 @@ func (m *Model) putDeck(mv deckMove, dir string) tea.Cmd {
 	if dir == moxFolder {
 		return func() tea.Msg {
 			return noticeMsg{err: fmt.Errorf("the moxfield folder is for followed decks, not yours")}
+		}
+	}
+	if dir == tagListsFolder {
+		return func() tea.Msg {
+			return noticeMsg{err: fmt.Errorf("the tag lists folder shows the tag lists that are on — t turns one on")}
 		}
 	}
 	dest := uniqueSlug(inFolder(dir, path.Base(mv.slug)))
@@ -499,8 +504,8 @@ func renameDest(slug, name string) (dest, base string, err error) {
 // rename there.
 func renameFolderCmd(e deckEntry, name string) tea.Cmd {
 	return func() tea.Msg {
-		if e.slug == moxFolder {
-			return noticeMsg{err: fmt.Errorf("the moxfield folder isn't yours to rename")}
+		if virtualFolder(e.slug) {
+			return noticeMsg{err: fmt.Errorf("the %s folder isn't yours to rename", e.slug)}
 		}
 		newPath := inFolder(folderOf(e.slug), deck.Slugify(strings.TrimSpace(name)))
 		if newPath == "" {

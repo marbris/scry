@@ -357,9 +357,17 @@ func cardInfo(c deck.Card, width int, rd rules.Data, rulings []mtg.Ruling, rulin
 		}
 	}
 
-	if len(c.Tags) > 0 {
-		out = append(out, "", lipgloss.NewStyle().Foreground(theme.Highlight).
-			Render(fit(strings.Join(c.Tags, " "), width)))
+	// The card's own tags, then in a dimmer hand the ones a tag list gives
+	// it — they count the same, but they aren't in this list's file.
+	if global := onlyGlobal(c); len(c.Tags) > 0 || len(global) > 0 {
+		line := lipgloss.NewStyle().Foreground(theme.Highlight).Render(strings.Join(c.Tags, " "))
+		if len(global) > 0 {
+			if len(c.Tags) > 0 {
+				line += " "
+			}
+			line += lipgloss.NewStyle().Foreground(theme.TextDim).Render(strings.Join(global, " "))
+		}
+		out = append(out, "", lipgloss.NewStyle().MaxWidth(width).Render(line))
 	}
 
 	// Printing details: what set, how rare, how often it's played.
