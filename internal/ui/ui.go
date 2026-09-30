@@ -31,7 +31,7 @@ type Model struct {
 	// register is what y picked up, waiting for p. Whole deck cards, so a
 	// card moved between decks brings its quantity and tags with it.
 	register []deck.Card
-	// lastTag is what T reaches for.
+	// lastTag is what A tags with.
 	lastTag string
 
 	// quitting is the unsaved-changes question, raised when q would lose

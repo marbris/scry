@@ -91,6 +91,19 @@ func (s cardSort) String() string {
 	return "as found"
 }
 
+// parseCardSort is the order a name from String stands for.
+func parseCardSort(name string) (cardSort, bool) {
+	if name == "" {
+		return 0, false
+	}
+	for _, s := range allSorts {
+		if s.String() == name {
+			return s, true
+		}
+	}
+	return 0, false
+}
+
 // next cycles through the orders in force, wrapping. An order the cycle
 // doesn't offer — one config.json has since left out — steps to its start.
 func (s cardSort) next(delta int) cardSort {

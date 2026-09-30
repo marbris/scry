@@ -210,7 +210,7 @@ Open panels straight to what you want:
 `ttr` is useful without opening the interface at all:
 
 ```bash
-ttr                                   # come back to the panels you left
+ttr                                   # come back to the panels you left, sorted and filtered as they were
 ttr 't:creature c:rw cmc<=3'          # run a Scryfall query
 ttr Isshin                            # one exact match prints straight to the terminal
 ttr https://moxfield.com/decks/...    # open a deck on Moxfield

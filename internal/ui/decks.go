@@ -184,6 +184,10 @@ func (m Model) handleDeckOpened(msg deckOpenedMsg) (tea.Model, tea.Cmd) {
 	l.deck = &msg.info
 	l.dirty = msg.uncommitted
 	l.recheck()
+	if p.pending != nil {
+		p.pending.applyLayout(l)
+		p.pending = nil
+	}
 
 	// A deck opened in its own panel replaces what was there; one opened
 	// from the decks list steps into it, so esc goes back to the list.

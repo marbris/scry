@@ -104,6 +104,10 @@ func (m Model) handleSearchDone(msg searchDoneMsg) (tea.Model, tea.Cmd) {
 		l.keepSorts(p.lastSorts)
 	}
 	p.lastSorts = nil
+	if p.pending != nil {
+		p.pending.applyLayout(l)
+		p.pending = nil
+	}
 	l.name = msg.query
 	l.matched = msg.total
 	p.show(l)
