@@ -155,11 +155,11 @@ func sortColour(c mtg.Card, s cardSort) (lipgloss.Color, bool) {
 	case sortColor:
 		return colourForCard(c.DisplayColors()), true
 	case sortType:
-		return typeColour(c.TypeLine), true
+		return stats.TypeColour(c.TypeLine), true
 	case sortRarity:
 		return stats.RarityColour(c.Rarity), true
 	case sortMana:
-		return rampColour(int(c.CMC)), true
+		return stats.RampColour(int(c.CMC)), true
 	case sortPower, sortToughness:
 		stat := c.Power
 		if s == sortToughness {
@@ -169,33 +169,17 @@ func sortColour(c mtg.Card, s cardSort) (lipgloss.Color, bool) {
 		if !ok || v < 0 {
 			return theme.TextMuted, true // no number, or a * with none honest
 		}
-		return rampColour(v), true
+		return stats.RampColour(v), true
 	case sortUSD:
 		v, ok := c.USD()
 		if !ok {
 			return theme.TextMuted, true
 		}
-		return rampColour(stats.PriceBand(v) * (len(ramp()) - 1) / maxInt(stats.PriceBands()-1, 1)), true
+		return stats.PriceColour(stats.PriceBand(v)), true
 	case sortEDHREC:
-		return rampColour(edhrecBand(c.EDHRECRank)), true
+		return stats.RampColour(edhrecBand(c.EDHRECRank)), true
 	}
 	return "", false
-}
-
-// ramp is the scale the numeric orders paint on, low to high. Built from the
-// theme's roles at call time, so a theme switch repaints it.
-func ramp() []lipgloss.Color {
-	return []lipgloss.Color{
-		theme.TextDim, theme.Info, theme.Member, theme.Success,
-		theme.Highlight, theme.Accent, theme.Error, theme.Special,
-	}
-}
-
-// rampColour is step n of the ramp, the top step standing for everything
-// past it — a nine-drop is as hot as a seven.
-func rampColour(n int) lipgloss.Color {
-	r := ramp()
-	return r[max(0, min(n, len(r)-1))]
 }
 
 // edhrecBand puts a rank on the ramp: the most played cards hottest, the
@@ -265,34 +249,6 @@ func paintMana(text string) string {
 		}
 	}
 	return b.String()
-}
-
-// typeColour gives each card type its own colour, so a list ordered by type
-// reads as bands rather than as a column of identical grey.
-//
-// A mapping onto the existing roles rather than eight new ones: a theme
-// that changes its greens changes creatures with them, which is the
-// behaviour you would want anyway.
-func typeColour(typeLine string) lipgloss.Color {
-	switch mtg.PrimaryType(typeLine) {
-	case "Creature":
-		return theme.Success
-	case "Instant":
-		return theme.ManaU
-	case "Sorcery":
-		return theme.ManaR
-	case "Artifact":
-		return theme.TextDim
-	case "Enchantment":
-		return theme.ManaW
-	case "Planeswalker":
-		return theme.ManaMulti
-	case "Battle":
-		return theme.Accent
-	case "Land":
-		return theme.Member
-	}
-	return theme.TextMuted
 }
 
 // layoutRow works the ladder, returning the name and the column already

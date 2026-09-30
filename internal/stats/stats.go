@@ -116,6 +116,53 @@ func RarityColour(rarity string) lipgloss.Color {
 	return theme.TextMuted
 }
 
+// Ramp is the scale the numeric categories paint on, low to high — the
+// curve's bars here, and a card list sorted by mana value, power, toughness,
+// price or rank. Built from the theme's roles at call time, so a theme switch
+// repaints it.
+func Ramp() []lipgloss.Color {
+	return []lipgloss.Color{
+		theme.TextDim, theme.Info, theme.Member, theme.Success,
+		theme.Highlight, theme.Accent, theme.Error, theme.Special,
+	}
+}
+
+// RampColour is step n of the ramp, the top step standing for everything
+// past it — a nine-drop is as hot as a seven.
+func RampColour(n int) lipgloss.Color {
+	r := Ramp()
+	return r[max(0, min(n, len(r)-1))]
+}
+
+// TypeColour gives each card type its own colour, so a list ordered by type
+// reads as bands rather than as a column of identical grey, and the type
+// breakdown's bars match them.
+//
+// A mapping onto the existing roles rather than eight new ones: a theme
+// that changes its greens changes creatures with them, which is the
+// behaviour you would want anyway.
+func TypeColour(typeLine string) lipgloss.Color {
+	switch mtg.PrimaryType(typeLine) {
+	case "Creature":
+		return theme.Success
+	case "Instant":
+		return theme.ManaU
+	case "Sorcery":
+		return theme.ManaR
+	case "Artifact":
+		return theme.TextDim
+	case "Enchantment":
+		return theme.ManaW
+	case "Planeswalker":
+		return theme.ManaMulti
+	case "Battle":
+		return theme.Accent
+	case "Land":
+		return theme.Member
+	}
+	return theme.TextMuted
+}
+
 func rarityRows(entries []deck.Card) []Row {
 	// The usual rarities in their usual order, then anything unexpected.
 	order := []string{"common", "uncommon", "rare", "mythic", "special", "bonus"}
@@ -166,7 +213,7 @@ func cmcRows() []Row {
 			label = "7+"
 		}
 		rows = append(rows, Row{
-			Group: "Mana Value", Label: label, Color: theme.BarFill,
+			Group: "Mana Value", Label: label, Color: RampColour(n),
 			Match: func(ci deck.Card) bool {
 				if mtg.IsLand(ci.Card) {
 					return false
@@ -191,7 +238,7 @@ func typeRows() []Row {
 	for _, t := range types {
 		cardType := t
 		rows = append(rows, Row{
-			Group: "Type", Label: cardType, Color: theme.Special,
+			Group: "Type", Label: cardType, Color: TypeColour(cardType),
 			Match: func(ci deck.Card) bool {
 				return strings.Contains(ci.Card.TypeLine, cardType)
 			},
@@ -220,6 +267,12 @@ func PriceBand(v float64) int {
 // PriceBands is how many bands there are.
 func PriceBands() int { return len(priceBands) }
 
+// PriceColour is where a price band sits on the ramp, the bands spread
+// across it end to end.
+func PriceColour(band int) lipgloss.Color {
+	return RampColour(band * (len(Ramp()) - 1) / max(PriceBands()-1, 1))
+}
+
 var priceBands = []struct {
 	label  string
 	lo, hi float64 // [lo, hi); hi of 0 means no upper bound
@@ -236,10 +289,10 @@ var priceBands = []struct {
 
 func priceRows() []Row {
 	rows := make([]Row, 0, len(priceBands))
-	for _, band := range priceBands {
+	for i, band := range priceBands {
 		lo, hi := band.lo, band.hi
 		rows = append(rows, Row{
-			Group: "Price (USD)", Label: band.label, Color: theme.Special,
+			Group: "Price (USD)", Label: band.label, Color: PriceColour(i),
 			Match: func(ci deck.Card) bool {
 				v, ok := ci.Card.USD()
 				if !ok {

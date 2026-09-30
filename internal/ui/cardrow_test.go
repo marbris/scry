@@ -9,6 +9,7 @@ import (
 
 	"ttr/internal/deck"
 	"ttr/internal/mtg"
+	"ttr/internal/stats"
 	"ttr/internal/theme"
 )
 
@@ -317,7 +318,7 @@ func TestEachCardTypeGetsItsOwnColour(t *testing.T) {
 		"Creature — Elf", "Instant", "Sorcery", "Enchantment",
 		"Legendary Planeswalker — Jace", "Basic Land — Forest",
 	} {
-		c := typeColour(line)
+		c := stats.TypeColour(line)
 		if other, dup := seen[c]; dup {
 			t.Errorf("%q and %q are the same colour", line, other)
 		}

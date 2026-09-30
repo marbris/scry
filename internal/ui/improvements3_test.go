@@ -227,7 +227,7 @@ func TestTheSortConfigReordersAndTrimsTheCycle(t *testing.T) {
 
 func TestScryfallOrderColoursTheNamesByType(t *testing.T) {
 	sol := mtg.Card{Name: "Sol Ring", TypeLine: "Artifact"}
-	if got := nameColour(sol, sortArrival, sortArrival); got != typeColour(sol.TypeLine) {
+	if got := nameColour(sol, sortArrival, sortArrival); got != stats.TypeColour(sol.TypeLine) {
 		t.Errorf("Scryfall order painted an artifact %v", got)
 	}
 }

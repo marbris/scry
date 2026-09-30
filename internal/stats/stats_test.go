@@ -114,3 +114,28 @@ func TestStatGroupsSayTheyExcludeLands(t *testing.T) {
 		}
 	}
 }
+
+func TestNumericAndTypeBarsTakeTheCardListsColours(t *testing.T) {
+	// A bar should be the colour of the cards it counts when the list is
+	// sorted by that category: the curve and the prices on the ramp, each
+	// type in its own colour — not one colour for the whole group.
+	for i, r := range cmcRows() {
+		if r.Color != RampColour(i) {
+			t.Errorf("mana value %s: bar %q, want ramp step %d %q", r.Label, r.Color, i, RampColour(i))
+		}
+	}
+	for i, r := range priceRows() {
+		if r.Color != PriceColour(i) {
+			t.Errorf("price %s: bar %q, want %q", r.Label, r.Color, PriceColour(i))
+		}
+	}
+	for _, g := range [][]Row{cmcRows(), priceRows(), typeRows()} {
+		seen := map[string]string{}
+		for _, r := range g {
+			if prev, ok := seen[string(r.Color)]; ok {
+				t.Errorf("%s: %s and %s share colour %q", r.Group, prev, r.Label, r.Color)
+			}
+			seen[string(r.Color)] = r.Label
+		}
+	}
+}

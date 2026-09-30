@@ -162,9 +162,9 @@ var defaultRoles = map[string]string{
 	"selectionBg": "bgAlt", "selectionFg": "white",
 	"marked": "yellow", "member": "aqua", "memberOther": "gray",
 
-	// Black mana is drawn grey: a glyph in the terminal's background colour
+	// Black mana is drawn purple: a glyph in the terminal's background colour
 	// is a glyph you can't see.
-	"manaW": "white", "manaU": "blue", "manaB": "gray", "manaR": "red",
+	"manaW": "white", "manaU": "blue", "manaB": "purple", "manaR": "red",
 	"manaG": "green", "manaC": "fgDim", "manaMulti": "yellow",
 
 	"rarityCommon": "fg", "rarityUncommon": "fgDim", "rarityRare": "yellow",
